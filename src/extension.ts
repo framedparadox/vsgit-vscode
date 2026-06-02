@@ -1,0 +1,205 @@
+import * as vscode from "vscode";
+import { RepositoryManager } from "./git/RepositoryManager";
+import { RepositoriesProvider } from "./views/RepositoriesProvider";
+import { StagingProvider } from "./views/StagingProvider";
+import { registerBranchCommands } from "./commands/branch";
+import { registerStagingCommands } from "./commands/staging";
+import { registerHistoryCommands } from "./commands/history";
+import { registerRemoteCommands } from "./commands/remote";
+import { registerTagCommands } from "./commands/tag";
+import { registerTransportCommands } from "./commands/transport";
+import { registerInteractiveRebase } from "./commands/interactiveRebase";
+import { ReflogProvider } from "./views/ReflogProvider";
+import { registerReflogCommands } from "./commands/reflog";
+import { EgitFileDecorationProvider } from "./decorations/FileDecorations";
+import { BlameController } from "./decorations/BlameController";
+import { EgitQuickDiffProvider } from "./git/QuickDiffProvider";
+import { registerCompareCommands } from "./commands/compare";
+import { registerBlameCommands } from "./commands/blame";
+import { SynchronizeProvider } from "./views/SynchronizeProvider";
+import { registerSyncCommands } from "./commands/sync";
+import { registerConfigCommands } from "./commands/config";
+import { registerStashCommands } from "./commands/stash";
+import { registerSubmoduleCommands } from "./commands/submodule";
+import { registerCloneCommands } from "./commands/clone";
+import { registerGerritCommands } from "./commands/gerrit";
+import { registerLfsCommands } from "./commands/lfs";
+import { registerSCMCommands } from "./commands/scm";
+import { registerNotesCommands } from "./commands/notes";
+import { registerArchiveCommands } from "./commands/archive";
+import { registerSubtreeCommands } from "./commands/subtree";
+import { registerGraphCommands } from "./commands/graph";
+import { GitContentProvider, EGIT_SCHEME } from "./git/GitContentProvider";
+import { registerFileContextCommands } from "./commands/fileContext";
+import { registerReplaceCommands } from "./commands/replace";
+import { registerPatchCommands } from "./commands/patch";
+import { registerWorktreeCommands } from "./commands/worktree";
+import { registerBisectCommands } from "./commands/bisect";
+import { registerBranchExtraCommands } from "./commands/branch";
+import { WorktreesProvider } from "./views/WorktreesProvider";
+import { ConflictsProvider } from "./views/ConflictsProvider";
+import { CompareProvider } from "./views/CompareProvider";
+import { clearSessionBypass } from "./util/confirmation";
+import { AutoFetchService } from "./services/AutoFetchService";
+import { GitWatcherService } from "./services/GitWatcherService";
+import { GraphStatusBarService } from "./services/GraphStatusBarService";
+import { registerAutoFetchCommands } from "./commands/autoFetch";
+import { registerCommitOpsCommands } from "./commands/commitOps";
+
+export async function activate(
+  context: vscode.ExtensionContext,
+): Promise<void> {
+  const manager = new RepositoryManager();
+  context.subscriptions.push(manager);
+
+  // Read-only content provider backing the diff editors.
+  context.subscriptions.push(
+    vscode.workspace.registerTextDocumentContentProvider(
+      EGIT_SCHEME,
+      new GitContentProvider(),
+    ),
+  );
+
+  const repositoriesProvider = new RepositoriesProvider(manager);
+  context.subscriptions.push(
+    vscode.window.createTreeView("egit.repositories", {
+      treeDataProvider: repositoriesProvider,
+      showCollapseAll: true,
+    }),
+  );
+
+  const stagingProvider = new StagingProvider(manager);
+  context.subscriptions.push(
+    vscode.window.createTreeView("egit.staging", {
+      treeDataProvider: stagingProvider,
+      showCollapseAll: true,
+    }),
+  );
+
+  const reflogProvider = new ReflogProvider(manager);
+  context.subscriptions.push(
+    vscode.window.createTreeView("egit.reflog", {
+      treeDataProvider: reflogProvider,
+    }),
+  );
+
+  const syncProvider = new SynchronizeProvider(manager);
+  context.subscriptions.push(
+    vscode.window.createTreeView("egit.synchronize", {
+      treeDataProvider: syncProvider,
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("egit.repositories.refresh", () =>
+      manager.scan(),
+    ),
+  );
+
+  registerBranchCommands(context, manager);
+  registerStagingCommands(context, manager, stagingProvider);
+  registerHistoryCommands(context, manager);
+  registerRemoteCommands(context, manager);
+  registerTagCommands(context, manager);
+  registerTransportCommands(context, manager);
+  registerInteractiveRebase(context, manager);
+  registerReflogCommands(context, manager, reflogProvider);
+
+  // Decorations, blame, quick-diff, compare/conflicts.
+  context.subscriptions.push(
+    vscode.window.registerFileDecorationProvider(
+      new EgitFileDecorationProvider(manager),
+    ),
+  );
+  const blameController = new BlameController(manager);
+  context.subscriptions.push(blameController);
+  registerBlameCommands(context, blameController);
+  
+  // Phase 4 — Compare View
+  const compareProvider = new CompareProvider(manager);
+  const compareView = vscode.window.createTreeView("egit.compare", {
+    treeDataProvider: compareProvider,
+  });
+  context.subscriptions.push(compareView);
+
+  // Reveal the Compare view (called internally after starting a comparison)
+  context.subscriptions.push(
+    vscode.commands.registerCommand("egit.compare.focus", () =>
+      vscode.commands.executeCommand("egit.compare.view.focus"),
+    ),
+  );
+
+  registerCompareCommands(context, manager, compareProvider);
+
+  const quickDiff = new EgitQuickDiffProvider(manager);
+  const scm = vscode.scm.createSourceControl("egit", "Git (EGit)");
+  scm.quickDiffProvider = quickDiff;
+  context.subscriptions.push(scm);
+
+  registerSyncCommands(context, syncProvider);
+  registerConfigCommands(context, manager);
+  registerStashCommands(context, manager);
+  registerSubmoduleCommands(context, manager);
+  registerCloneCommands(context, manager);
+  registerGerritCommands(context, manager);
+  registerLfsCommands(context, manager);
+  
+  // Phase 5 — SCM view context menus
+  registerSCMCommands(context, manager);
+
+  // Phase 6 — Advanced operations
+  registerNotesCommands(context, manager);
+  registerArchiveCommands(context, manager);
+  registerSubtreeCommands(context, manager);
+
+  // Phase 7 — Git graph visualization
+  registerGraphCommands(context, manager);
+  context.subscriptions.push(new GraphStatusBarService());
+
+  // Commit-level operations: cherry-pick, revert, squash, GPG verify, fetch PRs, switch to
+  registerCommitOpsCommands(context, manager);
+
+  // Phase 8 — Auto-fetch & background operations
+  const gitWatcher = new GitWatcherService(context, manager);
+  context.subscriptions.push(gitWatcher);
+
+  const autoFetchService = new AutoFetchService(context, manager);
+  context.subscriptions.push(autoFetchService);
+
+  registerAutoFetchCommands(context, manager, autoFetchService);
+
+  // Phase 1 — EGit Team menu + new views
+  registerFileContextCommands(context, manager);
+  registerReplaceCommands(context, manager);
+  registerPatchCommands(context, manager);
+  registerWorktreeCommands(context, manager);
+  registerBisectCommands(context, manager);
+  registerBranchExtraCommands(context, manager);
+
+  const worktreesProvider = new WorktreesProvider(manager);
+  context.subscriptions.push(
+    vscode.window.createTreeView("egit.worktrees", {
+      treeDataProvider: worktreesProvider,
+    }),
+  );
+
+  const conflictsProvider = new ConflictsProvider(manager);
+  context.subscriptions.push(
+    vscode.window.createTreeView("egit.conflicts", {
+      treeDataProvider: conflictsProvider,
+    }),
+  );
+
+  // Rescan when the set of workspace folders changes.
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeWorkspaceFolders(() => manager.scan()),
+  );
+
+  await manager.scan();
+}
+
+export function deactivate(): void {
+  // Clear session-level confirmation bypass flags
+  clearSessionBypass();
+  // Disposables registered in context.subscriptions handle cleanup.
+}

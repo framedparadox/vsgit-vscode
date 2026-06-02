@@ -1,0 +1,312 @@
+/* Git Graph webview styling — clean-room match of the vscode-git-graph look. */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  color: var(--vscode-foreground);
+  background-color: var(--vscode-editor-background);
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── top control bar ──────────────────────────────────────────────────── */
+#controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  background-color: var(--vscode-sideBar-background);
+  border-bottom: 1px solid var(--vscode-panel-border);
+  flex-shrink: 0;
+}
+
+#controls .ctl-btn {
+  background: transparent;
+  color: var(--vscode-foreground);
+  border: 1px solid transparent;
+  padding: 3px 6px;
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 12px;
+  line-height: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+#controls .ctl-btn:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
+#controls .ctl-btn.active { background-color: var(--vscode-inputOption-activeBackground, rgba(14,99,156,0.4)); }
+
+#controls select {
+  background-color: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  border: 1px solid var(--vscode-dropdown-border, #555);
+  padding: 2px 6px;
+  border-radius: 2px;
+  font-size: 12px;
+  max-width: 220px;
+}
+
+#controls .spacer { flex: 1; }
+
+#commit-count {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  white-space: nowrap;
+}
+
+.toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ─── find widget ──────────────────────────────────────────────────────── */
+#find-widget {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  position: absolute;
+  top: 38px;
+  right: 14px;
+  z-index: 50;
+  background-color: var(--vscode-editorWidget-background, #252526);
+  border: 1px solid var(--vscode-editorWidget-border, #454545);
+  border-radius: 4px;
+  padding: 4px 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+#find-widget.visible { display: flex; }
+#find-input {
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, #555);
+  padding: 2px 6px;
+  border-radius: 2px;
+  font-size: 12px;
+  width: 200px;
+}
+#find-widget button {
+  background: transparent;
+  color: var(--vscode-foreground);
+  border: none;
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 3px;
+}
+#find-widget button:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
+#find-count { font-size: 11px; color: var(--vscode-descriptionForeground); min-width: 48px; text-align: center; }
+
+/* ─── layout ───────────────────────────────────────────────────────────── */
+#container {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  flex-direction: column;
+}
+
+#graph-scroll {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+
+#graph-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+#graph-table th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: var(--vscode-sideBar-background);
+  border-bottom: 1px solid var(--vscode-panel-border);
+  font-weight: 600;
+  font-size: 11px;
+  text-align: left;
+  padding: 4px 6px;
+  color: var(--vscode-descriptionForeground);
+  user-select: none;
+}
+#graph-table th .col-resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+}
+
+#graph-table tr.commit-row {
+  height: 24px;
+  cursor: pointer;
+}
+#graph-table tr.commit-row:hover { background-color: var(--vscode-list-hoverBackground); }
+#graph-table tr.commit-row.selected {
+  background-color: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}
+#graph-table tr.commit-row.find-match { background-color: var(--vscode-editor-findMatchHighlightBackground, rgba(234,92,0,0.33)); }
+#graph-table tr.commit-row.find-current { background-color: var(--vscode-editor-findMatchBackground, rgba(234,92,0,0.55)); }
+
+td.col-graph {
+  padding: 0;
+  vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+}
+td.col-graph canvas { display: block; vertical-align: middle; }
+
+td.col-refs {
+  padding: 0 6px;
+  vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+td.col-desc {
+  padding: 0 6px;
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+td.col-date, td.col-author, td.col-commit {
+  padding: 0 6px;
+  vertical-align: middle;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+td.col-commit { font-family: var(--vscode-editor-font-family, monospace); }
+
+th.hidden-col, td.hidden-col { display: none; }
+
+/* uncommitted-changes row */
+tr.commit-row.uncommitted td.col-desc { font-style: italic; color: var(--vscode-descriptionForeground); }
+
+/* ─── ref badges (logo + value, tinted to the lane colour) ─────────────────
+ * --ref-color is set inline per-badge to the lane colour of the commit the
+ * ref points at. The badge uses a faint tint of that colour with a matching
+ * border, and the SVG glyph is drawn in the lane colour. */
+.ref-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 6px 0 4px;
+  margin: 0 4px 0 0;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+  vertical-align: middle;
+  color: var(--vscode-foreground);
+  background-color: color-mix(in srgb, var(--ref-color, #888) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ref-color, #888) 60%, transparent);
+  cursor: default;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ref-badge.clickable { cursor: pointer; }
+.ref-badge:hover { background-color: color-mix(in srgb, var(--ref-color, #888) 34%, transparent); }
+.ref-badge .ref-icon { display: inline-flex; align-items: center; }
+.ref-badge .ref-svg { display: block; }
+/* HEAD: solid lane-coloured fill so the checked-out ref stands out. */
+.ref-head {
+  background-color: var(--ref-color, #1d8c2e);
+  border-color: #fff;
+  color: #fff;
+  font-weight: 700;
+}
+.desc-text { vertical-align: middle; }
+
+/* ─── docked details panel ─────────────────────────────────────────────── */
+#details-panel {
+  height: 0;
+  background-color: var(--vscode-sideBar-background);
+  border-top: 1px solid var(--vscode-panel-border);
+  overflow-y: auto;
+  flex-shrink: 0;
+  font-size: 12px;
+  transition: height 0.08s ease;
+}
+#details-panel.visible { height: 240px; }
+#details-inner { padding: 10px 14px; }
+
+#details-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+#details-header .detail-sha {
+  font-family: var(--vscode-editor-font-family, monospace);
+  color: var(--vscode-textLink-foreground, #4daafc);
+  font-size: 12px;
+}
+#details-close { margin-left: auto; cursor: pointer; background: transparent; border: none; color: var(--vscode-foreground); padding: 2px 6px; border-radius: 3px; }
+#details-close:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
+
+.detail-meta { display: grid; grid-template-columns: 90px 1fr; gap: 2px 10px; margin-bottom: 10px; }
+.detail-label { font-size: 11px; color: var(--vscode-descriptionForeground); }
+.detail-value { word-break: break-word; }
+.detail-mono { font-family: var(--vscode-editor-font-family, monospace); }
+
+#details-files { margin-top: 6px; }
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.file-row:hover { background-color: var(--vscode-list-hoverBackground); }
+.file-status {
+  width: 14px;
+  text-align: center;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-weight: 700;
+}
+.file-status.A { color: #4ec94e; }
+.file-status.M { color: #e2c08d; }
+.file-status.D { color: #f14c4c; }
+.file-status.R { color: #4daafc; }
+.file-status.C { color: #4daafc; }
+.file-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ─── context menu ─────────────────────────────────────────────────────── */
+.context-menu {
+  position: fixed;
+  background-color: var(--vscode-menu-background, #252526);
+  color: var(--vscode-menu-foreground, #ccc);
+  border: 1px solid var(--vscode-menu-border, #454545);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  padding: 4px 0;
+  z-index: 1000;
+  min-width: 200px;
+  display: none;
+}
+.context-menu.visible { display: block; }
+.context-menu-item { padding: 5px 16px; cursor: pointer; font-size: 12px; white-space: nowrap; }
+.context-menu-item:hover { background-color: var(--vscode-menu-selectionBackground, #094771); color: var(--vscode-menu-selectionForeground, #fff); }
+.context-menu-separator { height: 1px; background-color: var(--vscode-menu-separatorBackground, #454545); margin: 4px 0; }
+.context-menu-title { padding: 4px 16px; font-size: 11px; color: var(--vscode-descriptionForeground); cursor: default; }
+
+#loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--vscode-descriptionForeground);
+  font-size: 13px;
+}

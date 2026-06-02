@@ -7,7 +7,7 @@ import { RefPickerView } from "../webviews/RefPickerView";
 
 /**
  * "Replace With" operations — restore a file's content from a known ref.
- * Maps to EGit's Team → Replace With submenu.
+ * Maps to VsGit's Team → Replace With submenu.
  */
 export function registerReplaceCommands(
   context: vscode.ExtensionContext,
@@ -16,20 +16,20 @@ export function registerReplaceCommands(
   const reg = (id: string, fn: (...a: unknown[]) => unknown) =>
     context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
-  reg("egit.replace.withHead", async (uriArg, allUris) => {
+  reg("vsgit.replace.withHead", async (uriArg, allUris) => {
     await replaceWith(manager, resolveUris(uriArg, allUris), "HEAD");
   });
 
-  reg("egit.replace.withIndex", async (uriArg, allUris) => {
+  reg("vsgit.replace.withIndex", async (uriArg, allUris) => {
     await replaceWithIndex(manager, resolveUris(uriArg, allUris));
   });
 
-  reg("egit.replace.withPrevious", async (uriArg, allUris) => {
+  reg("vsgit.replace.withPrevious", async (uriArg, allUris) => {
     await replaceWith(manager, resolveUris(uriArg, allUris), "HEAD~1");
   });
 
-  // "Branch, Tag, or Reference…" — full EGit-style ref picker
-  reg("egit.replace.withBranchOrTag", async (uriArg, allUris) => {
+  // "Branch, Tag, or Reference…" — full VsGit-style ref picker
+  reg("vsgit.replace.withBranchOrTag", async (uriArg, allUris) => {
     const uris = resolveUris(uriArg, allUris);
     if (uris.length === 0) return;
     const repo = repoForUri(manager, uris[0]);
@@ -44,7 +44,7 @@ export function registerReplaceCommands(
   });
 
   // "Commit…" — rich webview commit picker
-  reg("egit.replace.withCommit", async (uriArg, allUris) => {
+  reg("vsgit.replace.withCommit", async (uriArg, allUris) => {
     const uris = resolveUris(uriArg, allUris);
     if (uris.length === 0) return;
     const repo = repoForUri(manager, uris[0]);
@@ -55,7 +55,7 @@ export function registerReplaceCommands(
   });
 
   // Legacy — delegates to the same rich picker
-  reg("egit.replace.withRef", async (uriArg, allUris) => {
+  reg("vsgit.replace.withRef", async (uriArg, allUris) => {
     const uris = resolveUris(uriArg, allUris);
     if (uris.length === 0) return;
     const repo = repoForUri(manager, uris[0]);
@@ -70,7 +70,7 @@ export function registerReplaceCommands(
   });
 
   // "Local History" — delegate to VS Code's built-in timeline/local-history panel
-  reg("egit.replace.withLocalHistory", async (uriArg) => {
+  reg("vsgit.replace.withLocalHistory", async (uriArg) => {
     const uri = resolveUri(uriArg);
     if (!uri) return;
     try {

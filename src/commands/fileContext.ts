@@ -8,7 +8,7 @@ import { CommitPickerView } from "../webviews/CommitPickerView";
 import { RefPickerView } from "../webviews/RefPickerView";
 
 /**
- * Explorer / editor context menu operations that map to EGit's "Team" menu.
+ * Explorer / editor context menu operations that map to VsGit's "Team" menu.
  * Commands receive a `vscode.Uri` (from the explorer) or fall back to the
  * active editor.
  */
@@ -21,7 +21,7 @@ export function registerFileContextCommands(
 
   // ── Stage / unstage from explorer ─────────────────────────────────────
 
-  reg("egit.file.stage", async (uriArg, allUris) => {
+  reg("vsgit.file.stage", async (uriArg, allUris) => {
     const uris = resolveUris(uriArg, allUris);
     if (uris.length === 0) return;
     const repo = repoForUri(manager, uris[0]);
@@ -30,7 +30,7 @@ export function registerFileContextCommands(
     await withProgress(manager, "Stage", () => repo.stage(rels));
   });
 
-  reg("egit.file.unstage", async (uriArg, allUris) => {
+  reg("vsgit.file.unstage", async (uriArg, allUris) => {
     const uris = resolveUris(uriArg, allUris);
     if (uris.length === 0) return;
     const repo = repoForUri(manager, uris[0]);
@@ -39,7 +39,7 @@ export function registerFileContextCommands(
     await withProgress(manager, "Unstage", () => repo.unstage(rels));
   });
 
-  reg("egit.file.ignore", async (uriArg, allUris) => {
+  reg("vsgit.file.ignore", async (uriArg, allUris) => {
     const uris = resolveUris(uriArg, allUris);
     if (uris.length === 0) return;
     const repo = repoForUri(manager, uris[0]);
@@ -55,24 +55,24 @@ export function registerFileContextCommands(
 
   // ── Compare With ──────────────────────────────────────────────────────
 
-  reg("egit.compare.withHead", async (uriArg) => {
+  reg("vsgit.compare.withHead", async (uriArg) => {
     await compareFileWith(manager, resolveUri(uriArg), "HEAD");
   });
 
-  reg("egit.compare.withIndex", async (uriArg) => {
+  reg("vsgit.compare.withIndex", async (uriArg) => {
     await compareFileWithIndex(manager, resolveUri(uriArg));
   });
 
   // "Index With HEAD" — diff the staged version against HEAD (no working tree involved)
-  reg("egit.compare.indexWithHead", async (uriArg) => {
+  reg("vsgit.compare.indexWithHead", async (uriArg) => {
     await compareIndexWithHead(manager, resolveUri(uriArg));
   });
 
-  reg("egit.compare.withPrevious", async (uriArg) => {
+  reg("vsgit.compare.withPrevious", async (uriArg) => {
     await compareFileWith(manager, resolveUri(uriArg), "HEAD~1");
   });
 
-  reg("egit.compare.withCommit", async (uriArg) => {
+  reg("vsgit.compare.withCommit", async (uriArg) => {
     const uri = resolveUri(uriArg);
     if (!uri) return;
     const repo = repoForUri(manager, uri);
@@ -82,8 +82,8 @@ export function registerFileContextCommands(
     await compareFileWith(manager, uri, sha);
   });
 
-  // "Branch, Tag, or Reference…" — full EGit-style ref picker
-  reg("egit.compare.withBranchOrTag", async (uriArg) => {
+  // "Branch, Tag, or Reference…" — full VsGit-style ref picker
+  reg("vsgit.compare.withBranchOrTag", async (uriArg) => {
     const uri = resolveUri(uriArg);
     if (!uri) return;
     const repo = repoForUri(manager, uri);
@@ -98,7 +98,7 @@ export function registerFileContextCommands(
   });
 
   // "Clipboard" — paste text from clipboard into a temp document and diff against it
-  reg("egit.compare.withClipboard", async (uriArg) => {
+  reg("vsgit.compare.withClipboard", async (uriArg) => {
     const uri = resolveUri(uriArg);
     if (!uri) return;
     const clipText = await vscode.env.clipboard.readText();
@@ -119,7 +119,7 @@ export function registerFileContextCommands(
   });
 
   // "Each Other" — pick two files from the workspace and diff them
-  reg("egit.compare.eachOther", async (uriArg, allUris) => {
+  reg("vsgit.compare.eachOther", async (uriArg, allUris) => {
     const uris = resolveUris(uriArg, allUris);
 
     let leftUri: vscode.Uri | undefined;
@@ -158,7 +158,7 @@ export function registerFileContextCommands(
   });
 
   // "Local History" — show VS Code's built-in local history timeline for the file
-  reg("egit.compare.withLocalHistory", async (uriArg) => {
+  reg("vsgit.compare.withLocalHistory", async (uriArg) => {
     const uri = resolveUri(uriArg);
     if (!uri) return;
     try {
@@ -175,13 +175,13 @@ export function registerFileContextCommands(
 
   // ── Show file history ─────────────────────────────────────────────────
 
-  reg("egit.file.showHistory", async (uriArg) => {
+  reg("vsgit.file.showHistory", async (uriArg) => {
     const uri = resolveUri(uriArg);
     if (!uri) return;
     const repo = repoForUri(manager, uri);
     if (!repo) return;
     const rel = path.relative(repo.root, uri.fsPath);
-    await vscode.commands.executeCommand("egit.history.show", {
+    await vscode.commands.executeCommand("vsgit.history.show", {
       repoRoot: repo.root,
       file: rel,
     });
@@ -189,7 +189,7 @@ export function registerFileContextCommands(
 
   // ── Assume unchanged / skip worktree ─────────────────────────────────
 
-  reg("egit.file.assumeUnchanged", async (uriArg, allUris) => {
+  reg("vsgit.file.assumeUnchanged", async (uriArg, allUris) => {
     const uris = resolveUris(uriArg, allUris);
     if (uris.length === 0) return;
     const repo = repoForUri(manager, uris[0]);
@@ -200,7 +200,7 @@ export function registerFileContextCommands(
     );
   });
 
-  reg("egit.file.noAssumeUnchanged", async (uriArg, allUris) => {
+  reg("vsgit.file.noAssumeUnchanged", async (uriArg, allUris) => {
     const uris = resolveUris(uriArg, allUris);
     if (uris.length === 0) return;
     const repo = repoForUri(manager, uris[0]);
@@ -211,7 +211,7 @@ export function registerFileContextCommands(
     );
   });
 
-  reg("egit.file.skipWorktree", async (uriArg, allUris) => {
+  reg("vsgit.file.skipWorktree", async (uriArg, allUris) => {
     const uris = resolveUris(uriArg, allUris);
     if (uris.length === 0) return;
     const repo = repoForUri(manager, uris[0]);
@@ -222,7 +222,7 @@ export function registerFileContextCommands(
     );
   });
 
-  reg("egit.file.noSkipWorktree", async (uriArg, allUris) => {
+  reg("vsgit.file.noSkipWorktree", async (uriArg, allUris) => {
     const uris = resolveUris(uriArg, allUris);
     if (uris.length === 0) return;
     const repo = repoForUri(manager, uris[0]);
@@ -233,7 +233,7 @@ export function registerFileContextCommands(
     );
   });
 
-  reg("egit.file.untrack", async (uriArg, allUris) => {
+  reg("vsgit.file.untrack", async (uriArg, allUris) => {
     const uris = resolveUris(uriArg, allUris);
     if (uris.length === 0) return;
     const repo = repoForUri(manager, uris[0]);
@@ -250,7 +250,7 @@ export function registerFileContextCommands(
 
   // ── Clean untracked ───────────────────────────────────────────────────
 
-  reg("egit.clean", async (uriArg, allUris) => {
+  reg("vsgit.clean", async (uriArg, allUris) => {
     const uris = resolveUris(uriArg, allUris);
     const repo = uris.length > 0
       ? repoForUri(manager, uris[0])

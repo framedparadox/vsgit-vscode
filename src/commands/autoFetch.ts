@@ -8,7 +8,7 @@ export function registerAutoFetchCommands(
   service: AutoFetchService,
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand("egit.autoFetch.fetchNow", () =>
+    vscode.commands.registerCommand("vsgit.autoFetch.fetchNow", () =>
       service.fetchAllNow(true),
     ),
   );

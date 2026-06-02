@@ -4,11 +4,11 @@ import * as fs from "node:fs/promises";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { GitExecutor } from "../git/GitExecutor";
 import { errMsg, resolveRepo, withProgress } from "./shared";
-import { EgitNode } from "../views/RepositoriesProvider";
+import { VsgitNode } from "../views/RepositoriesProvider";
 
 /**
  * Patch commands: create a patch from staged/committed changes and apply a
- * patch file. Maps to EGit's Team → Advanced → Create Patch / Apply Patch.
+ * patch file. Maps to VsGit's Team → Advanced → Create Patch / Apply Patch.
  */
 export function registerPatchCommands(
   context: vscode.ExtensionContext,
@@ -18,8 +18,8 @@ export function registerPatchCommands(
     context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
   // Create patch from the current staged changes (git diff --cached)
-  reg("egit.patch.createFromStaged", async (node) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.patch.createFromStaged", async (node) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
     const git = new GitExecutor();
     let diff: string;
@@ -48,8 +48,8 @@ export function registerPatchCommands(
   });
 
   // Create patch from last N commits (git format-patch)
-  reg("egit.patch.createFromCommits", async (node) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.patch.createFromCommits", async (node) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
     const nStr = await vscode.window.showInputBox({
       prompt: "Number of commits to include in patch",
@@ -84,7 +84,7 @@ export function registerPatchCommands(
   });
 
   // Apply a patch file (git apply)
-  reg("egit.patch.apply", async (uriArg) => {
+  reg("vsgit.patch.apply", async (uriArg) => {
     let patchUri: vscode.Uri | undefined;
     if (uriArg instanceof vscode.Uri && uriArg.scheme === "file") {
       patchUri = uriArg;

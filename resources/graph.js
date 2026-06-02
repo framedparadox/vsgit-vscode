@@ -30,7 +30,7 @@ let CONFIG = {
             '#00d9cc','#e138e8','#85d900','#dc5b23','#6f24d6','#ffcc00'],
   style: 'rounded',
   dateFormat: 'relative',
-  // EGit-style columns: Id | Graph | Message | Author | Authored Date |
+  // VsGit-style columns: Id | Graph | Message | Author | Authored Date |
   // Committer | Committed Date. Id/Graph/Message are always shown; the rest toggle.
   columns: { id: true, author: true, authoredDate: true, committer: true, committedDate: true },
   showRemoteBranches: true,
@@ -560,10 +560,10 @@ function renderTable(rows) {
     tr.dataset.sha = commit.sha;
     if (commit.sha === selectedSha) tr.classList.add('selected');
 
-    // Column order mirrors EGit: Id | Graph | Message | Author | Authored Date |
+    // Column order mirrors VsGit: Id | Graph | Message | Author | Authored Date |
     // Committer | Committed Date.
 
-    // Id: the abbreviated commit hash (EGit's leading column).
+    // Id: the abbreviated commit hash (VsGit's leading column).
     const tdId = document.createElement('td');
     tdId.className = 'col-id';
     tdId.textContent = commit.kind === 'uncommitted' ? '*' : commit.shortSha;
@@ -577,7 +577,7 @@ function renderTable(rows) {
     if (i === 0) tdGraph.appendChild(buildGraphSvg(rows));
     tr.appendChild(tdGraph);
 
-    // Message: inline ref pills, then the commit subject (EGit / git-graph style).
+    // Message: inline ref pills, then the commit subject (VsGit / git-graph style).
     const tdDesc = document.createElement('td');
     tdDesc.className = 'col-desc';
     tdDesc.appendChild(refBadgesFor(commit, colorOf.get(commit.sha) ?? row.colorIdx));
@@ -784,7 +784,7 @@ function openExpandedRow(commit, tr) {
 }
 
 // LEFT pane: commit metadata + message. Shows author AND committer (with their
-// respective dates), matching EGit's commit detail.
+// respective dates), matching VsGit's commit detail.
 function renderSummary(commit) {
   const host = document.getElementById('cdvSummary');
   if (!host) return;

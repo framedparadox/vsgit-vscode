@@ -1,6 +1,6 @@
 /**
  * HTML for the "Compare / Replace with a Branch, Tag, or Reference" picker.
- * Replicates the Eclipse EGit ref-picker dialog:
+ * Replicates the Eclipse VsGit ref-picker dialog:
  *   - Title + subtitle showing the file name and action
  *   - Filter text input with clear button
  *   - Collapsible tree: Local | Remote Tracking | Tags | References
@@ -203,7 +203,7 @@ window.addEventListener('message', ({ data }) => {
   groups = data.groups;
   if (data.title)    document.getElementById('headTitle').textContent = data.title;
   if (data.subtitle) document.getElementById('headSub').textContent  = data.subtitle;
-  // Collapse Remote Tracking by default (matches EGit behaviour)
+  // Collapse Remote Tracking by default (matches VsGit behaviour)
   groups.forEach(g => {
     collapsedGroups[g.id] = g.collapsedByDefault === true;
   });

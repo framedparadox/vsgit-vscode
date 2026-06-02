@@ -17,7 +17,7 @@ export function registerSCMCommands(
     context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
   // Stage selected file(s)
-  reg("egit.scm.stage", async (...resourceStates: unknown[]) => {
+  reg("vsgit.scm.stage", async (...resourceStates: unknown[]) => {
     const uris = resourceStates
       .filter((r): r is { resourceUri: vscode.Uri } => 
         typeof r === 'object' && r !== null && 'resourceUri' in r
@@ -36,7 +36,7 @@ export function registerSCMCommands(
   });
 
   // Unstage selected file(s)
-  reg("egit.scm.unstage", async (...resourceStates: unknown[]) => {
+  reg("vsgit.scm.unstage", async (...resourceStates: unknown[]) => {
     const uris = resourceStates
       .filter((r): r is { resourceUri: vscode.Uri } =>
         typeof r === 'object' && r !== null && 'resourceUri' in r
@@ -55,7 +55,7 @@ export function registerSCMCommands(
   });
 
   // Discard changes in selected file(s)
-  reg("egit.scm.discard", async (...resourceStates: unknown[]) => {
+  reg("vsgit.scm.discard", async (...resourceStates: unknown[]) => {
     const uris = resourceStates
       .filter((r): r is { resourceUri: vscode.Uri } => 
         typeof r === 'object' && r !== null && 'resourceUri' in r
@@ -86,7 +86,7 @@ export function registerSCMCommands(
   });
 
   // Open diff for file
-  reg("egit.scm.openDiff", async (resourceState: unknown) => {
+  reg("vsgit.scm.openDiff", async (resourceState: unknown) => {
     if (
       typeof resourceState !== 'object' || 
       resourceState === null || 
@@ -108,7 +108,7 @@ export function registerSCMCommands(
   });
 
   // Open file
-  reg("egit.scm.openFile", async (resourceState: unknown) => {
+  reg("vsgit.scm.openFile", async (resourceState: unknown) => {
     if (
       typeof resourceState !== 'object' || 
       resourceState === null || 
@@ -120,7 +120,7 @@ export function registerSCMCommands(
   });
 
   // Show file history
-  reg("egit.scm.showHistory", async (resourceState: unknown) => {
+  reg("vsgit.scm.showHistory", async (resourceState: unknown) => {
     if (
       typeof resourceState !== 'object' || 
       resourceState === null || 
@@ -132,14 +132,14 @@ export function registerSCMCommands(
     if (!repo) return;
 
     const rel = uri.fsPath.slice(repo.root.length + 1);
-    await vscode.commands.executeCommand("egit.history.show", {
+    await vscode.commands.executeCommand("vsgit.history.show", {
       repoRoot: repo.root,
       file: rel,
     });
   });
 
   // Blame file
-  reg("egit.scm.blame", async (resourceState: unknown) => {
+  reg("vsgit.scm.blame", async (resourceState: unknown) => {
     if (
       typeof resourceState !== 'object' || 
       resourceState === null || 
@@ -149,11 +149,11 @@ export function registerSCMCommands(
     const uri = (resourceState as { resourceUri: vscode.Uri }).resourceUri;
     const doc = await vscode.workspace.openTextDocument(uri);
     await vscode.window.showTextDocument(doc);
-    await vscode.commands.executeCommand("egit.blame.toggle");
+    await vscode.commands.executeCommand("vsgit.blame.toggle");
   });
 
   // Replace with HEAD
-  reg("egit.scm.replaceWithHead", async (...resourceStates: unknown[]) => {
+  reg("vsgit.scm.replaceWithHead", async (...resourceStates: unknown[]) => {
     const uris = resourceStates
       .filter((r): r is { resourceUri: vscode.Uri } => 
         typeof r === 'object' && r !== null && 'resourceUri' in r
@@ -186,7 +186,7 @@ export function registerSCMCommands(
   });
 
   // Stage all in group
-  reg("egit.scm.stageAll", async (group: unknown) => {
+  reg("vsgit.scm.stageAll", async (group: unknown) => {
     // group.resourceStates contains all files in the group
     if (
       typeof group !== 'object' || 
@@ -211,7 +211,7 @@ export function registerSCMCommands(
   });
 
   // Unstage all in group
-  reg("egit.scm.unstageAll", async (group: unknown) => {
+  reg("vsgit.scm.unstageAll", async (group: unknown) => {
     if (
       typeof group !== 'object' ||
       group === null ||
@@ -235,7 +235,7 @@ export function registerSCMCommands(
   });
 
   // Discard all in group
-  reg("egit.scm.discardAll", async (group: unknown) => {
+  reg("vsgit.scm.discardAll", async (group: unknown) => {
     if (
       typeof group !== 'object' || 
       group === null || 

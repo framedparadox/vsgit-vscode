@@ -19,7 +19,7 @@ export interface ConfirmationOptions {
 
 /**
  * Shows a confirmation dialog for destructive operations.
- * Respects the `egit.confirmDestructiveActions` setting.
+ * Respects the `vsgit.confirmDestructiveActions` setting.
  * Supports session-level bypass.
  * 
  * @returns true if user confirmed, false otherwise
@@ -27,7 +27,7 @@ export interface ConfirmationOptions {
 export async function confirmDestructiveAction(
   options: ConfirmationOptions,
 ): Promise<boolean> {
-  const config = vscode.workspace.getConfiguration("egit");
+  const config = vscode.workspace.getConfiguration("vsgit");
   const confirmEnabled = config.get<boolean>("confirmDestructiveActions", true);
   
   if (!confirmEnabled) {

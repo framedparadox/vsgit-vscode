@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { Repository } from "../git/Repository";
 import { GitContentProvider } from "../git/GitContentProvider";
-import { EgitNode } from "../views/RepositoriesProvider";
+import { VsgitNode } from "../views/RepositoriesProvider";
 import { resolveRepo, withProgress, errMsg } from "./shared";
 import { CompareProvider } from "../views/CompareProvider";
 
@@ -21,7 +21,7 @@ export function registerCompareCommands(
     context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
   // Compare the active editor's file against a ref the user picks.
-  reg("egit.compare.withRef", async (uriArg) => {
+  reg("vsgit.compare.withRef", async (uriArg) => {
     const uri = uriArg instanceof vscode.Uri ? uriArg : vscode.window.activeTextEditor?.document.uri;
     if (!uri || uri.scheme !== "file") {
       vscode.window.showWarningMessage("Open a file to compare.");
@@ -48,13 +48,13 @@ export function registerCompareCommands(
   });
 
   // Conflict resolution entry points (work on conflicted files).
-  reg("egit.conflict.useOurs", (node) =>
+  reg("vsgit.conflict.useOurs", (node) =>
     resolveConflict(manager, node, "ours"),
   );
-  reg("egit.conflict.useTheirs", (node) =>
+  reg("vsgit.conflict.useTheirs", (node) =>
     resolveConflict(manager, node, "theirs"),
   );
-  reg("egit.conflict.markResolved", async (node) => {
+  reg("vsgit.conflict.markResolved", async (node) => {
     const target = await resolveConflictTarget(manager, node);
     if (!target) {
       return;
@@ -63,7 +63,7 @@ export function registerCompareCommands(
       target.repo.markResolved(target.rel),
     );
   });
-  reg("egit.conflict.openMergeEditor", async (node) => {
+  reg("vsgit.conflict.openMergeEditor", async (node) => {
     const target = await resolveConflictTarget(manager, node);
     if (!target) {
       return;
@@ -103,7 +103,7 @@ export function registerCompareCommands(
 
   // Compare View tree commands
   if (compareProvider) {
-    reg("egit.compare.start", async () => {
+    reg("vsgit.compare.start", async () => {
       const repos = manager.getAll();
       if (repos.length === 0) {
         vscode.window.showErrorMessage("No repositories found");
@@ -132,18 +132,18 @@ export function registerCompareCommands(
       if (!ref2Pick) return;
 
       await compareProvider.startComparison(repo, ref1Pick.ref, ref2Pick.ref);
-      await vscode.commands.executeCommand("egit.compare.focus");
+      await vscode.commands.executeCommand("vsgit.compare.focus");
       vscode.window.showInformationMessage(
         `Comparing ${ref1Pick.ref} ↔ ${ref2Pick.ref}`,
       );
     });
 
-    reg("egit.compare.clear", () => {
+    reg("vsgit.compare.clear", () => {
       compareProvider.clearComparison();
       vscode.window.showInformationMessage("Comparison cleared");
     });
 
-    reg("egit.compare.switchSides", async () => {
+    reg("vsgit.compare.switchSides", async () => {
       const current = compareProvider.getCurrentComparison();
       if (!current) {
         vscode.window.showWarningMessage("No active comparison");
@@ -154,7 +154,7 @@ export function registerCompareCommands(
     });
 
     reg(
-      "egit.compare.openDiff",
+      "vsgit.compare.openDiff",
       async (repo, filePath, ref1, ref2) => {
         const r = repo as Repository;
         const fp = filePath as string;
@@ -172,7 +172,7 @@ export function registerCompareCommands(
       },
     );
 
-    reg("egit.showCommitDetails", async (repo, sha) => {
+    reg("vsgit.showCommitDetails", async (repo, sha) => {
       const r = repo as Repository;
       const s = sha as string;
       const files = await r.commitFiles(s);
@@ -270,7 +270,7 @@ async function resolveConflictTarget(
     return { repo: n.repo, rel: n.change.path };
   }
   // Otherwise prompt across all conflicted files.
-  const repo = await resolveRepo(manager, node as EgitNode);
+  const repo = await resolveRepo(manager, node as VsgitNode);
   if (!repo) {
     return undefined;
   }

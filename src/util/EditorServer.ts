@@ -40,8 +40,8 @@ export class EditorServer implements vscode.Disposable {
     // Quote the shim path so paths with spaces work in git's editor parsing.
     const cmd = `"${process.execPath}" "${shimPath}"`;
     return {
-      EGIT_IPC_SOCK: this.sockPath,
-      EGIT_IPC_TOKEN: this.token,
+      VSGIT_IPC_SOCK: this.sockPath,
+      VSGIT_IPC_TOKEN: this.token,
       GIT_SEQUENCE_EDITOR: cmd,
       GIT_EDITOR: cmd,
     };
@@ -98,9 +98,9 @@ export class EditorServer implements vscode.Disposable {
   private static makeSocketPath(): string {
     const id = crypto.randomBytes(8).toString("hex");
     if (process.platform === "win32") {
-      return `\\\\.\\pipe\\egit-${id}`;
+      return `\\\\.\\pipe\\vsgit-${id}`;
     }
-    return path.join(os.tmpdir(), `egit-${id}.sock`);
+    return path.join(os.tmpdir(), `vsgit-${id}.sock`);
   }
 
   dispose(): void {

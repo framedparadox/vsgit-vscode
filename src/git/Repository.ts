@@ -826,7 +826,7 @@ export class Repository {
   }> {
     // Get commits with graph structure. Fields (NUL-separated): full SHA, short
     // SHA, subject, author name, author date, committer name, committer date,
-    // parent SHAs, ref names. EGit's history shows author and committer (and both
+    // parent SHAs, ref names. VsGit's history shows author and committer (and both
     // of their dates) as separate columns, so we capture %cn/%ci alongside %an/%ai.
     // --topo-order guarantees a child is always listed before its parents, which
     // keeps the lane layout free of backtracking edges (date-order can interleave

@@ -2,13 +2,13 @@ import * as vscode from "vscode";
 import { GitExecutor } from "./GitExecutor";
 import { isOptionLike } from "./argGuard";
 
-export const EGIT_SCHEME = "egit";
+export const VSGIT_SCHEME = "vsgit";
 
 /**
  * Serves file contents at a given git revision (or the index) so VS Code's
  * native diff editor can render side-by-side comparisons.
  *
- * URI shape: egit:<absolute-path>?repo=<root>&ref=<rev>&path=<repoRelPath>
+ * URI shape: vsgit:<absolute-path>?repo=<root>&ref=<rev>&path=<repoRelPath>
  * where ref is "~index" for the staged copy, or any revision (HEAD, sha, ...).
  */
 export class GitContentProvider implements vscode.TextDocumentContentProvider {
@@ -41,7 +41,7 @@ export class GitContentProvider implements vscode.TextDocumentContentProvider {
   ): vscode.Uri {
     const query = new URLSearchParams({ repo: repoRoot, ref, path: relPath });
     return vscode.Uri.parse(
-      `${EGIT_SCHEME}:${absPath}?${query.toString()}`,
+      `${VSGIT_SCHEME}:${absPath}?${query.toString()}`,
     );
   }
 }

@@ -3,11 +3,11 @@ import { RepositoryManager } from "../git/RepositoryManager";
 import { FileChange, FileChangeState } from "../git/parsers/status";
 
 /**
- * Explorer file decorations (EGit "label decorations"): a status letter badge
+ * Explorer file decorations (VsGit "label decorations"): a status letter badge
  * and color on files that are modified/added/deleted/untracked/ignored/
  * conflicted, derived from each repository's status snapshot.
  */
-export class EgitFileDecorationProvider
+export class VsgitFileDecorationProvider
   implements vscode.FileDecorationProvider, vscode.Disposable
 {
   private readonly _onDidChange = new vscode.EventEmitter<

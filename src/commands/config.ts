@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { Repository } from "../git/Repository";
-import { EgitNode } from "../views/RepositoriesProvider";
+import { VsgitNode } from "../views/RepositoriesProvider";
 import { configHtml } from "../webviews/configHtml";
 import { resolveRepo, errMsg } from "./shared";
 
@@ -12,22 +12,22 @@ export function registerConfigCommands(
   context: vscode.ExtensionContext,
   manager: RepositoryManager,
 ): void {
-  const openConfig = async (node?: EgitNode) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  const openConfig = async (node?: VsgitNode) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
     openConfigEditor(repo, manager);
   };
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("egit.config.open", openConfig),
+    vscode.commands.registerCommand("vsgit.config.open", openConfig),
     // Phase 9 alias — "openPanel" is the name referenced in the plan
-    vscode.commands.registerCommand("egit.config.openPanel", openConfig),
+    vscode.commands.registerCommand("vsgit.config.openPanel", openConfig),
   );
 }
 
 function openConfigEditor(repo: Repository, manager: RepositoryManager): void {
   const panel = vscode.window.createWebviewPanel(
-    "egit.config",
+    "vsgit.config",
     `Git Config: ${repo.name}`,
     vscode.ViewColumn.Active,
     { enableScripts: true, retainContextWhenHidden: true },
@@ -62,7 +62,7 @@ function openConfigEditor(repo: Repository, manager: RepositoryManager): void {
         await manager.refreshAll();
         panel.webview.postMessage({ type: "remotes", remotes: repo.remotes });
       } else if (m.type === "loadExtensionSettings") {
-        const cfg = vscode.workspace.getConfiguration("egit");
+        const cfg = vscode.workspace.getConfiguration("vsgit");
         panel.webview.postMessage({
           type: "extensionSettings",
           settings: {
@@ -74,7 +74,7 @@ function openConfigEditor(repo: Repository, manager: RepositoryManager): void {
         });
       } else if (m.type === "setExtensionSetting") {
         await vscode.workspace
-          .getConfiguration("egit")
+          .getConfiguration("vsgit")
           .update(m.key as string, m.value, vscode.ConfigurationTarget.Global);
       }
     } catch (e) {

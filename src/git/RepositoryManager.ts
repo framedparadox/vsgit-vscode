@@ -61,7 +61,7 @@ export class RepositoryManager implements vscode.Disposable {
     await Promise.all(
       this.getAll().map((repo) =>
         repo.refresh().catch((err) => {
-          console.error(`egit: failed to refresh ${repo.root}`, err);
+          console.error(`vsgit: failed to refresh ${repo.root}`, err);
         }),
       ),
     );
@@ -91,7 +91,7 @@ export class RepositoryManager implements vscode.Disposable {
       );
       this.watchers.set(root, watcher);
     } catch (err) {
-      console.error(`egit: cannot watch ${gitDir}`, err);
+      console.error(`vsgit: cannot watch ${gitDir}`, err);
     }
   }
 

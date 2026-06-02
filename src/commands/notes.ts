@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
-import { EgitNode } from "../views/RepositoriesProvider";
+import { VsgitNode } from "../views/RepositoriesProvider";
 import { resolveRepo, errMsg, withProgress } from "./shared";
 
 /** Git notes operations: add, edit, remove, show notes on commits. */
@@ -12,8 +12,8 @@ export function registerNotesCommands(
     context.subscriptions.push(vscode.commands.registerCommand(cmd, handler));
 
   // Add note to commit
-  reg("egit.notes.add", async (node: unknown) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.notes.add", async (node: unknown) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
 
     const ref = await vscode.window.showInputBox({
@@ -40,8 +40,8 @@ export function registerNotesCommands(
   });
 
   // Edit existing note
-  reg("egit.notes.edit", async (node: unknown) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.notes.edit", async (node: unknown) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
 
     const ref = await vscode.window.showInputBox({
@@ -71,8 +71,8 @@ export function registerNotesCommands(
   });
 
   // Remove note
-  reg("egit.notes.remove", async (node: unknown) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.notes.remove", async (node: unknown) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
 
     const ref = await vscode.window.showInputBox({
@@ -100,8 +100,8 @@ export function registerNotesCommands(
   });
 
   // Show note
-  reg("egit.notes.show", async (node: unknown) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.notes.show", async (node: unknown) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
 
     const ref = await vscode.window.showInputBox({

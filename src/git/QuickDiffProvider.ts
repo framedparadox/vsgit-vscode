@@ -7,7 +7,7 @@ import { GitContentProvider } from "./GitContentProvider";
  * quick-diff gutter indicators (added/changed/removed) for tracked files.
  * Registered as an SCM quick-diff provider.
  */
-export class EgitQuickDiffProvider implements vscode.QuickDiffProvider {
+export class VsgitQuickDiffProvider implements vscode.QuickDiffProvider {
   constructor(private readonly manager: RepositoryManager) {}
 
   provideOriginalResource(uri: vscode.Uri): vscode.Uri | undefined {

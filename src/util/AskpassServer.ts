@@ -30,8 +30,8 @@ export class AskpassServer implements vscode.Disposable {
   /** Env vars that route git credential prompts back here via the shim. */
   env(shimPath: string): NodeJS.ProcessEnv {
     return {
-      EGIT_ASKPASS_SOCK: this.sockPath,
-      EGIT_ASKPASS_TOKEN: this.token,
+      VSGIT_ASKPASS_SOCK: this.sockPath,
+      VSGIT_ASKPASS_TOKEN: this.token,
       GIT_ASKPASS: `"${process.execPath}" "${shimPath}"`,
       // Never fall back to a blocking terminal prompt.
       GIT_TERMINAL_PROMPT: "0",
@@ -90,9 +90,9 @@ export class AskpassServer implements vscode.Disposable {
   private static makeSocketPath(): string {
     const id = crypto.randomBytes(8).toString("hex");
     if (process.platform === "win32") {
-      return `\\\\.\\pipe\\egit-askpass-${id}`;
+      return `\\\\.\\pipe\\vsgit-askpass-${id}`;
     }
-    return path.join(os.tmpdir(), `egit-askpass-${id}.sock`);
+    return path.join(os.tmpdir(), `vsgit-askpass-${id}.sock`);
   }
 
   dispose(): void {

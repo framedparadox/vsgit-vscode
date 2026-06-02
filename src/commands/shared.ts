@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { Repository } from "../git/Repository";
-import { EgitNode } from "../views/RepositoriesProvider";
+import { VsgitNode } from "../views/RepositoriesProvider";
 import { GitError } from "../git/GitError";
 
 export function errMsg(err: unknown): string {
@@ -44,7 +44,7 @@ export function humanizeGitError(err: unknown): string {
 /** Resolve the repository for a node, or prompt when invoked from the palette. */
 export async function resolveRepo(
   manager: RepositoryManager,
-  node?: EgitNode,
+  node?: VsgitNode,
 ): Promise<Repository | undefined> {
   if (node && "repo" in node) {
     return node.repo;

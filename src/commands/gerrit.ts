@@ -1,12 +1,12 @@
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { Repository } from "../git/Repository";
-import { EgitNode } from "../views/RepositoriesProvider";
+import { VsgitNode } from "../views/RepositoriesProvider";
 import { Credentials } from "../util/credentials";
 import { resolveRepo, withProgress } from "./shared";
 
 /**
- * Gerrit support: push HEAD to refs/for/<branch> for code review. EGit's
+ * Gerrit support: push HEAD to refs/for/<branch> for code review. VsGit's
  * Change-Id is normally injected by Gerrit's commit-msg hook; we offer to
  * install that hook and then push for review.
  */
@@ -18,9 +18,9 @@ export function registerGerritCommands(
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      "egit.gerrit.pushForReview",
-      async (node?: EgitNode) => {
-        const repo = await resolveRepo(manager, node as EgitNode);
+      "vsgit.gerrit.pushForReview",
+      async (node?: VsgitNode) => {
+        const repo = await resolveRepo(manager, node as VsgitNode);
         if (!repo) {
           return;
         }
@@ -47,9 +47,9 @@ export function registerGerritCommands(
     ),
 
     vscode.commands.registerCommand(
-      "egit.gerrit.installHook",
-      async (node?: EgitNode) => {
-        const repo = await resolveRepo(manager, node as EgitNode);
+      "vsgit.gerrit.installHook",
+      async (node?: VsgitNode) => {
+        const repo = await resolveRepo(manager, node as VsgitNode);
         if (!repo) {
           return;
         }

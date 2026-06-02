@@ -1,6 +1,6 @@
 /**
  * HTML for the "Select a Commit" picker webview.
- * Replicates the Eclipse EGit commit-picker dialog:
+ * Replicates the Eclipse VsGit commit-picker dialog:
  *   - Header: count + repo name, subtitle
  *   - Search bar with a magnifier icon
  *   - Resizable table: graph | Id | Message | Author | Authored Date | Committer | Committed Date

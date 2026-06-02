@@ -18,7 +18,7 @@ export function registerCloneCommands(
   const shimPath = path.join(context.extensionPath, "resources", "askpass.js");
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("egit.clone", async () => {
+    vscode.commands.registerCommand("vsgit.clone", async () => {
       const url = await vscode.window.showInputBox({
         prompt: "Repository URL to clone",
         placeHolder: "https://github.com/owner/repo.git",
@@ -84,7 +84,7 @@ export function registerCloneCommands(
       }
     }),
 
-    vscode.commands.registerCommand("egit.init", async () => {
+    vscode.commands.registerCommand("vsgit.init", async () => {
       const folder = await vscode.window.showOpenDialog({
         canSelectFolders: true,
         canSelectFiles: false,

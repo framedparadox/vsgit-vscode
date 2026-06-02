@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { Repository } from "../git/Repository";
-import { EgitNode } from "../views/RepositoriesProvider";
+import { VsgitNode } from "../views/RepositoriesProvider";
 import { resolveRepo, withProgress } from "./shared";
 
 /** Tag operations: create (lightweight/annotated/signed), delete, checkout, push. */
@@ -12,8 +12,8 @@ export function registerTagCommands(
   const reg = (id: string, fn: (...a: unknown[]) => unknown) =>
     context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
-  reg("egit.tag.create", async (node) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.tag.create", async (node) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) {
       return;
     }
@@ -51,8 +51,8 @@ export function registerTagCommands(
     );
   });
 
-  reg("egit.tag.delete", async (node) => {
-    const n = node as EgitNode;
+  reg("vsgit.tag.delete", async (node) => {
+    const n = node as VsgitNode;
     if (!n || n.type !== "tag") {
       return;
     }
@@ -69,8 +69,8 @@ export function registerTagCommands(
     );
   });
 
-  reg("egit.tag.checkout", async (node) => {
-    const n = node as EgitNode;
+  reg("vsgit.tag.checkout", async (node) => {
+    const n = node as VsgitNode;
     if (!n || n.type !== "tag") {
       return;
     }
@@ -79,8 +79,8 @@ export function registerTagCommands(
     );
   });
 
-  reg("egit.tag.push", async (node) => {
-    const n = node as EgitNode;
+  reg("vsgit.tag.push", async (node) => {
+    const n = node as VsgitNode;
     if (!n || n.type !== "tag") {
       return;
     }
@@ -93,8 +93,8 @@ export function registerTagCommands(
     );
   });
 
-  reg("egit.tag.forceCreate", async (node) => {
-    const n = node as EgitNode;
+  reg("vsgit.tag.forceCreate", async (node) => {
+    const n = node as VsgitNode;
     if (!n || n.type !== "tag") {
       return;
     }
@@ -117,8 +117,8 @@ export function registerTagCommands(
     );
   });
 
-  reg("egit.tag.deleteRemote", async (node) => {
-    const n = node as EgitNode;
+  reg("vsgit.tag.deleteRemote", async (node) => {
+    const n = node as VsgitNode;
     if (!n || n.type !== "tag") {
       return;
     }

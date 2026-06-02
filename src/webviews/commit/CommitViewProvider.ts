@@ -12,10 +12,10 @@ import { FileChange } from "../../git/parsers/status";
  * and a Commit button with amend / sign-off / GPG toggles.
  *
  * Staging and commit all flow through existing `Repository` methods and the
- * registered `egit.staging.*` commands — this view only owns the UI.
+ * registered `vsgit.staging.*` commands — this view only owns the UI.
  */
 export class CommitViewProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = "egit.commit";
+  public static readonly viewType = "vsgit.commit";
 
   private view?: vscode.WebviewView;
   private message = "";
@@ -87,32 +87,32 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         return;
       case "stage":
         await vscode.commands.executeCommand(
-          "egit.staging.stage",
+          "vsgit.staging.stage",
           this.fileNode(msg.data, "unstaged"),
         );
         return;
       case "unstage":
         await vscode.commands.executeCommand(
-          "egit.staging.unstage",
+          "vsgit.staging.unstage",
           this.fileNode(msg.data, "staged"),
         );
         return;
       case "discard":
         await vscode.commands.executeCommand(
-          "egit.staging.discard",
+          "vsgit.staging.discard",
           this.fileNode(msg.data, "unstaged"),
         );
         return;
       case "stageAll":
-        await vscode.commands.executeCommand("egit.staging.stageAll");
+        await vscode.commands.executeCommand("vsgit.staging.stageAll");
         return;
       case "unstageAll":
-        await vscode.commands.executeCommand("egit.staging.unstageAll");
+        await vscode.commands.executeCommand("vsgit.staging.unstageAll");
         return;
       case "openDiff": {
         const group = (msg.data as { group: StagingGroup }).group;
         await vscode.commands.executeCommand(
-          "egit.staging.openDiff",
+          "vsgit.staging.openDiff",
           this.fileNode(msg.data, group),
         );
         return;

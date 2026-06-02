@@ -36,7 +36,7 @@ export function registerStagingCommands(
     }
   };
 
-  reg("egit.staging.stage", (node) =>
+  reg("vsgit.staging.stage", (node) =>
     guard(async () => {
       const repo = repoOf(node as StagingNode);
       const change = (node as StagingNode)?.type === "file" ? (node as { change: FileChange }).change : undefined;
@@ -47,7 +47,7 @@ export function registerStagingCommands(
     }, "Stage"),
   );
 
-  reg("egit.staging.unstage", (node) =>
+  reg("vsgit.staging.unstage", (node) =>
     guard(async () => {
       const repo = repoOf(node as StagingNode);
       const change = (node as StagingNode)?.type === "file" ? (node as { change: FileChange }).change : undefined;
@@ -58,19 +58,19 @@ export function registerStagingCommands(
     }, "Unstage"),
   );
 
-  reg("egit.staging.stageAll", () =>
+  reg("vsgit.staging.stageAll", () =>
     guard(async () => {
       await staging.activeRepo?.stageAll();
     }, "Stage all"),
   );
 
-  reg("egit.staging.unstageAll", () =>
+  reg("vsgit.staging.unstageAll", () =>
     guard(async () => {
       await staging.activeRepo?.unstageAll();
     }, "Unstage all"),
   );
 
-  reg("egit.staging.discard", (node) =>
+  reg("vsgit.staging.discard", (node) =>
     guard(async () => {
       const n = node as StagingNode;
       if (n?.type !== "file") {
@@ -92,7 +92,7 @@ export function registerStagingCommands(
     }, "Discard"),
   );
 
-  reg("egit.staging.addToGitignore", (node) =>
+  reg("vsgit.staging.addToGitignore", (node) =>
     guard(async () => {
       const n = node as StagingNode;
       if (n?.type !== "file") {
@@ -102,7 +102,7 @@ export function registerStagingCommands(
     }, "Add to .gitignore"),
   );
 
-  reg("egit.staging.openDiff", async (node) => {
+  reg("vsgit.staging.openDiff", async (node) => {
     const n = node as StagingNode;
     if (n?.type !== "file") {
       return;
@@ -111,16 +111,16 @@ export function registerStagingCommands(
   });
 
   // Stage / unstage an individual hunk by letting the user pick from the file's hunks.
-  reg("egit.staging.stageHunk", (node) =>
+  reg("vsgit.staging.stageHunk", (node) =>
     guard(() => stageHunk(node as StagingNode, false), "Stage hunk"),
   );
-  reg("egit.staging.unstageHunk", (node) =>
+  reg("vsgit.staging.unstageHunk", (node) =>
     guard(() => stageHunk(node as StagingNode, true), "Unstage hunk"),
   );
 
-  reg("egit.staging.commit", () => commitFlow(staging, manager, false));
-  reg("egit.staging.commitAmend", () => commitFlow(staging, manager, true));
-  reg("egit.staging.refresh", () => manager.refreshAll());
+  reg("vsgit.staging.commit", () => commitFlow(staging, manager, false));
+  reg("vsgit.staging.commitAmend", () => commitFlow(staging, manager, true));
+  reg("vsgit.staging.refresh", () => manager.refreshAll());
 }
 
 async function openDiff(node: Extract<StagingNode, { type: "file" }>): Promise<void> {

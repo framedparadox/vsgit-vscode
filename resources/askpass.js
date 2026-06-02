@@ -2,7 +2,7 @@
  * Credential helper invoked by git as GIT_ASKPASS during clone/fetch/push.
  *
  * Git runs:  node askpass.js "Username for 'https://host': "
- * We forward the prompt to the extension over the IPC socket (EGIT_ASKPASS_SOCK)
+ * We forward the prompt to the extension over the IPC socket (VSGIT_ASKPASS_SOCK)
  * and print the user's answer on stdout, which git consumes.
  *
  * Plain CommonJS, node built-ins only — runs OUTSIDE the VS Code process.
@@ -10,8 +10,8 @@
 const net = require("node:net");
 
 const prompt = process.argv[2] || "";
-const sockPath = process.env.EGIT_ASKPASS_SOCK;
-const token = process.env.EGIT_ASKPASS_TOKEN;
+const sockPath = process.env.VSGIT_ASKPASS_SOCK;
+const token = process.env.VSGIT_ASKPASS_TOKEN;
 
 if (!sockPath || !token) {
   process.exit(1);

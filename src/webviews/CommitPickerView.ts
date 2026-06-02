@@ -14,7 +14,7 @@ export class CommitPickerView {
   static async pick(repo: Repository): Promise<string | undefined> {
     return new Promise<string | undefined>((resolve) => {
       const panel = vscode.window.createWebviewPanel(
-        "egit.commitPicker",
+        "vsgit.commitPicker",
         "Select a Commit",
         vscode.ViewColumn.Active,
         {

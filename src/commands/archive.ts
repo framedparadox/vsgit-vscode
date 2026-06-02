@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import { RepositoryManager } from "../git/RepositoryManager";
-import { EgitNode } from "../views/RepositoriesProvider";
+import { VsgitNode } from "../views/RepositoriesProvider";
 import { resolveRepo, errMsg, withProgress } from "./shared";
 
 /** Git archive command: create zip/tar archives from refs. */
@@ -11,9 +11,9 @@ export function registerArchiveCommands(
 ): void {
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      "egit.archive.create",
+      "vsgit.archive.create",
       async (node: unknown) => {
-        const repo = await resolveRepo(manager, node as EgitNode);
+        const repo = await resolveRepo(manager, node as VsgitNode);
         if (!repo) return;
 
         // Pick ref

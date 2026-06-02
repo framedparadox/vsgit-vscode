@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { errMsg, resolveRepo, withProgress } from "./shared";
-import { EgitNode } from "../views/RepositoriesProvider";
+import { VsgitNode } from "../views/RepositoriesProvider";
 
 /** Bisect workflow commands. */
 export function registerBisectCommands(
@@ -11,8 +11,8 @@ export function registerBisectCommands(
   const reg = (id: string, fn: (...a: unknown[]) => unknown) =>
     context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
-  reg("egit.bisect.start", async (node) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.bisect.start", async (node) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
     try {
       await repo.bisectStart();
@@ -25,8 +25,8 @@ export function registerBisectCommands(
     }
   });
 
-  reg("egit.bisect.good", async (node) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.bisect.good", async (node) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
     const sha = await vscode.window.showInputBox({
       prompt: "Commit SHA to mark as GOOD (leave empty for current HEAD)",
@@ -42,8 +42,8 @@ export function registerBisectCommands(
     }
   });
 
-  reg("egit.bisect.bad", async (node) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.bisect.bad", async (node) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
     const sha = await vscode.window.showInputBox({
       prompt: "Commit SHA to mark as BAD (leave empty for current HEAD)",
@@ -59,15 +59,15 @@ export function registerBisectCommands(
     }
   });
 
-  reg("egit.bisect.reset", async (node) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.bisect.reset", async (node) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
     await withProgress(manager, "Bisect reset", () => repo.bisectReset());
     BisectStatusBar.hide();
   });
 
-  reg("egit.bisect.log", async (node) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.bisect.log", async (node) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
     try {
       const log = await repo.bisectLog();
@@ -93,7 +93,7 @@ class BisectStatusBar {
         vscode.StatusBarAlignment.Left,
         100,
       );
-      this.item.command = "egit.bisect.reset";
+      this.item.command = "vsgit.bisect.reset";
     }
     this.item.text = `$(git-commit) Bisect: ${repoName} (click to reset)`;
     this.item.tooltip = "Git bisect is in progress. Click to reset.";

@@ -12,9 +12,9 @@ export function registerReflogCommands(
   const reg = (id: string, fn: (...a: unknown[]) => unknown) =>
     context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
-  reg("egit.reflog.refresh", () => provider.refresh());
+  reg("vsgit.reflog.refresh", () => provider.refresh());
 
-  reg("egit.reflog.checkout", async (node) => {
+  reg("vsgit.reflog.checkout", async (node) => {
     const n = node as ReflogNode;
     if (!n || n.type !== "entry") {
       return;
@@ -24,7 +24,7 @@ export function registerReflogCommands(
     );
   });
 
-  reg("egit.reflog.reset", async (node) => {
+  reg("vsgit.reflog.reset", async (node) => {
     const n = node as ReflogNode;
     if (!n || n.type !== "entry") {
       return;

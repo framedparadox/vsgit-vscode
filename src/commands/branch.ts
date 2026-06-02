@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { GitExecutor } from "../git/GitExecutor";
 import { RepositoryManager } from "../git/RepositoryManager";
-import { EgitNode } from "../views/RepositoriesProvider";
+import { VsgitNode } from "../views/RepositoriesProvider";
 import { Repository } from "../git/Repository";
 import { resolveRepo, withProgress, errMsg } from "./shared";
 import { confirmDestructiveAction, DestructiveOperations } from "../util/confirmation";
@@ -18,8 +18,8 @@ export function registerBranchCommands(
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      "egit.branch.checkout",
-      async (node?: EgitNode) => {
+      "vsgit.branch.checkout",
+      async (node?: VsgitNode) => {
         const target = await resolveBranch(manager, node);
         if (!target) {
           return;
@@ -38,8 +38,8 @@ export function registerBranchCommands(
     ),
 
     vscode.commands.registerCommand(
-      "egit.branch.create",
-      async (node?: EgitNode) => {
+      "vsgit.branch.create",
+      async (node?: VsgitNode) => {
         const repo = await resolveRepo(manager, node);
         if (!repo) {
           return;
@@ -75,8 +75,8 @@ export function registerBranchCommands(
     ),
 
     vscode.commands.registerCommand(
-      "egit.branch.delete",
-      async (node?: EgitNode) => {
+      "vsgit.branch.delete",
+      async (node?: VsgitNode) => {
         const target = await resolveBranch(manager, node);
         if (!target) {
           return;
@@ -105,8 +105,8 @@ export function registerBranchCommands(
     ),
 
     vscode.commands.registerCommand(
-      "egit.branch.rename",
-      async (node?: EgitNode) => {
+      "vsgit.branch.rename",
+      async (node?: VsgitNode) => {
         const target = await resolveBranch(manager, node);
         if (!target) {
           return;
@@ -130,8 +130,8 @@ export function registerBranchCommands(
     ),
 
     vscode.commands.registerCommand(
-      "egit.branch.configureUpstream",
-      async (node?: EgitNode) => {
+      "vsgit.branch.configureUpstream",
+      async (node?: VsgitNode) => {
         const target = await resolveBranch(manager, node);
         if (!target) {
           return;
@@ -167,7 +167,7 @@ async function doBranchReset(
   manager: RepositoryManager,
   node: unknown,
 ): Promise<void> {
-  const repo = await resolveRepo(manager, node as EgitNode);
+  const repo = await resolveRepo(manager, node as VsgitNode);
   if (!repo) return;
 
   const mode = await vscode.window.showQuickPick(
@@ -215,12 +215,12 @@ export function registerBranchExtraCommands(
 
   // ── Branch reset ──────────────────────────────────────────────────────
 
-  reg("egit.branch.reset", (node) => doBranchReset(manager, node));
+  reg("vsgit.branch.reset", (node) => doBranchReset(manager, node));
 
   // ── Compare branches ─────────────────────────────────────────────────
 
-  reg("egit.branch.compareTo", async (node) => {
-    const n = node as EgitNode | undefined;
+  reg("vsgit.branch.compareTo", async (node) => {
+    const n = node as VsgitNode | undefined;
     const repo = n && "repo" in n ? n.repo : await resolveRepo(manager, undefined);
     if (!repo) return;
 
@@ -260,8 +260,8 @@ export function registerBranchExtraCommands(
 
   // ── Remote branch: checkout with local tracking ───────────────────────
 
-  reg("egit.remoteBranch.checkout", async (node) => {
-    const n = node as EgitNode | undefined;
+  reg("vsgit.remoteBranch.checkout", async (node) => {
+    const n = node as VsgitNode | undefined;
     if (!n || n.type !== "branch" || n.ref.kind !== "remoteBranch") {
       // Fallback: prompt
       const repo = await resolveRepo(manager, undefined);
@@ -292,8 +292,8 @@ export function registerBranchExtraCommands(
 
   // ── Remote branch: delete ─────────────────────────────────────────────
 
-  reg("egit.remoteBranch.delete", async (node) => {
-    const n = node as EgitNode | undefined;
+  reg("vsgit.remoteBranch.delete", async (node) => {
+    const n = node as VsgitNode | undefined;
     if (!n || n.type !== "branch" || n.ref.kind !== "remoteBranch") {
       vscode.window.showWarningMessage("Select a remote branch to delete.");
       return;
@@ -319,7 +319,7 @@ interface BranchTarget {
 
 async function resolveBranch(
   manager: RepositoryManager,
-  node?: EgitNode,
+  node?: VsgitNode,
 ): Promise<BranchTarget | undefined> {
   if (node && node.type === "branch") {
     return { repo: node.repo, name: node.ref.shortName };

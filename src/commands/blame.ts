@@ -7,6 +7,6 @@ export function registerBlameCommands(
   blame: BlameController,
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand("egit.blame.toggle", () => blame.toggle()),
+    vscode.commands.registerCommand("vsgit.blame.toggle", () => blame.toggle()),
   );
 }

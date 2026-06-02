@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
-import { EgitNode } from "../views/RepositoriesProvider";
+import { VsgitNode } from "../views/RepositoriesProvider";
 import { resolveRepo, withProgress, errMsg } from "./shared";
 import { confirmDestructiveAction } from "../util/confirmation";
 import { Credentials } from "../util/credentials";
@@ -24,8 +24,8 @@ export function registerCommitOpsCommands(
 
   // ── Cherry-pick ───────────────────────────────────────────────────────────
 
-  reg("egit.commit.cherryPick", async (node) => {
-    const n = node as EgitNode | undefined;
+  reg("vsgit.commit.cherryPick", async (node) => {
+    const n = node as VsgitNode | undefined;
     const repo = n && "repo" in n ? n.repo : await resolveRepo(manager, undefined);
     if (!repo) return;
 
@@ -54,8 +54,8 @@ export function registerCommitOpsCommands(
 
   // ── Revert ───────────────────────────────────────────────────────────────
 
-  reg("egit.commit.revert", async (node) => {
-    const n = node as EgitNode | undefined;
+  reg("vsgit.commit.revert", async (node) => {
+    const n = node as VsgitNode | undefined;
     const repo = n && "repo" in n ? n.repo : await resolveRepo(manager, undefined);
     if (!repo) return;
 
@@ -84,8 +84,8 @@ export function registerCommitOpsCommands(
 
   // ── Squash commits ───────────────────────────────────────────────────────
 
-  reg("egit.commit.squash", async (node) => {
-    const n = node as EgitNode | undefined;
+  reg("vsgit.commit.squash", async (node) => {
+    const n = node as VsgitNode | undefined;
     const repo = n && "repo" in n ? n.repo : await resolveRepo(manager, undefined);
     if (!repo) return;
 
@@ -132,8 +132,8 @@ export function registerCommitOpsCommands(
 
   // ── GPG signature verification ───────────────────────────────────────────
 
-  reg("egit.commit.verifyGpg", async (node) => {
-    const n = node as EgitNode | undefined;
+  reg("vsgit.commit.verifyGpg", async (node) => {
+    const n = node as VsgitNode | undefined;
     const repo = n && "repo" in n ? n.repo : await resolveRepo(manager, undefined);
     if (!repo) return;
 
@@ -167,8 +167,8 @@ export function registerCommitOpsCommands(
 
   // ── Fetch GitHub Pull Requests ────────────────────────────────────────────
 
-  reg("egit.fetchGithubPrs", async (node) => {
-    const n = node as EgitNode | undefined;
+  reg("vsgit.fetchGithubPrs", async (node) => {
+    const n = node as VsgitNode | undefined;
     const repo = n && "repo" in n ? n.repo : await resolveRepo(manager, undefined);
     if (!repo) return;
 
@@ -202,8 +202,8 @@ export function registerCommitOpsCommands(
 
   // ── Switch To (quick branch switcher) ────────────────────────────────────
 
-  reg("egit.switchTo", async (node) => {
-    const n = node as EgitNode | undefined;
+  reg("vsgit.switchTo", async (node) => {
+    const n = node as VsgitNode | undefined;
     const repo = n && "repo" in n ? n.repo : await resolveRepo(manager, undefined);
     if (!repo) return;
 
@@ -254,8 +254,8 @@ export function registerCommitOpsCommands(
 
   // ── Merge Tool (per-file) ─────────────────────────────────────────────────
 
-  reg("egit.mergeTool", async (node) => {
-    const n = node as EgitNode | undefined;
+  reg("vsgit.mergeTool", async (node) => {
+    const n = node as VsgitNode | undefined;
     const repo = n && "repo" in n ? n.repo : await resolveRepo(manager, undefined);
     if (!repo) return;
 
@@ -285,15 +285,15 @@ export function registerCommitOpsCommands(
       const doc = await vscode.workspace.openTextDocument(uri);
       await vscode.window.showTextDocument(doc);
       vscode.window.showInformationMessage(
-        `Resolve conflicts in ${picks.path}, then run "Mark Resolved" (egit.conflicts.markResolved).`,
+        `Resolve conflicts in ${picks.path}, then run "Mark Resolved" (vsgit.conflicts.markResolved).`,
       );
     }
   });
 
   // ── Rebase live progress status bar ──────────────────────────────────────
 
-  reg("egit.rebase.showProgress", async (node) => {
-    const n = node as EgitNode | undefined;
+  reg("vsgit.rebase.showProgress", async (node) => {
+    const n = node as VsgitNode | undefined;
     const repo = n && "repo" in n ? n.repo : await resolveRepo(manager, undefined);
     if (!repo) return;
 

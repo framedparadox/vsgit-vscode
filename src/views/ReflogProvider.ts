@@ -54,7 +54,7 @@ export class ReflogProvider implements vscode.TreeDataProvider<ReflogNode> {
     );
     item.description = e.shortSha;
     item.iconPath = new vscode.ThemeIcon(actionIcon(e.action));
-    item.contextValue = "egit.reflogEntry";
+    item.contextValue = "vsgit.reflogEntry";
     item.tooltip = `${e.sha}\n${new Date(e.date * 1000).toLocaleString()}`;
     return item;
   }

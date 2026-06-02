@@ -20,11 +20,11 @@ export class AutoFetchService implements vscode.Disposable {
       vscode.StatusBarAlignment.Left,
       100,
     );
-    this.statusBarItem.command = "egit.autoFetch.fetchNow";
+    this.statusBarItem.command = "vsgit.autoFetch.fetchNow";
     this.statusBarItem.tooltip = "Click to fetch all remotes now";
 
     this.configListener = vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration("egit.autoFetch")) {
+      if (e.affectsConfiguration("vsgit.autoFetch")) {
         this.restart();
       }
     });
@@ -38,7 +38,7 @@ export class AutoFetchService implements vscode.Disposable {
       this.timer = undefined;
     }
 
-    const cfg = vscode.workspace.getConfiguration("egit");
+    const cfg = vscode.workspace.getConfiguration("vsgit");
     const enabled = cfg.get<boolean>("autoFetch.enabled", false);
 
     if (!enabled) {
@@ -81,7 +81,7 @@ export class AutoFetchService implements vscode.Disposable {
                 "Pull Now",
               );
               if (action === "Pull Now") {
-                await vscode.commands.executeCommand("egit.pull", { type: "repo", repo });
+                await vscode.commands.executeCommand("vsgit.pull", { type: "repo", repo });
               }
             }
             this.behindCache.set(repo.root, ab.behind);

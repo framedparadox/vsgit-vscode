@@ -67,7 +67,7 @@ export class SynchronizeProvider implements vscode.TreeDataProvider<SyncNode> {
     item.description = `${c.shortSha} · ${c.authorName}`;
     item.iconPath = new vscode.ThemeIcon("git-commit");
     item.tooltip = `${c.sha}\n${c.authorName} <${c.authorEmail}>`;
-    item.contextValue = "egit.syncCommit";
+    item.contextValue = "vsgit.syncCommit";
     return item;
   }
 

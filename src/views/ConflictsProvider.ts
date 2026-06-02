@@ -29,16 +29,16 @@ export class ConflictsProvider implements vscode.TreeDataProvider<ConflictNode> 
         vscode.TreeItemCollapsibleState.Expanded,
       );
       item.iconPath = new vscode.ThemeIcon("warning");
-      item.contextValue = "egit.conflictRepo";
+      item.contextValue = "vsgit.conflictRepo";
       return item;
     }
 
     const item = new vscode.TreeItem(node.change.path);
     item.description = conflictDescription(node.change);
     item.iconPath = new vscode.ThemeIcon("merge");
-    item.contextValue = "egit.conflictFile";
+    item.contextValue = "vsgit.conflictFile";
     item.command = {
-      command: "egit.conflict.openMergeEditor",
+      command: "vsgit.conflict.openMergeEditor",
       title: "Open Merge Editor",
       arguments: [node],
     };

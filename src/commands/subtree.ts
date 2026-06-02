@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
-import { EgitNode } from "../views/RepositoriesProvider";
+import { VsgitNode } from "../views/RepositoriesProvider";
 import { resolveRepo, errMsg, withProgress } from "./shared";
 
 /** Git subtree operations: add, pull, push, split subtrees. */
@@ -12,8 +12,8 @@ export function registerSubtreeCommands(
     context.subscriptions.push(vscode.commands.registerCommand(cmd, handler));
 
   // Add subtree
-  reg("egit.subtree.add", async (node: unknown) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.subtree.add", async (node: unknown) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
 
     const prefix = await vscode.window.showInputBox({
@@ -48,8 +48,8 @@ export function registerSubtreeCommands(
   });
 
   // Pull subtree updates
-  reg("egit.subtree.pull", async (node: unknown) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.subtree.pull", async (node: unknown) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
 
     const prefix = await vscode.window.showInputBox({
@@ -84,8 +84,8 @@ export function registerSubtreeCommands(
   });
 
   // Push subtree changes
-  reg("egit.subtree.push", async (node: unknown) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.subtree.push", async (node: unknown) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
 
     const prefix = await vscode.window.showInputBox({
@@ -127,8 +127,8 @@ export function registerSubtreeCommands(
   });
 
   // Split subtree
-  reg("egit.subtree.split", async (node: unknown) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.subtree.split", async (node: unknown) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
 
     const prefix = await vscode.window.showInputBox({

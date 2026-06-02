@@ -2,7 +2,7 @@
  * Stand-alone editor shim invoked by git as GIT_SEQUENCE_EDITOR / GIT_EDITOR.
  *
  * Git runs:  node sequence-editor.js <file>
- * We connect to the extension's IPC server (path in EGIT_IPC_SOCK), hand it the
+ * We connect to the extension's IPC server (path in VSGIT_IPC_SOCK), hand it the
  * file's current contents plus a "kind" derived from the filename, and block
  * until the extension returns the edited text (or signals cancellation).
  *
@@ -13,8 +13,8 @@ const net = require("node:net");
 const path = require("node:path");
 
 const file = process.argv[2];
-const sockPath = process.env.EGIT_IPC_SOCK;
-const token = process.env.EGIT_IPC_TOKEN;
+const sockPath = process.env.VSGIT_IPC_SOCK;
+const token = process.env.VSGIT_IPC_TOKEN;
 
 if (!file || !sockPath || !token) {
   // No way to round-trip; leave the file untouched so git proceeds with defaults.

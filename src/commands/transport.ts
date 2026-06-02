@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { Repository } from "../git/Repository";
-import { EgitNode } from "../views/RepositoriesProvider";
+import { VsgitNode } from "../views/RepositoriesProvider";
 import { Credentials } from "../util/credentials";
 import { resolveRepo, withProgress } from "./shared";
 
@@ -14,8 +14,8 @@ export function registerTransportCommands(
     context.subscriptions.push(vscode.commands.registerCommand(id, fn));
   const creds = new Credentials(context);
 
-  reg("egit.fetch", async (node) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.fetch", async (node) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) {
       return;
     }
@@ -35,8 +35,8 @@ export function registerTransportCommands(
     );
   });
 
-  reg("egit.pull", async (node) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.pull", async (node) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) {
       return;
     }
@@ -53,20 +53,20 @@ export function registerTransportCommands(
     );
   });
 
-  reg("egit.push", async (node) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.push", async (node) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) {
       return;
     }
     await pushDialog(manager, creds, repo);
   });
 
-  reg("egit.merge", async (node) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.merge", async (node) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) {
       return;
     }
-    const ref = await pickMergeSource(repo, node as EgitNode);
+    const ref = await pickMergeSource(repo, node as VsgitNode);
     if (!ref) {
       return;
     }
@@ -89,12 +89,12 @@ export function registerTransportCommands(
     await withProgress(manager, `Merge ${ref}`, () => repo.merge(ref, opts));
   });
 
-  reg("egit.rebase", async (node) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.rebase", async (node) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) {
       return;
     }
-    const onto = await pickMergeSource(repo, node as EgitNode, "Rebase onto");
+    const onto = await pickMergeSource(repo, node as VsgitNode, "Rebase onto");
     if (!onto) {
       return;
     }
@@ -104,10 +104,10 @@ export function registerTransportCommands(
   });
 
   // Sequencer controls (rebase/merge in progress).
-  reg("egit.rebase.continue", (node) => seq(manager, node, "rebase", "continue"));
-  reg("egit.rebase.skip", (node) => seq(manager, node, "rebase", "skip"));
-  reg("egit.rebase.abort", (node) => seq(manager, node, "rebase", "abort"));
-  reg("egit.merge.abort", (node) => seq(manager, node, "merge", "abort"));
+  reg("vsgit.rebase.continue", (node) => seq(manager, node, "rebase", "continue"));
+  reg("vsgit.rebase.skip", (node) => seq(manager, node, "rebase", "skip"));
+  reg("vsgit.rebase.abort", (node) => seq(manager, node, "rebase", "abort"));
+  reg("vsgit.merge.abort", (node) => seq(manager, node, "merge", "abort"));
 }
 
 async function seq(
@@ -116,7 +116,7 @@ async function seq(
   kind: "rebase" | "merge",
   action: "continue" | "skip" | "abort",
 ): Promise<void> {
-  const repo = await resolveRepo(manager, node as EgitNode);
+  const repo = await resolveRepo(manager, node as VsgitNode);
   if (!repo) {
     return;
   }
@@ -186,7 +186,7 @@ async function pickRemote(
 /** Pick a branch/ref to merge or rebase. Defaults from the clicked node. */
 async function pickMergeSource(
   repo: Repository,
-  node: EgitNode,
+  node: VsgitNode,
   placeHolder = "Select branch to merge",
 ): Promise<string | undefined> {
   if (node && node.type === "branch") {

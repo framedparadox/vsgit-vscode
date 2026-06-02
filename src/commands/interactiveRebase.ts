@@ -2,7 +2,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { Repository } from "../git/Repository";
-import { EgitNode } from "../views/RepositoriesProvider";
+import { VsgitNode } from "../views/RepositoriesProvider";
 import { EditorServer, EditRequest } from "../util/EditorServer";
 import { rebaseTodoHtml } from "../webviews/rebaseTodoHtml";
 import { editTextHtml } from "../webviews/editTextHtml";
@@ -30,13 +30,13 @@ export function registerInteractiveRebase(
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      "egit.rebase.interactive",
-      async (node?: EgitNode) => {
-        const repo = await resolveRepo(manager, node as EgitNode);
+      "vsgit.rebase.interactive",
+      async (node?: VsgitNode) => {
+        const repo = await resolveRepo(manager, node as VsgitNode);
         if (!repo) {
           return;
         }
-        const onto = await pickOnto(repo, node as EgitNode);
+        const onto = await pickOnto(repo, node as VsgitNode);
         if (!onto) {
           return;
         }
@@ -48,7 +48,7 @@ export function registerInteractiveRebase(
 
 async function pickOnto(
   repo: Repository,
-  node: EgitNode,
+  node: VsgitNode,
 ): Promise<string | undefined> {
   if (node && node.type === "branch") {
     return node.ref.shortName;
@@ -114,7 +114,7 @@ async function runInteractiveRebase(
 function editTodo(content: string): Promise<string | undefined> {
   const items = parseRebaseTodo(content);
   return showWebview<string>(
-    "egit.rebaseTodo",
+    "vsgit.rebaseTodo",
     "Interactive Rebase",
     (nonce, csp) => rebaseTodoHtml(nonce, csp),
     (panel, resolve) => {
@@ -136,7 +136,7 @@ function editTodo(content: string): Promise<string | undefined> {
 /** Show the text webview for a reword/edit commit message. */
 function editCommitMessage(content: string): Promise<string | undefined> {
   return showWebview<string>(
-    "egit.rebaseMessage",
+    "vsgit.rebaseMessage",
     "Edit Commit Message",
     (nonce, csp) => editTextHtml(nonce, csp),
     (panel, resolve) => {

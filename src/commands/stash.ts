@@ -1,7 +1,7 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
-import { EgitNode } from "../views/RepositoriesProvider";
+import { VsgitNode } from "../views/RepositoriesProvider";
 import { resolveRepo, withProgress } from "./shared";
 import { GitContentProvider } from "../git/GitContentProvider";
 
@@ -13,8 +13,8 @@ export function registerStashCommands(
   const reg = (id: string, fn: (...a: unknown[]) => unknown) =>
     context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
-  reg("egit.stash.create", async (node) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.stash.create", async (node) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) {
       return;
     }
@@ -36,11 +36,11 @@ export function registerStashCommands(
     );
   });
 
-  reg("egit.stash.apply", (node) => stashOp(manager, node, "apply"));
-  reg("egit.stash.pop", (node) => stashOp(manager, node, "pop"));
+  reg("vsgit.stash.apply", (node) => stashOp(manager, node, "apply"));
+  reg("vsgit.stash.pop", (node) => stashOp(manager, node, "pop"));
 
-  reg("egit.stash.drop", async (node) => {
-    const n = node as EgitNode;
+  reg("vsgit.stash.drop", async (node) => {
+    const n = node as VsgitNode;
     if (!n || n.type !== "stash") {
       return;
     }
@@ -55,8 +55,8 @@ export function registerStashCommands(
     await withProgress(manager, `Drop ${n.ref}`, () => n.repo.stashDrop(n.ref));
   });
 
-  reg("egit.stash.view", async (node) => {
-    const n = node as EgitNode;
+  reg("vsgit.stash.view", async (node) => {
+    const n = node as VsgitNode;
     if (!n || n.type !== "stash") {
       return;
     }
@@ -87,8 +87,8 @@ export function registerStashCommands(
     );
   });
 
-  reg("egit.stash.branch", async (node) => {
-    const n = node as EgitNode;
+  reg("vsgit.stash.branch", async (node) => {
+    const n = node as VsgitNode;
     if (!n || n.type !== "stash") {
       return;
     }
@@ -117,7 +117,7 @@ async function stashOp(
   node: unknown,
   op: "apply" | "pop",
 ): Promise<void> {
-  const n = node as EgitNode;
+  const n = node as VsgitNode;
   if (!n || n.type !== "stash") {
     return;
   }

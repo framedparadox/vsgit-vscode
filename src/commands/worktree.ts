@@ -18,7 +18,7 @@ export function registerWorktreeCommands(
   const reg = (id: string, fn: (...a: unknown[]) => unknown) =>
     context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
-  reg("egit.worktree.create", async () => {
+  reg("vsgit.worktree.create", async () => {
     const repos = manager.getAll();
     if (repos.length === 0) {
       vscode.window.showWarningMessage("No Git repositories found.");
@@ -83,7 +83,7 @@ export function registerWorktreeCommands(
     }
   });
 
-  reg("egit.worktree.open", async (node: unknown) => {
+  reg("vsgit.worktree.open", async (node: unknown) => {
     const n = node as WorktreeNode | undefined;
     if (!n || n.type !== "worktree") return;
     await vscode.commands.executeCommand(
@@ -93,7 +93,7 @@ export function registerWorktreeCommands(
     );
   });
 
-  reg("egit.worktree.openHere", async (node: unknown) => {
+  reg("vsgit.worktree.openHere", async (node: unknown) => {
     const n = node as WorktreeNode | undefined;
     if (!n || n.type !== "worktree") return;
     await vscode.commands.executeCommand(
@@ -103,7 +103,7 @@ export function registerWorktreeCommands(
     );
   });
 
-  reg("egit.worktree.remove", async (node: unknown) => {
+  reg("vsgit.worktree.remove", async (node: unknown) => {
     const n = node as WorktreeNode | undefined;
     if (!n || n.type !== "worktree") return;
     const confirm = await vscode.window.showWarningMessage(
@@ -125,7 +125,7 @@ export function registerWorktreeCommands(
     }
   });
 
-  reg("egit.worktree.prune", async () => {
+  reg("vsgit.worktree.prune", async () => {
     const repos = manager.getAll();
     if (repos.length === 0) return;
     await withProgress(manager, "Prune worktrees", async () => {
@@ -135,7 +135,7 @@ export function registerWorktreeCommands(
     });
   });
 
-  reg("egit.worktree.revealInExplorer", async (node: unknown) => {
+  reg("vsgit.worktree.revealInExplorer", async (node: unknown) => {
     const n = node as WorktreeNode | undefined;
     if (!n || n.type !== "worktree") return;
     await vscode.commands.executeCommand(
@@ -144,7 +144,7 @@ export function registerWorktreeCommands(
     );
   });
 
-  reg("egit.worktree.lock", async (node: unknown) => {
+  reg("vsgit.worktree.lock", async (node: unknown) => {
     const n = node as WorktreeNode | undefined;
     if (!n || n.type !== "worktree") return;
 
@@ -171,7 +171,7 @@ export function registerWorktreeCommands(
     }
   });
 
-  reg("egit.worktree.unlock", async (node: unknown) => {
+  reg("vsgit.worktree.unlock", async (node: unknown) => {
     const n = node as WorktreeNode | undefined;
     if (!n || n.type !== "worktree") return;
 

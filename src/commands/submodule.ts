@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
-import { EgitNode } from "../views/RepositoriesProvider";
+import { VsgitNode } from "../views/RepositoriesProvider";
 import { resolveRepo, withProgress } from "./shared";
 
 /** Submodule operations: add, init, update, sync. */
@@ -11,8 +11,8 @@ export function registerSubmoduleCommands(
   const reg = (id: string, fn: (...a: unknown[]) => unknown) =>
     context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
-  reg("egit.submodule.add", async (node) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.submodule.add", async (node) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) {
       return;
     }
@@ -31,10 +31,10 @@ export function registerSubmoduleCommands(
     );
   });
 
-  reg("egit.submodule.update", async (node) => {
-    const target = subTarget(node as EgitNode);
+  reg("vsgit.submodule.update", async (node) => {
+    const target = subTarget(node as VsgitNode);
     if (!target) {
-      const repo = await resolveRepo(manager, node as EgitNode);
+      const repo = await resolveRepo(manager, node as VsgitNode);
       if (!repo) {
         return;
       }
@@ -48,9 +48,9 @@ export function registerSubmoduleCommands(
     );
   });
 
-  reg("egit.submodule.sync", async (node) => {
-    const target = subTarget(node as EgitNode);
-    const repo = target?.repo ?? (await resolveRepo(manager, node as EgitNode));
+  reg("vsgit.submodule.sync", async (node) => {
+    const target = subTarget(node as VsgitNode);
+    const repo = target?.repo ?? (await resolveRepo(manager, node as VsgitNode));
     if (!repo) {
       return;
     }
@@ -59,9 +59,9 @@ export function registerSubmoduleCommands(
     );
   });
 
-  reg("egit.submodule.init", async (node) => {
-    const target = subTarget(node as EgitNode);
-    const repo = target?.repo ?? (await resolveRepo(manager, node as EgitNode));
+  reg("vsgit.submodule.init", async (node) => {
+    const target = subTarget(node as VsgitNode);
+    const repo = target?.repo ?? (await resolveRepo(manager, node as VsgitNode));
     if (!repo) {
       return;
     }
@@ -71,7 +71,7 @@ export function registerSubmoduleCommands(
   });
 }
 
-function subTarget(node: EgitNode): { repo: import("../git/Repository").Repository; path: string } | undefined {
+function subTarget(node: VsgitNode): { repo: import("../git/Repository").Repository; path: string } | undefined {
   if (node && node.type === "submodule") {
     return { repo: node.repo, path: node.path };
   }

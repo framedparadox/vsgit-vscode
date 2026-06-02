@@ -1,12 +1,12 @@
-# Git (EGit) Extension - Implementation Plan
+# Git (VsGit) Extension - Implementation Plan
 
 ## Overview
-Transform the git-vscode extension into a comprehensive EGit-style Git client for VS Code, incorporating features from vscode-gitlens, vscode-git-graph, and eclipse-egit.
+Transform the git-vscode extension into a comprehensive VsGit-style Git client for VS Code, incorporating features from vscode-gitlens, vscode-git-graph, and eclipse-vsgit.
 
 ## Phase 1: Explorer Context Menu (Team Menu) ✅ COMPLETE
 
 ### Objectives
-Implement the EGit "Team" right-click menu on files/folders in the Explorer view.
+Implement the VsGit "Team" right-click menu on files/folders in the Explorer view.
 
 ### Completed Tasks
 - ✅ Created `src/commands/fileContext.ts` with all Team menu operations
@@ -59,15 +59,15 @@ Add advanced branch and tag operations: reset, force re-tag, remote branch manag
 
 ### Completed Tasks
 - ✅ Updated `src/commands/branch.ts` with `registerBranchExtraCommands()`:
-  - `egit.branch.reset` — Soft/Mixed/Hard reset with confirmation
-  - `egit.branch.compareTo` — Compare two branches and show commit differences
-  - `egit.remoteBranch.checkout` — Checkout remote branch with local tracking
-  - `egit.remoteBranch.delete` — Delete remote branch with confirmation
+  - `vsgit.branch.reset` — Soft/Mixed/Hard reset with confirmation
+  - `vsgit.branch.compareTo` — Compare two branches and show commit differences
+  - `vsgit.remoteBranch.checkout` — Checkout remote branch with local tracking
+  - `vsgit.remoteBranch.delete` — Delete remote branch with confirmation
 - ✅ Updated `src/commands/tag.ts`:
-  - `egit.tag.forceCreate` — Force replace existing tag with confirmation
-  - `egit.tag.deleteRemote` — Delete tag from remote repository
+  - `vsgit.tag.forceCreate` — Force replace existing tag with confirmation
+  - `vsgit.tag.deleteRemote` — Delete tag from remote repository
 - ✅ Updated `src/commands/stash.ts`:
-  - `egit.stash.branch` — Create new branch from stash
+  - `vsgit.stash.branch` — Create new branch from stash
 - ✅ Updated `package.json`:
   - Added commands to contributes.commands
   - Added view/item/context menu entries for remote branches and tags
@@ -85,7 +85,7 @@ Replace the 500-commit limit with proper pagination, add compare mode and filter
 - ✅ **History View Pagination**
   - Replace `maxCommits` limit with page-based loading
   - Add "Load More" button/action in History view
-  - Use `egit.graph.pageSize` setting (default 200)
+  - Use `vsgit.graph.pageSize` setting (default 200)
   - Track current page offset per repository
   - Show loading indicator during fetch
 
@@ -126,7 +126,7 @@ Replace the 500-commit limit with proper pagination, add compare mode and filter
 
 ### Implementation Notes
 - Update `src/commands/history.ts` and `src/views/HistoryProvider.ts`
-- Add new setting `egit.history.defaultFilter` (all/current-branch)
+- Add new setting `vsgit.history.defaultFilter` (all/current-branch)
 - Use `git log --skip=N --max-count=M` for pagination
 - Store pagination state in `HistoryProvider` class
 - Add new node type `HistoryLoadMoreNode` to represent "Load More" button
@@ -140,7 +140,7 @@ Add a dedicated Compare view for side-by-side branch/ref comparison. Upgrade the
 
 ### Completed Tasks
 - ✅ **Compare View (Tree)**
-  - New tree view: `egit.compare`
+  - New tree view: `vsgit.compare`
   - Show current comparison (if active)
   - Display: "Comparing [RefA] ↔ [RefB]"
   - List commits unique to each side
@@ -149,7 +149,7 @@ Add a dedicated Compare view for side-by-side branch/ref comparison. Upgrade the
   - Toolbar actions: Switch sides, Clear comparison, Pick new refs
 
 - ✅ **Staging Panel Enhanced**
-  - Convert `egit.staging` from TreeView to Webview panel
+  - Convert `vsgit.staging` from TreeView to Webview panel
   - Full-width commit message editor
   - Checkbox lists for staged/unstaged files
   - Inline diff preview (optional, toggle)
@@ -200,7 +200,7 @@ Add context menus to VS Code's built-in SCM view (Source Control panel). Impleme
     - Discard All (with confirmation)
 
 - ✅ **Safety Confirmation Layer**
-  - Implement `egit.confirmDestructiveActions` setting check
+  - Implement `vsgit.confirmDestructiveActions` setting check
   - Destructive operations requiring confirmation:
     - Hard reset
     - Discard changes
@@ -213,7 +213,7 @@ Add context menus to VS Code's built-in SCM view (Source Control panel). Impleme
   - Store session-level bypass flag
 
 - ✅ **Command Preview (Optional)**
-  - Implement `egit.showCommandPreview` setting
+  - Implement `vsgit.showCommandPreview` setting
   - Show exact git command in a preview modal before execution
   - Allow editing command arguments
   - "Execute" / "Cancel" buttons
@@ -233,38 +233,38 @@ Implement less-common but powerful git operations: LFS management, git notes, wo
 
 ### Completed Tasks
 - ✅ **Git LFS Extended**
-  - Current: `egit.lfs.info` shows tracked files
+  - Current: `vsgit.lfs.info` shows tracked files
   - Add:
-    - `egit.lfs.track` — Track new file patterns
-    - `egit.lfs.untrack` — Untrack patterns
-    - `egit.lfs.lock` — Lock files on remote
-    - `egit.lfs.unlock` — Unlock files
-    - `egit.lfs.locks` — Show all locks
-    - `egit.lfs.pull` — Pull LFS objects
-    - `egit.lfs.prune` — Prune old LFS objects
+    - `vsgit.lfs.track` — Track new file patterns
+    - `vsgit.lfs.untrack` — Untrack patterns
+    - `vsgit.lfs.lock` — Lock files on remote
+    - `vsgit.lfs.unlock` — Unlock files
+    - `vsgit.lfs.locks` — Show all locks
+    - `vsgit.lfs.pull` — Pull LFS objects
+    - `vsgit.lfs.prune` — Prune old LFS objects
 
 - ✅ **Git Notes**
-  - `egit.notes.add` — Add note to commit
-  - `egit.notes.edit` — Edit existing note
-  - `egit.notes.remove` — Remove note
-  - `egit.notes.show` — Show notes in commit details
+  - `vsgit.notes.add` — Add note to commit
+  - `vsgit.notes.edit` — Edit existing note
+  - `vsgit.notes.remove` — Remove note
+  - `vsgit.notes.show` — Show notes in commit details
   - Display notes in History view (optional column)
 
 - ✅ **Worktree Lock/Unlock**
-  - `egit.worktree.lock` — Lock worktree (prevent pruning)
-  - `egit.worktree.unlock` — Unlock worktree
+  - `vsgit.worktree.lock` — Lock worktree (prevent pruning)
+  - `vsgit.worktree.unlock` — Unlock worktree
   - Show lock status in Worktrees view
 
 - ✅ **Git Archive**
-  - `egit.archive.create` — Create archive (zip/tar) from ref
+  - `vsgit.archive.create` — Create archive (zip/tar) from ref
   - Prompt for ref, format, output location
   - Support `--prefix` option
 
 - ✅ **Subtree Operations**
-  - `egit.subtree.add` — Add subtree
-  - `egit.subtree.pull` — Pull subtree updates
-  - `egit.subtree.push` — Push subtree changes
-  - `egit.subtree.split` — Split subtree into separate history
+  - `vsgit.subtree.add` — Add subtree
+  - `vsgit.subtree.pull` — Pull subtree updates
+  - `vsgit.subtree.push` — Push subtree changes
+  - `vsgit.subtree.split` — Split subtree into separate history
 
 ### Implementation Notes
 - Create `src/commands/lfs.ts` (extend existing)
@@ -312,7 +312,7 @@ Implement an interactive, visual git graph similar to git-graph extension and So
 ### Implementation Notes
 - Use HTML Canvas or SVG for rendering
 - Consider using `gitgraph.js` library or implement custom
-- Add setting `egit.graph.layout` (compact/detailed)
+- Add setting `vsgit.graph.layout` (compact/detailed)
 - Add toolbar: Refresh, Fetch, Branch filter, Search
 
 ---
@@ -325,7 +325,7 @@ Implement automatic background fetching and repository monitoring.
 ### Tasks
 - [ ] **Auto-Fetch Service**
   - Create `src/services/AutoFetchService.ts`
-  - Read `egit.autoFetch.enabled` and `egit.autoFetch.intervalMinutes`
+  - Read `vsgit.autoFetch.enabled` and `vsgit.autoFetch.intervalMinutes`
   - Start timer on extension activation
   - Fetch all remotes for all repositories
   - Show subtle notification on new commits
@@ -347,7 +347,7 @@ Implement automatic background fetching and repository monitoring.
 - [ ] **Pull Notifications**
   - Show notification when remote has new commits
   - Quick action: "Pull Now" button
-  - Respect `egit.autoFetch.notify` setting
+  - Respect `vsgit.autoFetch.notify` setting
 
 ### Implementation Notes
 - Use `vscode.workspace.createFileSystemWatcher()` for `.git/**` changes
@@ -385,7 +385,7 @@ Provide in-app configuration UI for common git settings.
     - Set commit template path
 
 - [ ] **Extension Settings Integration**
-  - Show current `egit.*` settings
+  - Show current `vsgit.*` settings
   - Quick toggle buttons for boolean settings
   - Link to VS Code settings editor
 
@@ -393,7 +393,7 @@ Provide in-app configuration UI for common git settings.
 - Create `src/webviews/config/` folder
 - Use `git config --list --show-origin --show-scope` to read
 - Use `git config --local/--global --add/--unset` to write
-- Add command `egit.config.openPanel`
+- Add command `vsgit.config.openPanel`
 
 ---
 
@@ -460,22 +460,22 @@ Final integration, performance optimization, accessibility, and testing.
 ## Settings Reference
 
 ### Existing Settings
-- `egit.commit.gpgSign` — Sign commits with GPG
-- `egit.commit.signOff` — Add Signed-off-by trailer
-- `egit.fetch.pruneOnFetch` — Prune on fetch
-- `egit.history.maxCommits` — Max commits in history (deprecated in Phase 3)
-- `egit.blame.enabledByDefault` — Auto-enable blame
+- `vsgit.commit.gpgSign` — Sign commits with GPG
+- `vsgit.commit.signOff` — Add Signed-off-by trailer
+- `vsgit.fetch.pruneOnFetch` — Prune on fetch
+- `vsgit.history.maxCommits` — Max commits in history (deprecated in Phase 3)
+- `vsgit.blame.enabledByDefault` — Auto-enable blame
 
 ### New Settings (Phase 1)
-- `egit.git.path` — Custom git executable path
-- `egit.autoRefresh` — Auto-refresh views on change
-- `egit.autoFetch.enabled` — Enable auto-fetch
-- `egit.autoFetch.intervalMinutes` — Fetch interval
-- `egit.graph.pageSize` — History page size (Phase 3)
-- `egit.graph.sortOrder` — Commit sort order
-- `egit.confirmDestructiveActions` — Confirm destructive ops
-- `egit.showCommandPreview` — Preview git commands
-- `egit.defaultPullMode` — Pull strategy (merge/rebase)
+- `vsgit.git.path` — Custom git executable path
+- `vsgit.autoRefresh` — Auto-refresh views on change
+- `vsgit.autoFetch.enabled` — Enable auto-fetch
+- `vsgit.autoFetch.intervalMinutes` — Fetch interval
+- `vsgit.graph.pageSize` — History page size (Phase 3)
+- `vsgit.graph.sortOrder` — Commit sort order
+- `vsgit.confirmDestructiveActions` — Confirm destructive ops
+- `vsgit.showCommandPreview` — Preview git commands
+- `vsgit.defaultPullMode` — Pull strategy (merge/rebase)
 
 ---
 

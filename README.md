@@ -1,6 +1,6 @@
-# Git (EGit) for VS Code
+# Git (VsGit) for VS Code
 
-A full-featured, EGit-style Git client for VS Code. Spawns `git` directly — no libgit2, no JS overhead — with 135+ commands across every Git workflow.
+A full-featured, VsGit-style Git client for VS Code. Spawns `git` directly — no libgit2, no JS overhead — with 135+ commands across every Git workflow.
 
 ## Features
 
@@ -79,20 +79,20 @@ A full-featured, EGit-style Git client for VS Code. Spawns `git` directly — no
 ## Requirements
 
 - VS Code 1.85+
-- `git` 2.20+ on `$PATH` (or configured via `egit.git.path`)
+- `git` 2.20+ on `$PATH` (or configured via `vsgit.git.path`)
 - `git-lfs` for LFS commands (optional)
 
 ## Extension Settings
 
 | Setting | Default | Description |
 |---|---|---|
-| `egit.autoFetch.enabled` | `false` | Fetch all remotes automatically |
-| `egit.autoFetch.intervalMinutes` | `3` | Auto-fetch interval |
-| `egit.confirmDestructiveActions` | `true` | Confirmation dialogs for hard reset, force push, etc. |
-| `egit.defaultPullMode` | `merge` | Pull strategy: merge or rebase |
-| `egit.blame.enabledByDefault` | `false` | Show blame on file open |
-| `egit.graph.pageSize` | `200` | Commits per history page |
-| `egit.git.path` | `""` | Custom git executable path |
+| `vsgit.autoFetch.enabled` | `false` | Fetch all remotes automatically |
+| `vsgit.autoFetch.intervalMinutes` | `3` | Auto-fetch interval |
+| `vsgit.confirmDestructiveActions` | `true` | Confirmation dialogs for hard reset, force push, etc. |
+| `vsgit.defaultPullMode` | `merge` | Pull strategy: merge or rebase |
+| `vsgit.blame.enabledByDefault` | `false` | Show blame on file open |
+| `vsgit.graph.pageSize` | `200` | Commits per history page |
+| `vsgit.git.path` | `""` | Custom git executable path |
 
 ## License
 

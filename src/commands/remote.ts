@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
-import { EgitNode } from "../views/RepositoriesProvider";
+import { VsgitNode } from "../views/RepositoriesProvider";
 import { resolveRepo, withProgress } from "./shared";
 
 /** Remote management: add, edit (rename/url), delete. */
@@ -11,8 +11,8 @@ export function registerRemoteCommands(
   const reg = (id: string, fn: (...a: unknown[]) => unknown) =>
     context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
-  reg("egit.remote.add", async (node) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.remote.add", async (node) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) {
       return;
     }
@@ -32,8 +32,8 @@ export function registerRemoteCommands(
     );
   });
 
-  reg("egit.remote.remove", async (node) => {
-    const n = node as EgitNode;
+  reg("vsgit.remote.remove", async (node) => {
+    const n = node as VsgitNode;
     if (!n || n.type !== "remote") {
       return;
     }
@@ -50,8 +50,8 @@ export function registerRemoteCommands(
     );
   });
 
-  reg("egit.remote.prune", async (node) => {
-    const n = node as EgitNode;
+  reg("vsgit.remote.prune", async (node) => {
+    const n = node as VsgitNode;
     let repo = await resolveRepo(manager, n);
     if (!repo) {
       return;
@@ -83,8 +83,8 @@ export function registerRemoteCommands(
     vscode.window.setStatusBarMessage(`Pruned stale refs for ${remoteName}`, 3000);
   });
 
-  reg("egit.remote.edit", async (node) => {
-    const n = node as EgitNode;
+  reg("vsgit.remote.edit", async (node) => {
+    const n = node as VsgitNode;
     if (!n || n.type !== "remote") {
       return;
     }

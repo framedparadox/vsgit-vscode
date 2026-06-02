@@ -9,10 +9,10 @@ export function registerSyncCommands(
   const reg = (id: string, fn: (...a: unknown[]) => unknown) =>
     context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
-  reg("egit.sync.refresh", () => provider.refresh());
+  reg("vsgit.sync.refresh", () => provider.refresh());
 
   // Cherry-pick a commit from the Synchronize view
-  reg("egit.sync.cherryPick", async (node) => {
+  reg("vsgit.sync.cherryPick", async (node) => {
     const n = node as SyncNode;
     if (!n || n.type !== "commit") return;
     try {
@@ -25,7 +25,7 @@ export function registerSyncCommands(
   });
 
   // Checkout (detached) a commit from the Synchronize view
-  reg("egit.sync.checkoutCommit", async (node) => {
+  reg("vsgit.sync.checkoutCommit", async (node) => {
     const n = node as SyncNode;
     if (!n || n.type !== "commit") return;
     try {
@@ -38,9 +38,9 @@ export function registerSyncCommands(
   });
 
   // Show commit details from the Synchronize view
-  reg("egit.sync.showCommitDetails", (node) => {
+  reg("vsgit.sync.showCommitDetails", (node) => {
     const n = node as SyncNode;
     if (!n || n.type !== "commit") return;
-    return vscode.commands.executeCommand("egit.showCommitDetails", n.repo, n.commit.sha);
+    return vscode.commands.executeCommand("vsgit.showCommitDetails", n.repo, n.commit.sha);
   });
 }

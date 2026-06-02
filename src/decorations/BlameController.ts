@@ -4,7 +4,7 @@ import { BlameLine } from "../git/parsers/blame";
 
 /**
  * Inline blame annotations: when enabled, shows author · date · summary at the
- * end of the current line as dimmed text (EGit's "revision annotations").
+ * end of the current line as dimmed text (VsGit's "revision annotations").
  * Toggled per-editor; recomputed when the active editor or selection changes.
  */
 export class BlameController implements vscode.Disposable {

@@ -31,7 +31,7 @@ interface WebviewCommit {
  * coloured DAG drawn by one overlay SVG, inline ref-label pills in the commit
  * rows, and an expand-at-selection commit-details row (changed files left, commit
  * metadata right). All actions are backed by `Repository` and the existing
- * `egit.*` commands; live refresh is driven by `RepositoryManager.onDidChange`.
+ * `vsgit.*` commands; live refresh is driven by `RepositoryManager.onDidChange`.
  */
 export class GraphPanel {
   public static currentPanel: GraphPanel | undefined;
@@ -102,7 +102,7 @@ export class GraphPanel {
     }
 
     const panel = vscode.window.createWebviewPanel(
-      "egit.graph",
+      "vsgit.graph",
       "Git Graph",
       column || vscode.ViewColumn.One,
       {
@@ -117,7 +117,7 @@ export class GraphPanel {
 
   // ─── config ──────────────────────────────────────────────────────────────
   private get cfg() {
-    return vscode.workspace.getConfiguration("egit");
+    return vscode.workspace.getConfiguration("vsgit");
   }
 
   /** Re-resolve the active repo against the manager; fall back if it vanished. */
@@ -293,26 +293,26 @@ export class GraphPanel {
       }
 
       switch (message.type) {
-        // ── toolbar transport: reuse existing egit.* commands (askpass + progress) ──
+        // ── toolbar transport: reuse existing vsgit.* commands (askpass + progress) ──
         case "pull":
-          await vscode.commands.executeCommand("egit.pull", { repo });
+          await vscode.commands.executeCommand("vsgit.pull", { repo });
           return;
         case "push":
-          await vscode.commands.executeCommand("egit.push", { repo });
+          await vscode.commands.executeCommand("vsgit.push", { repo });
           return;
         case "fetch":
-          await vscode.commands.executeCommand("egit.fetch", { repo });
+          await vscode.commands.executeCommand("vsgit.fetch", { repo });
           return;
         case "toolbarMerge":
-          await vscode.commands.executeCommand("egit.merge", { repo });
+          await vscode.commands.executeCommand("vsgit.merge", { repo });
           return;
         case "toolbarRebase":
-          await vscode.commands.executeCommand("egit.rebase", { repo });
+          await vscode.commands.executeCommand("vsgit.rebase", { repo });
           return;
         case "commitOpen":
-          // egit.commit is a WebviewView; VS Code auto-registers a <viewId>.focus
+          // vsgit.commit is a WebviewView; VS Code auto-registers a <viewId>.focus
           // command to reveal it.
-          await vscode.commands.executeCommand("egit.commit.focus");
+          await vscode.commands.executeCommand("vsgit.commit.focus");
           return;
         case "createBranchInteractive":
           await this.createBranch("HEAD", true);
@@ -324,7 +324,7 @@ export class GraphPanel {
         // ── sequencer (continue / skip / abort) ──
         // Driven directly through Repository.sequencerAction, which supports all
         // four kinds (rebase / merge / cherry-pick / revert); only rebase exposes
-        // continue/skip/abort as standalone egit.* commands.
+        // continue/skip/abort as standalone vsgit.* commands.
         case "seqContinue":
           await this.runSequencer(repo, message.data, "continue");
           return;
@@ -857,11 +857,11 @@ export class GraphPanel {
     <div id="main">
       <div id="loading">Loading graph…</div>
       <div id="empty-state" style="display:none">No Git repository is active.</div>
-      <!-- Column layout mirrors EGit's history view:
+      <!-- Column layout mirrors VsGit's history view:
            Id | (graph rail) | Message | Author | Authored Date | Committer | Committed Date.
            The graph rail is its own fixed-width column right after Id so the overlay
            SVG keeps a clean, uniform coordinate space; ref pills + message text live
-           in the Message column, exactly as EGit renders them. -->
+           in the Message column, exactly as VsGit renders them. -->
       <table id="graph-table">
         <colgroup>
           <col id="col-id" class="col-id">

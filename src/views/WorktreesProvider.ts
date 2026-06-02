@@ -30,7 +30,7 @@ export class WorktreesProvider implements vscode.TreeDataProvider<WorktreeTreeNo
       );
       item.iconPath = new vscode.ThemeIcon("repo");
       item.description = node.repo.root;
-      item.contextValue = "egit.worktreeRepo";
+      item.contextValue = "vsgit.worktreeRepo";
       return item;
     }
 
@@ -44,10 +44,10 @@ export class WorktreesProvider implements vscode.TreeDataProvider<WorktreeTreeNo
     item.description = wt.branch ?? wt.head.slice(0, 8);
     item.tooltip = wt.path;
     item.iconPath = new vscode.ThemeIcon(isMain ? "repo" : "git-branch");
-    item.contextValue = isMain ? "egit.worktree.main" : "egit.worktree";
+    item.contextValue = isMain ? "vsgit.worktree.main" : "vsgit.worktree";
     if (!isMain) {
       item.command = {
-        command: "egit.worktree.openHere",
+        command: "vsgit.worktree.openHere",
         title: "Open Worktree",
         arguments: [node],
       };

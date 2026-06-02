@@ -7,7 +7,7 @@ import { RefInfo } from "../git/parsers/refs";
  * The kinds of nodes the Repositories tree renders. Each TreeItem carries one
  * of these via the `node` discriminated union so commands can act on them.
  */
-export type EgitNode =
+export type VsgitNode =
   | { type: "repo"; repo: Repository }
   | { type: "group"; repo: Repository; group: GroupKind }
   | { type: "branch"; repo: Repository; ref: RefInfo }
@@ -35,10 +35,10 @@ const GROUP_LABELS: Record<GroupKind, string> = {
 };
 
 export class RepositoriesProvider
-  implements vscode.TreeDataProvider<EgitNode>
+  implements vscode.TreeDataProvider<VsgitNode>
 {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<
-    EgitNode | undefined
+    VsgitNode | undefined
   >();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
@@ -70,7 +70,7 @@ export class RepositoriesProvider
     });
   }
 
-  getTreeItem(node: EgitNode): vscode.TreeItem {
+  getTreeItem(node: VsgitNode): vscode.TreeItem {
     switch (node.type) {
       case "repo": {
         const item = new vscode.TreeItem(
@@ -84,7 +84,7 @@ export class RepositoriesProvider
         const abStr = abParts.join(" ");
         item.description = [node.repo.headName, abStr].filter(Boolean).join("  ");
         item.iconPath = new vscode.ThemeIcon("repo");
-        item.contextValue = "egit.repo";
+        item.contextValue = "vsgit.repo";
         item.tooltip = node.repo.root;
         return item;
       }
@@ -96,8 +96,8 @@ export class RepositoriesProvider
         item.iconPath = new vscode.ThemeIcon(groupIcon(node.group));
         item.contextValue =
           node.group === "localBranches" || node.group === "remoteBranches"
-            ? "egit.branchesNode"
-            : `egit.${node.group}Node`;
+            ? "vsgit.branchesNode"
+            : `vsgit.${node.group}Node`;
         return item;
       }
       case "branch": {
@@ -114,8 +114,8 @@ export class RepositoriesProvider
           .join("  ");
         item.contextValue =
           node.ref.kind === "localBranch"
-            ? "egit.branch.local"
-            : "egit.branch.remote";
+            ? "vsgit.branch.local"
+            : "vsgit.branch.remote";
         item.tooltip = node.ref.objectId;
         return item;
       }
@@ -123,26 +123,26 @@ export class RepositoriesProvider
         const item = new vscode.TreeItem(node.ref.shortName);
         item.iconPath = new vscode.ThemeIcon("tag");
         item.description = node.ref.subject;
-        item.contextValue = "egit.tag";
+        item.contextValue = "vsgit.tag";
         return item;
       }
       case "remote": {
         const item = new vscode.TreeItem(node.remoteName);
         item.iconPath = new vscode.ThemeIcon("cloud");
-        item.contextValue = "egit.remote";
+        item.contextValue = "vsgit.remote";
         return item;
       }
       case "stash": {
         const item = new vscode.TreeItem(node.message || node.ref);
         item.iconPath = new vscode.ThemeIcon("archive");
         item.description = node.ref;
-        item.contextValue = "egit.stash";
+        item.contextValue = "vsgit.stash";
         return item;
       }
       case "submodule": {
         const item = new vscode.TreeItem(node.path);
         item.iconPath = new vscode.ThemeIcon("file-submodule");
-        item.contextValue = "egit.submodule";
+        item.contextValue = "vsgit.submodule";
         return item;
       }
       case "info": {
@@ -153,19 +153,19 @@ export class RepositoriesProvider
     }
   }
 
-  getChildren(node?: EgitNode): EgitNode[] {
+  getChildren(node?: VsgitNode): VsgitNode[] {
     if (!node) {
       const repos = this.manager.getAll();
       if (repos.length === 0) {
         return [];
       }
-      return repos.map((repo) => ({ type: "repo", repo }) as EgitNode);
+      return repos.map((repo) => ({ type: "repo", repo }) as VsgitNode);
     }
 
     if (node.type === "repo") {
       const repo = node.repo;
       return (Object.keys(GROUP_LABELS) as GroupKind[]).map(
-        (group) => ({ type: "group", repo, group }) as EgitNode,
+        (group) => ({ type: "group", repo, group }) as VsgitNode,
       );
     }
 
@@ -176,28 +176,28 @@ export class RepositoriesProvider
     return [];
   }
 
-  private groupChildren(repo: Repository, group: GroupKind): EgitNode[] {
+  private groupChildren(repo: Repository, group: GroupKind): VsgitNode[] {
     switch (group) {
       case "localBranches":
         return emptyOr(
           repo.localBranches.map(
-            (ref) => ({ type: "branch", repo, ref }) as EgitNode,
+            (ref) => ({ type: "branch", repo, ref }) as VsgitNode,
           ),
         );
       case "remoteBranches":
         return emptyOr(
           repo.remoteBranches.map(
-            (ref) => ({ type: "branch", repo, ref }) as EgitNode,
+            (ref) => ({ type: "branch", repo, ref }) as VsgitNode,
           ),
         );
       case "tags":
         return emptyOr(
-          repo.tags.map((ref) => ({ type: "tag", repo, ref }) as EgitNode),
+          repo.tags.map((ref) => ({ type: "tag", repo, ref }) as VsgitNode),
         );
       case "remotes":
         return emptyOr(
           repo.remotes.map(
-            (r) => ({ type: "remote", repo, remoteName: r.name }) as EgitNode,
+            (r) => ({ type: "remote", repo, remoteName: r.name }) as VsgitNode,
           ),
         );
       case "stashes":
@@ -209,20 +209,20 @@ export class RepositoriesProvider
                 repo,
                 ref: s.ref,
                 message: s.message,
-              }) as EgitNode,
+              }) as VsgitNode,
           ),
         );
       case "submodules":
         return emptyOr(
           repo.submodules.map(
-            (s) => ({ type: "submodule", repo, path: s.path }) as EgitNode,
+            (s) => ({ type: "submodule", repo, path: s.path }) as VsgitNode,
           ),
         );
     }
   }
 }
 
-function emptyOr(nodes: EgitNode[]): EgitNode[] {
+function emptyOr(nodes: VsgitNode[]): VsgitNode[] {
   return nodes.length > 0 ? nodes : [{ type: "info", label: "(none)" }];
 }
 

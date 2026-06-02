@@ -63,7 +63,7 @@ export class HistoryView {
       return;
     }
     this.panel = vscode.window.createWebviewPanel(
-      "egit.history",
+      "vsgit.history",
       `History: ${this.repo.name}`,
       vscode.ViewColumn.Active,
       {
@@ -164,10 +164,10 @@ export class HistoryView {
         }
         break;
       case "compareBranches":
-        await vscode.commands.executeCommand("egit.history.compareBranches");
+        await vscode.commands.executeCommand("vsgit.history.compareBranches");
         break;
       case "filterByBranch":
-        await vscode.commands.executeCommand("egit.history.filterByBranch");
+        await vscode.commands.executeCommand("vsgit.history.filterByBranch");
         break;
     }
   }
@@ -193,7 +193,7 @@ export class HistoryView {
       this.state.filters.until = opts.until;
     }
     try {
-      const pageSize = vscode.workspace.getConfiguration("egit").get<number>("graph.pageSize", 200);
+      const pageSize = vscode.workspace.getConfiguration("vsgit").get<number>("graph.pageSize", 200);
       
       let revRange: string | undefined;
       if (this.state.compareMode) {

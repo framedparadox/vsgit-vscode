@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { HistoryView } from "../webviews/HistoryView";
-import { EgitNode } from "../views/RepositoriesProvider";
+import { VsgitNode } from "../views/RepositoriesProvider";
 
 /** Registers the command that opens the History webview. */
 export function registerHistoryCommands(
@@ -12,8 +12,8 @@ export function registerHistoryCommands(
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      "egit.history.show",
-      async (node?: EgitNode | { repoRoot: string; file?: string }) => {
+      "vsgit.history.show",
+      async (node?: VsgitNode | { repoRoot: string; file?: string }) => {
         // Support both node from tree view and direct invocation from file context
         if (node && "repoRoot" in node) {
           const repo = manager.getAll().find((r) => r.root === node.repoRoot);
@@ -25,7 +25,7 @@ export function registerHistoryCommands(
     ),
 
     vscode.commands.registerCommand(
-      "egit.history.compareBranches",
+      "vsgit.history.compareBranches",
       async () => {
         const repos = manager.getAll();
         if (repos.length === 0) {
@@ -53,7 +53,7 @@ export function registerHistoryCommands(
     ),
 
     vscode.commands.registerCommand(
-      "egit.history.filterByBranch",
+      "vsgit.history.filterByBranch",
       async () => {
         const repos = manager.getAll();
         if (repos.length === 0) {

@@ -66,7 +66,7 @@ export class CompareProvider implements vscode.TreeDataProvider<CompareTreeNode>
       );
       item.iconPath = new vscode.ThemeIcon("git-compare");
       item.description = node.repo.name;
-      item.contextValue = "egit.comparison";
+      item.contextValue = "vsgit.comparison";
       return item;
     }
 
@@ -77,13 +77,13 @@ export class CompareProvider implements vscode.TreeDataProvider<CompareTreeNode>
       );
       if (node.section === "left") {
         item.iconPath = new vscode.ThemeIcon("arrow-left");
-        item.contextValue = "egit.comparison.section.left";
+        item.contextValue = "vsgit.comparison.section.left";
       } else if (node.section === "right") {
         item.iconPath = new vscode.ThemeIcon("arrow-right");
-        item.contextValue = "egit.comparison.section.right";
+        item.contextValue = "vsgit.comparison.section.right";
       } else {
         item.iconPath = new vscode.ThemeIcon("files");
-        item.contextValue = "egit.comparison.section.files";
+        item.contextValue = "vsgit.comparison.section.files";
       }
       return item;
     }
@@ -94,9 +94,9 @@ export class CompareProvider implements vscode.TreeDataProvider<CompareTreeNode>
       item.description = `${c.sha.slice(0, 8)} • ${c.authorName}`;
       item.tooltip = `${c.sha}\n${c.authorName} • ${new Date(c.authorDate * 1000).toLocaleString()}\n\n${c.subject}`;
       item.iconPath = new vscode.ThemeIcon("git-commit");
-      item.contextValue = "egit.comparison.commit";
+      item.contextValue = "vsgit.comparison.commit";
       item.command = {
-        command: "egit.showCommitDetails",
+        command: "vsgit.showCommitDetails",
         title: "Show Commit",
         arguments: [node.repo, c.sha],
       };
@@ -109,9 +109,9 @@ export class CompareProvider implements vscode.TreeDataProvider<CompareTreeNode>
     item.description = path.dirname(f.path);
     item.tooltip = f.path;
     item.iconPath = vscode.ThemeIcon.File;
-    item.contextValue = "egit.comparison.file";
+    item.contextValue = "vsgit.comparison.file";
     item.command = {
-      command: "egit.compare.openDiff",
+      command: "vsgit.compare.openDiff",
       title: "Open Diff",
       arguments: [node.repo, f.path, node.ref1, node.ref2],
     };

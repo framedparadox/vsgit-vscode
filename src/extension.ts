@@ -13,9 +13,9 @@ import { registerTransportCommands } from "./commands/transport";
 import { registerInteractiveRebase } from "./commands/interactiveRebase";
 import { ReflogProvider } from "./views/ReflogProvider";
 import { registerReflogCommands } from "./commands/reflog";
-import { EgitFileDecorationProvider } from "./decorations/FileDecorations";
+import { VsgitFileDecorationProvider } from "./decorations/FileDecorations";
 import { BlameController } from "./decorations/BlameController";
-import { EgitQuickDiffProvider } from "./git/QuickDiffProvider";
+import { VsgitQuickDiffProvider } from "./git/QuickDiffProvider";
 import { registerCompareCommands } from "./commands/compare";
 import { registerBlameCommands } from "./commands/blame";
 import { SynchronizeProvider } from "./views/SynchronizeProvider";
@@ -31,7 +31,7 @@ import { registerNotesCommands } from "./commands/notes";
 import { registerArchiveCommands } from "./commands/archive";
 import { registerSubtreeCommands } from "./commands/subtree";
 import { registerGraphCommands } from "./commands/graph";
-import { GitContentProvider, EGIT_SCHEME } from "./git/GitContentProvider";
+import { GitContentProvider, VSGIT_SCHEME } from "./git/GitContentProvider";
 import { registerFileContextCommands } from "./commands/fileContext";
 import { registerReplaceCommands } from "./commands/replace";
 import { registerPatchCommands } from "./commands/patch";
@@ -57,14 +57,14 @@ export async function activate(
   // Read-only content provider backing the diff editors.
   context.subscriptions.push(
     vscode.workspace.registerTextDocumentContentProvider(
-      EGIT_SCHEME,
+      VSGIT_SCHEME,
       new GitContentProvider(),
     ),
   );
 
   const repositoriesProvider = new RepositoriesProvider(manager);
   context.subscriptions.push(
-    vscode.window.createTreeView("egit.repositories", {
+    vscode.window.createTreeView("vsgit.repositories", {
       treeDataProvider: repositoriesProvider,
       showCollapseAll: true,
     }),
@@ -72,7 +72,7 @@ export async function activate(
 
   const stagingProvider = new StagingProvider(manager);
   context.subscriptions.push(
-    vscode.window.createTreeView("egit.staging", {
+    vscode.window.createTreeView("vsgit.staging", {
       treeDataProvider: stagingProvider,
       showCollapseAll: true,
     }),
@@ -93,20 +93,20 @@ export async function activate(
 
   const reflogProvider = new ReflogProvider(manager);
   context.subscriptions.push(
-    vscode.window.createTreeView("egit.reflog", {
+    vscode.window.createTreeView("vsgit.reflog", {
       treeDataProvider: reflogProvider,
     }),
   );
 
   const syncProvider = new SynchronizeProvider(manager);
   context.subscriptions.push(
-    vscode.window.createTreeView("egit.synchronize", {
+    vscode.window.createTreeView("vsgit.synchronize", {
       treeDataProvider: syncProvider,
     }),
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("egit.repositories.refresh", () =>
+    vscode.commands.registerCommand("vsgit.repositories.refresh", () =>
       manager.scan(),
     ),
   );
@@ -124,7 +124,7 @@ export async function activate(
   // Decorations, blame, quick-diff, compare/conflicts.
   context.subscriptions.push(
     vscode.window.registerFileDecorationProvider(
-      new EgitFileDecorationProvider(manager),
+      new VsgitFileDecorationProvider(manager),
     ),
   );
   const blameController = new BlameController(manager);
@@ -133,22 +133,22 @@ export async function activate(
   
   // Phase 4 — Compare View
   const compareProvider = new CompareProvider(manager);
-  const compareView = vscode.window.createTreeView("egit.compare", {
+  const compareView = vscode.window.createTreeView("vsgit.compare", {
     treeDataProvider: compareProvider,
   });
   context.subscriptions.push(compareView);
 
   // Reveal the Compare view (called internally after starting a comparison)
   context.subscriptions.push(
-    vscode.commands.registerCommand("egit.compare.focus", () =>
-      vscode.commands.executeCommand("egit.compare.view.focus"),
+    vscode.commands.registerCommand("vsgit.compare.focus", () =>
+      vscode.commands.executeCommand("vsgit.compare.view.focus"),
     ),
   );
 
   registerCompareCommands(context, manager, compareProvider);
 
-  const quickDiff = new EgitQuickDiffProvider(manager);
-  const scm = vscode.scm.createSourceControl("egit", "Git (EGit)");
+  const quickDiff = new VsgitQuickDiffProvider(manager);
+  const scm = vscode.scm.createSourceControl("vsgit", "Git (VsGit)");
   scm.quickDiffProvider = quickDiff;
   context.subscriptions.push(scm);
 
@@ -184,7 +184,7 @@ export async function activate(
 
   registerAutoFetchCommands(context, manager, autoFetchService);
 
-  // Phase 1 — EGit Team menu + new views
+  // Phase 1 — VsGit Team menu + new views
   registerFileContextCommands(context, manager);
   registerReplaceCommands(context, manager);
   registerPatchCommands(context, manager);
@@ -194,14 +194,14 @@ export async function activate(
 
   const worktreesProvider = new WorktreesProvider(manager);
   context.subscriptions.push(
-    vscode.window.createTreeView("egit.worktrees", {
+    vscode.window.createTreeView("vsgit.worktrees", {
       treeDataProvider: worktreesProvider,
     }),
   );
 
   const conflictsProvider = new ConflictsProvider(manager);
   context.subscriptions.push(
-    vscode.window.createTreeView("egit.conflicts", {
+    vscode.window.createTreeView("vsgit.conflicts", {
       treeDataProvider: conflictsProvider,
     }),
   );

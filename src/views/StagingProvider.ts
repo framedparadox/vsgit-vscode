@@ -11,7 +11,7 @@ export type StagingNode =
 
 /**
  * Staging view: two top-level groups (Staged / Unstaged Changes) listing the
- * files in the active repository. Mirrors EGit's Staging view layout. The
+ * files in the active repository. Mirrors VsGit's Staging view layout. The
  * "active" repository is the first discovered repo (multi-repo selection comes
  * in a later phase).
  */
@@ -37,15 +37,15 @@ export class StagingProvider implements vscode.TreeDataProvider<StagingNode> {
       
       if (node.group === "conflicted") {
         label = "Conflicted Files";
-        contextValue = "egit.conflictedGroup";
+        contextValue = "vsgit.conflictedGroup";
         icon = "warning";
       } else if (node.group === "staged") {
         label = "Staged Changes";
-        contextValue = "egit.stagedGroup";
+        contextValue = "vsgit.stagedGroup";
         icon = "check-all";
       } else {
         label = "Unstaged Changes";
-        contextValue = "egit.unstagedGroup";
+        contextValue = "vsgit.unstagedGroup";
         icon = "list-unordered";
       }
       
@@ -67,22 +67,22 @@ export class StagingProvider implements vscode.TreeDataProvider<StagingNode> {
     
     // Context value and icon based on group and conflict status
     if (node.group === "conflicted" || change.conflicted) {
-      item.contextValue = "egit.conflictedFile";
+      item.contextValue = "vsgit.conflictedFile";
       item.iconPath = new vscode.ThemeIcon("warning", new vscode.ThemeColor("list.errorForeground"));
       item.tooltip = `${change.path} — CONFLICTED`;
     } else if (node.group === "staged") {
-      item.contextValue = "egit.stagedFile";
+      item.contextValue = "vsgit.stagedFile";
       item.iconPath = new vscode.ThemeIcon(statusIcon(change, node.group));
       item.tooltip = `${change.path} — ${describeState(change, node.group)}`;
     } else {
-      item.contextValue = "egit.unstagedFile";
+      item.contextValue = "vsgit.unstagedFile";
       item.iconPath = new vscode.ThemeIcon(statusIcon(change, node.group));
       item.tooltip = `${change.path} — ${describeState(change, node.group)}`;
     }
     
     // Click opens a diff.
     item.command = {
-      command: "egit.staging.openDiff",
+      command: "vsgit.staging.openDiff",
       title: "Open Diff",
       arguments: [node],
     };

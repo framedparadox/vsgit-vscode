@@ -11,7 +11,7 @@ export function registerGraphCommands(
 ): void {
   // Show git graph
   context.subscriptions.push(
-    vscode.commands.registerCommand("egit.graph.show", async (node: unknown) => {
+    vscode.commands.registerCommand("vsgit.graph.show", async (node: unknown) => {
       const repos = manager.getAll();
       if (repos.length === 0) {
         vscode.window.showWarningMessage("No Git repositories found.");

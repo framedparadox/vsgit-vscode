@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
-import { EgitNode } from "../views/RepositoriesProvider";
+import { VsgitNode } from "../views/RepositoriesProvider";
 import { resolveRepo, errMsg, withProgress } from "./shared";
 
 /** Git LFS operations: track, lock, pull, prune, etc. */
@@ -12,8 +12,8 @@ export function registerLfsCommands(
     context.subscriptions.push(vscode.commands.registerCommand(cmd, handler));
 
   // Show LFS info
-  reg("egit.lfs.info", async (node: unknown) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.lfs.info", async (node: unknown) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
 
     const hasLfs = await repo.hasLfs();
@@ -38,8 +38,8 @@ export function registerLfsCommands(
   });
 
   // Track new pattern with LFS
-  reg("egit.lfs.track", async (node: unknown) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.lfs.track", async (node: unknown) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
 
     const pattern = await vscode.window.showInputBox({
@@ -61,8 +61,8 @@ export function registerLfsCommands(
   });
 
   // Untrack pattern from LFS
-  reg("egit.lfs.untrack", async (node: unknown) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.lfs.untrack", async (node: unknown) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
 
     const pattern = await vscode.window.showInputBox({
@@ -84,8 +84,8 @@ export function registerLfsCommands(
   });
 
   // Lock file on remote
-  reg("egit.lfs.lock", async (node: unknown) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.lfs.lock", async (node: unknown) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
 
     const files = await repo.lfsFiles();
@@ -110,8 +110,8 @@ export function registerLfsCommands(
   });
 
   // Unlock file on remote
-  reg("egit.lfs.unlock", async (node: unknown) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.lfs.unlock", async (node: unknown) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
 
     const locks = await repo.lfsLocks();
@@ -151,8 +151,8 @@ export function registerLfsCommands(
   });
 
   // Show all locks
-  reg("egit.lfs.locks", async (node: unknown) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.lfs.locks", async (node: unknown) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
 
     try {
@@ -176,8 +176,8 @@ export function registerLfsCommands(
   });
 
   // Pull LFS objects
-  reg("egit.lfs.pull", async (node: unknown) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.lfs.pull", async (node: unknown) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
 
     try {
@@ -191,8 +191,8 @@ export function registerLfsCommands(
   });
 
   // Prune old LFS objects
-  reg("egit.lfs.prune", async (node: unknown) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.lfs.prune", async (node: unknown) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
 
     const confirm = await vscode.window.showWarningMessage(

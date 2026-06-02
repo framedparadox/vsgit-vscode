@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
-import { EgitNode } from "../views/RepositoriesProvider";
+import { VsgitNode } from "../views/RepositoriesProvider";
 import { resolveRepo, withProgress } from "./shared";
 
 /** Repository maintenance: garbage collection, integrity check, object prune. */
@@ -11,8 +11,8 @@ export function registerMaintenanceCommands(
   const reg = (id: string, fn: (...a: unknown[]) => unknown) =>
     context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
-  reg("egit.maintenance.gc", async (node) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.maintenance.gc", async (node) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) {
       return;
     }
@@ -36,8 +36,8 @@ export function registerMaintenanceCommands(
     vscode.window.setStatusBarMessage("Repository garbage collected", 3000);
   });
 
-  reg("egit.maintenance.fsck", async (node) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.maintenance.fsck", async (node) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) {
       return;
     }
@@ -53,15 +53,15 @@ export function registerMaintenanceCommands(
       );
       return;
     }
-    const channel = vscode.window.createOutputChannel("EGit fsck");
+    const channel = vscode.window.createOutputChannel("VsGit fsck");
     channel.clear();
     channel.appendLine(output.trim() || "No issues found — object database is intact.");
     channel.show(true);
     context.subscriptions.push(channel);
   });
 
-  reg("egit.maintenance.prune", async (node) => {
-    const repo = await resolveRepo(manager, node as EgitNode);
+  reg("vsgit.maintenance.prune", async (node) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) {
       return;
     }

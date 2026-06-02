@@ -32,7 +32,7 @@ export class RefPickerView {
   ): Promise<string | undefined> {
     return new Promise<string | undefined>((resolve) => {
       const panel = vscode.window.createWebviewPanel(
-        "egit.refPicker",
+        "vsgit.refPicker",
         opts.title ?? "Select a Branch, Tag, or Reference",
         vscode.ViewColumn.Active,
         {
@@ -112,7 +112,7 @@ async function buildGroups(
       id: "remote",
       label: "Remote Tracking",
       icon: "📁",
-      collapsedByDefault: true,  // collapsed by default, like EGit
+      collapsedByDefault: true,  // collapsed by default, like VsGit
       items: remoteItems,
     });
   }

@@ -1,0 +1,166 @@
+/* Commit view — Source-Control-like staging + commit message panel. */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  color: var(--vscode-foreground);
+  background-color: var(--vscode-sideBar-background);
+}
+
+.empty {
+  padding: 16px 12px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 13px;
+}
+
+/* ─── message editor ─────────────────────────────────────────────────────── */
+#message-box { padding: 8px; }
+
+#message {
+  width: 100%;
+  min-height: 56px;
+  max-height: 200px;
+  resize: vertical;
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 3px;
+  padding: 6px 8px;
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  outline: none;
+}
+#message:focus { border-color: var(--vscode-focusBorder); }
+
+#commit-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+#commit-btn {
+  border: none;
+  border-radius: 2px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+#commit-btn:hover { background-color: var(--vscode-button-hoverBackground); }
+
+.opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ─── groups ─────────────────────────────────────────────────────────────── */
+.group { margin-top: 4px; }
+
+.group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--vscode-descriptionForeground);
+  position: sticky;
+  top: 0;
+  background-color: var(--vscode-sideBar-background);
+}
+.group-label { flex: 1; }
+.group-count {
+  background-color: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  border-radius: 9px;
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.group-action {
+  background: transparent;
+  border: none;
+  color: var(--vscode-foreground);
+  cursor: pointer;
+  border-radius: 3px;
+  width: 18px;
+  height: 18px;
+  line-height: 16px;
+  font-size: 14px;
+}
+.group-action:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
+
+.file-empty {
+  padding: 3px 12px 6px 24px;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  font-style: italic;
+}
+
+/* ─── file rows ──────────────────────────────────────────────────────────── */
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px 2px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.file-row:hover { background-color: var(--vscode-list-hoverBackground); }
+
+.file-status {
+  width: 14px;
+  text-align: center;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-weight: 700;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.file-status.s-A { color: #4ec94e; }
+.file-status.s-M { color: #e2c08d; }
+.file-status.s-D { color: #f14c4c; }
+.file-status.s-R { color: #4daafc; }
+.file-status.s-U { color: #e2c08d; }
+.file-status.s-C { color: #f14c4c; }
+
+.file-name { flex-shrink: 0; }
+.file-dir {
+  flex: 1;
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-actions {
+  margin-left: auto;
+  display: none;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.file-row:hover .file-actions { display: inline-flex; }
+.file-action {
+  background: transparent;
+  border: none;
+  color: var(--vscode-foreground);
+  cursor: pointer;
+  border-radius: 3px;
+  width: 18px;
+  height: 18px;
+  line-height: 16px;
+  font-size: 13px;
+}
+.file-action:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }

@@ -298,6 +298,32 @@ export class Repository {
     await this.git.run(["remote", "remove", name], { cwd: this.root });
   }
 
+  /** Prune stale remote-tracking refs that no longer exist on the remote. */
+  async pruneRemote(name: string): Promise<void> {
+    await this.git.run(["remote", "prune", name], { cwd: this.root });
+  }
+
+  // --- Maintenance --------------------------------------------------------
+
+  /** Garbage-collect: compress history and prune unreachable objects. */
+  async gc(aggressive = false): Promise<void> {
+    const args = ["gc"];
+    if (aggressive) {
+      args.push("--aggressive");
+    }
+    await this.git.run(args, { cwd: this.root });
+  }
+
+  /** Verify object database connectivity and report dangling/broken objects. */
+  async fsck(): Promise<string> {
+    return this.git.stdout(["fsck", "--full"], { cwd: this.root });
+  }
+
+  /** Prune loose unreachable objects from the object database. */
+  async pruneObjects(): Promise<void> {
+    await this.git.run(["prune"], { cwd: this.root });
+  }
+
   async renameRemote(oldName: string, newName: string): Promise<void> {
     await this.git.run(["remote", "rename", oldName, newName], {
       cwd: this.root,
@@ -832,7 +858,10 @@ export class Repository {
   }> {
     // Get commits with graph structure
     const format = "%H%x00%h%x00%s%x00%an%x00%ai%x00%P%x00%D";
-    const args = ["log", `--format=${format}`, "--date-order"];
+    // --topo-order guarantees a child is always listed before its parents, which
+    // keeps the lane layout free of backtracking edges (date-order can interleave
+    // branches and place a child after a parent dated earlier).
+    const args = ["log", `--format=${format}`, "--topo-order"];
     
     if (options.limit !== undefined) {
       args.push(`--max-count=${options.limit}`);

@@ -2,10 +2,12 @@ import * as vscode from "vscode";
 import { RepositoryManager } from "./git/RepositoryManager";
 import { RepositoriesProvider } from "./views/RepositoriesProvider";
 import { StagingProvider } from "./views/StagingProvider";
+import { CommitViewProvider } from "./webviews/commit/CommitViewProvider";
 import { registerBranchCommands } from "./commands/branch";
 import { registerStagingCommands } from "./commands/staging";
 import { registerHistoryCommands } from "./commands/history";
 import { registerRemoteCommands } from "./commands/remote";
+import { registerMaintenanceCommands } from "./commands/maintenance";
 import { registerTagCommands } from "./commands/tag";
 import { registerTransportCommands } from "./commands/transport";
 import { registerInteractiveRebase } from "./commands/interactiveRebase";
@@ -76,6 +78,19 @@ export async function activate(
     }),
   );
 
+  // Commit webview: Source-Control-like staging + commit message editor.
+  const commitProvider = new CommitViewProvider(
+    context.extensionUri,
+    manager,
+    stagingProvider,
+  );
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      CommitViewProvider.viewType,
+      commitProvider,
+    ),
+  );
+
   const reflogProvider = new ReflogProvider(manager);
   context.subscriptions.push(
     vscode.window.createTreeView("egit.reflog", {
@@ -100,6 +115,7 @@ export async function activate(
   registerStagingCommands(context, manager, stagingProvider);
   registerHistoryCommands(context, manager);
   registerRemoteCommands(context, manager);
+  registerMaintenanceCommands(context, manager);
   registerTagCommands(context, manager);
   registerTransportCommands(context, manager);
   registerInteractiveRebase(context, manager);

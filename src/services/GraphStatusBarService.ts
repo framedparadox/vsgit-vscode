@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
 
 /**
- * Shows a "Git Graph" button in the status bar (footer) that opens the graph.
- * Visibility is gated on the `egit.graph.showStatusBarItem` setting.
+ * Shows an icon-only ($(git-branch)) button in the status bar (footer) that opens
+ * the Git Graph. Visibility is gated on the `egit.graph.showStatusBarItem` setting.
  */
 export class GraphStatusBarService implements vscode.Disposable {
   private readonly statusBarItem: vscode.StatusBarItem;
@@ -14,7 +14,7 @@ export class GraphStatusBarService implements vscode.Disposable {
       99,
     );
     this.statusBarItem.command = "egit.graph.show";
-    this.statusBarItem.text = "$(git-commit) Git Graph";
+    this.statusBarItem.text = "$(git-branch)";
     this.statusBarItem.tooltip = "Open Git Graph";
 
     this.configListener = vscode.workspace.onDidChangeConfiguration((e) => {

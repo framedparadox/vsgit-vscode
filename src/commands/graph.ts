@@ -36,7 +36,7 @@ export function registerGraphCommands(
         repo = pick.repo;
       }
 
-      GraphPanel.createOrShow(repo, context.extensionUri);
+      GraphPanel.createOrShow(manager, context.extensionUri, repo);
     })
   );
 }

@@ -1,0 +1,79 @@
+import * as vscode from "vscode";
+import { RepositoryManager } from "../git/RepositoryManager";
+import { EgitNode } from "../views/RepositoriesProvider";
+import { resolveRepo, withProgress } from "./shared";
+
+/** Repository maintenance: garbage collection, integrity check, object prune. */
+export function registerMaintenanceCommands(
+  context: vscode.ExtensionContext,
+  manager: RepositoryManager,
+): void {
+  const reg = (id: string, fn: (...a: unknown[]) => unknown) =>
+    context.subscriptions.push(vscode.commands.registerCommand(id, fn));
+
+  reg("egit.maintenance.gc", async (node) => {
+    const repo = await resolveRepo(manager, node as EgitNode);
+    if (!repo) {
+      return;
+    }
+    const choice = await vscode.window.showQuickPick(
+      [
+        { label: "Standard", description: "git gc", aggressive: false },
+        {
+          label: "Aggressive",
+          description: "git gc --aggressive (slower, smaller)",
+          aggressive: true,
+        },
+      ],
+      { placeHolder: "Run garbage collection" },
+    );
+    if (!choice) {
+      return;
+    }
+    await withProgress(manager, "Garbage collect", () =>
+      repo.gc(choice.aggressive),
+    );
+    vscode.window.setStatusBarMessage("Repository garbage collected", 3000);
+  });
+
+  reg("egit.maintenance.fsck", async (node) => {
+    const repo = await resolveRepo(manager, node as EgitNode);
+    if (!repo) {
+      return;
+    }
+    let output: string;
+    try {
+      output = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.SourceControl, title: "Check integrity" },
+        () => repo.fsck(),
+      );
+    } catch (e) {
+      vscode.window.showErrorMessage(
+        `Integrity check failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
+      return;
+    }
+    const channel = vscode.window.createOutputChannel("EGit fsck");
+    channel.clear();
+    channel.appendLine(output.trim() || "No issues found — object database is intact.");
+    channel.show(true);
+    context.subscriptions.push(channel);
+  });
+
+  reg("egit.maintenance.prune", async (node) => {
+    const repo = await resolveRepo(manager, node as EgitNode);
+    if (!repo) {
+      return;
+    }
+    const confirm = await vscode.window.showWarningMessage(
+      "Prune all unreachable loose objects? Recently deleted commits not yet referenced may become unrecoverable.",
+      { modal: true },
+      "Prune",
+    );
+    if (confirm !== "Prune") {
+      return;
+    }
+    await withProgress(manager, "Prune objects", () => repo.pruneObjects());
+    vscode.window.setStatusBarMessage("Unreachable objects pruned", 3000);
+  });
+}

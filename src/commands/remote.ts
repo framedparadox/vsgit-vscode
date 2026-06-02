@@ -50,6 +50,39 @@ export function registerRemoteCommands(
     );
   });
 
+  reg("egit.remote.prune", async (node) => {
+    const n = node as EgitNode;
+    let repo = await resolveRepo(manager, n);
+    if (!repo) {
+      return;
+    }
+    // If invoked on a specific remote node, prune that one; otherwise ask.
+    let remoteName: string | undefined;
+    if (n && n.type === "remote") {
+      repo = n.repo;
+      remoteName = n.remoteName;
+    } else {
+      const names = repo.remotes.map((r) => r.name);
+      if (names.length === 0) {
+        vscode.window.showWarningMessage("No remotes configured.");
+        return;
+      }
+      remoteName =
+        names.length === 1
+          ? names[0]
+          : await vscode.window.showQuickPick(names, {
+              placeHolder: "Prune stale tracking refs for which remote?",
+            });
+    }
+    if (!remoteName) {
+      return;
+    }
+    await withProgress(manager, `Prune ${remoteName}`, () =>
+      repo.pruneRemote(remoteName as string),
+    );
+    vscode.window.setStatusBarMessage(`Pruned stale refs for ${remoteName}`, 3000);
+  });
+
   reg("egit.remote.edit", async (node) => {
     const n = node as EgitNode;
     if (!n || n.type !== "remote") {

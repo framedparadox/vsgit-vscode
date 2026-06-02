@@ -30,6 +30,11 @@
 - Extracted `parseWorktreeList` and the graph-log line parser into dedicated,
   unit-tested parser modules. Test suite grows from 36 to 60 cases.
 
+### Docs
+- Rewrote the README with a detailed feature reference, settings table,
+  architecture and security sections, and illustrated `docs/` diagrams of the
+  Git Graph panel and the activity-bar trees.
+
 ## [0.1.0] - 2026-06-01
 
 ### Added

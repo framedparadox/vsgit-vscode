@@ -17,6 +17,8 @@ interface WebviewCommit {
   message: string;
   author: string;
   date: string;
+  committer: string;
+  committerDate: string;
   parents: string[];
   refs: WebviewRef[];
   kind?: "commit" | "uncommitted";
@@ -142,10 +144,11 @@ export class GraphPanel {
         showRemoteBranches: c.get<boolean>("graph.showRemoteBranches", true),
         showSidebar: c.get<boolean>("graph.showSidebar", true),
         columns: {
-          refs: c.get<boolean>("graph.showRefsColumn", true),
-          date: c.get<boolean>("graph.showDateColumn", true),
+          id: c.get<boolean>("graph.showIdColumn", true),
           author: c.get<boolean>("graph.showAuthorColumn", true),
-          commit: c.get<boolean>("graph.showCommitColumn", true),
+          authoredDate: c.get<boolean>("graph.showAuthoredDateColumn", true),
+          committer: c.get<boolean>("graph.showCommitterColumn", true),
+          committedDate: c.get<boolean>("graph.showCommittedDateColumn", true),
         },
       },
     });
@@ -206,6 +209,8 @@ export class GraphPanel {
           message: `Uncommitted Changes (${uncommittedCount})`,
           author: "",
           date: "",
+          committer: "",
+          committerDate: "",
           parents: [head.sha],
           refs: [],
           kind: "uncommitted",
@@ -849,21 +854,30 @@ export class GraphPanel {
     <div id="main">
       <div id="loading">Loading graph…</div>
       <div id="empty-state" style="display:none">No Git repository is active.</div>
+      <!-- Column layout mirrors EGit's history view:
+           Id | (graph rail) | Message | Author | Authored Date | Committer | Committed Date.
+           The graph rail is its own fixed-width column right after Id so the overlay
+           SVG keeps a clean, uniform coordinate space; ref pills + message text live
+           in the Message column, exactly as EGit renders them. -->
       <table id="graph-table">
         <colgroup>
+          <col id="col-id" class="col-id">
           <col id="col-graph">
           <col id="col-desc">
-          <col id="col-date" class="col-date">
           <col id="col-author" class="col-author">
-          <col id="col-commit" class="col-commit">
+          <col id="col-adate" class="col-adate">
+          <col id="col-committer" class="col-committer">
+          <col id="col-cdate" class="col-cdate">
         </colgroup>
         <thead>
           <tr>
+            <th class="col-id">Id<span class="col-resizer" data-col="id"></span></th>
             <th>Graph</th>
-            <th>Description<span class="col-resizer" data-col="desc"></span></th>
-            <th class="col-date">Date<span class="col-resizer" data-col="date"></span></th>
+            <th>Message<span class="col-resizer" data-col="desc"></span></th>
             <th class="col-author">Author<span class="col-resizer" data-col="author"></span></th>
-            <th class="col-commit">Commit<span class="col-resizer" data-col="commit"></span></th>
+            <th class="col-adate">Authored Date<span class="col-resizer" data-col="adate"></span></th>
+            <th class="col-committer">Committer<span class="col-resizer" data-col="committer"></span></th>
+            <th class="col-cdate">Committed Date<span class="col-resizer" data-col="cdate"></span></th>
           </tr>
         </thead>
         <tbody id="graph-body"></tbody>

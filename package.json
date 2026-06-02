@@ -2022,6 +2022,26 @@
           "group": "1@2"
         },
         {
+          "command": "egit.merge",
+          "when": "view == egit.repositories && viewItem == egit.repo",
+          "group": "1b@1"
+        },
+        {
+          "command": "egit.rebase",
+          "when": "view == egit.repositories && viewItem == egit.repo",
+          "group": "1b@2"
+        },
+        {
+          "command": "egit.branch.reset",
+          "when": "view == egit.repositories && viewItem == egit.repo",
+          "group": "1b@3"
+        },
+        {
+          "command": "egit.tag.create",
+          "when": "view == egit.repositories && viewItem == egit.repo",
+          "group": "1b@4"
+        },
+        {
           "submenu": "egit.repo.switchTo",
           "when": "view == egit.repositories && viewItem == egit.repo",
           "group": "2@1"
@@ -2858,25 +2878,30 @@
           "default": true,
           "description": "Show remote branches in the Git Graph by default."
         },
-        "egit.graph.showRefsColumn": {
+        "egit.graph.showIdColumn": {
           "type": "boolean",
           "default": true,
-          "description": "Show the Branches / Tags column in the Git Graph."
-        },
-        "egit.graph.showDateColumn": {
-          "type": "boolean",
-          "default": true,
-          "description": "Show the Date column in the Git Graph."
+          "description": "Show the Id (commit hash) column in the Git Graph."
         },
         "egit.graph.showAuthorColumn": {
           "type": "boolean",
           "default": true,
           "description": "Show the Author column in the Git Graph."
         },
-        "egit.graph.showCommitColumn": {
+        "egit.graph.showAuthoredDateColumn": {
           "type": "boolean",
           "default": true,
-          "description": "Show the Commit (hash) column in the Git Graph."
+          "description": "Show the Authored Date column in the Git Graph."
+        },
+        "egit.graph.showCommitterColumn": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the Committer column in the Git Graph."
+        },
+        "egit.graph.showCommittedDateColumn": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the Committed Date column in the Git Graph."
         },
         "egit.graph.dateFormat": {
           "type": "string",

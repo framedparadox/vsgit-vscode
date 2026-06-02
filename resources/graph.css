@@ -274,9 +274,19 @@ body {
 
 /* Rows are locked to exactly 24px (= ROW_H in graph.js) so the single overlay
    SVG's per-row coordinates line up with the table rows. No vertical padding or
-   borders on commit cells, or the centres would drift. */
-#graph-table tr.commit-row { height: 24px; cursor: pointer; }
-#graph-table tr.commit-row td { height: 24px; padding-top: 0; padding-bottom: 0; line-height: 24px; }
+   borders on commit cells, or the centres would drift. The inline ref pills in the
+   Message column are 18px+2px tall; without clamping the row height they would push
+   a row past 24px and throw every dot/line below it out of alignment — so every
+   commit cell hard-clamps its box to 24px and clips vertical overflow. */
+#graph-table tr.commit-row { height: 24px; max-height: 24px; cursor: pointer; }
+#graph-table tr.commit-row td {
+  height: 24px;
+  max-height: 24px;
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 24px;
+  overflow: hidden;
+}
 #graph-table tr.commit-row:hover { background-color: var(--vscode-list-hoverBackground); }
 #graph-table tr.commit-row.selected,
 #graph-table tr.commit-row.commitDetailsOpen {
@@ -294,7 +304,9 @@ body {
 /* graph column: a fixed-width spacer; the overlay SVG lives in the first row's
    cell and is positioned absolutely so it spans every row in one coordinate
    space (it must not be clipped). */
-td.col-graph { padding: 0; vertical-align: middle; white-space: nowrap; position: relative; overflow: visible; }
+/* The graph cell must NOT clip: its overlay SVG spans every row out of this one
+   cell, so it overrides the row's `overflow:hidden` clamp (higher specificity). */
+#graph-table tr.commit-row td.col-graph { padding: 0; vertical-align: middle; white-space: nowrap; position: relative; overflow: visible; }
 #graph-svg { position: absolute; top: 0; left: 0; overflow: visible; pointer-events: none; z-index: 1; }
 #graph-svg .graph-node { pointer-events: auto; }
 
@@ -306,7 +318,7 @@ td.col-desc {
   white-space: nowrap;
   font-size: 12px;
 }
-td.col-date, td.col-author, td.col-commit {
+td.col-id, td.col-author, td.col-adate, td.col-committer, td.col-cdate {
   padding: 0 6px;
   vertical-align: middle;
   white-space: nowrap;
@@ -315,7 +327,7 @@ td.col-date, td.col-author, td.col-commit {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-td.col-commit { font-family: var(--vscode-editor-font-family, monospace); }
+td.col-id { font-family: var(--vscode-editor-font-family, monospace); }
 
 th.hidden-col, td.hidden-col { display: none; }
 
@@ -333,12 +345,11 @@ tr.commit-row.uncommitted td.col-desc { font-style: italic; color: var(--vscode-
   display: inline-block;
   height: 18px;
   line-height: 18px;
-  margin-top: 2px;
   margin-right: 5px;
   background-color: rgba(128, 128, 128, 0.15);
   border-radius: 5px;
   border: 1px solid rgba(128, 128, 128, 0.75);
-  vertical-align: top;
+  vertical-align: middle;
   font-size: 12px;
   cursor: pointer;
   overflow: hidden;

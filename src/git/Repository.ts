@@ -850,14 +850,19 @@ export class Repository {
       message: string;
       author: string;
       date: string;
+      committer: string;
+      committerDate: string;
       parents: string[];
       refs: string[];
     }>;
     branches: Array<{ name: string; sha: string; isHead: boolean }>;
     tags: Array<{ name: string; sha: string }>;
   }> {
-    // Get commits with graph structure
-    const format = "%H%x00%h%x00%s%x00%an%x00%ai%x00%P%x00%D";
+    // Get commits with graph structure. Fields (NUL-separated): full SHA, short
+    // SHA, subject, author name, author date, committer name, committer date,
+    // parent SHAs, ref names. EGit's history shows author and committer (and both
+    // of their dates) as separate columns, so we capture %cn/%ci alongside %an/%ai.
+    const format = "%H%x00%h%x00%s%x00%an%x00%ai%x00%cn%x00%ci%x00%P%x00%D";
     // --topo-order guarantees a child is always listed before its parents, which
     // keeps the lane layout free of backtracking edges (date-order can interleave
     // branches and place a child after a parent dated earlier).
@@ -879,18 +884,21 @@ export class Repository {
     const lines = out.trim().split("\n").filter((l) => l.length > 0);
     
     const commits = lines.map((line) => {
-      const [sha, shortSha, message, author, date, parentsStr, refsStr] = line.split("\x00");
+      const [sha, shortSha, message, author, date, committer, committerDate, parentsStr, refsStr] =
+        line.split("\x00");
       const parents = parentsStr ? parentsStr.split(" ") : [];
       const refs = refsStr
         ? refsStr.split(", ").map((r) => r.trim().replace(/^HEAD -> /, ""))
         : [];
-      
+
       return {
         sha,
         shortSha,
         message,
         author,
         date,
+        committer,
+        committerDate,
         parents,
         refs,
       };

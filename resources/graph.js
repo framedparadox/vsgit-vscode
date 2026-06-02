@@ -30,7 +30,9 @@ let CONFIG = {
             '#00d9cc','#e138e8','#85d900','#dc5b23','#6f24d6','#ffcc00'],
   style: 'rounded',
   dateFormat: 'relative',
-  columns: { refs: true, date: true, author: true, commit: true },
+  // EGit-style columns: Id | Graph | Message | Author | Authored Date |
+  // Committer | Committed Date. Id/Graph/Message are always shown; the rest toggle.
+  columns: { id: true, author: true, authoredDate: true, committer: true, committedDate: true },
   showRemoteBranches: true,
   showSidebar: true,
 };
@@ -643,15 +645,24 @@ function renderTable(rows) {
     tr.dataset.sha = commit.sha;
     if (commit.sha === selectedSha) tr.classList.add('selected');
 
-    // The graph cell is an empty fixed-size spacer; all lines + dots are drawn by
-    // one overlay SVG appended to the first row's graph cell (see below), so the
-    // whole DAG shares one coordinate space and edges never break across rows.
+    // Column order mirrors EGit: Id | Graph | Message | Author | Authored Date |
+    // Committer | Committed Date.
+
+    // Id: the abbreviated commit hash (EGit's leading column).
+    const tdId = document.createElement('td');
+    tdId.className = 'col-id';
+    tdId.textContent = commit.kind === 'uncommitted' ? '*' : commit.shortSha;
+    tr.appendChild(tdId);
+
+    // Graph: a fixed-size spacer cell; all lines + dots are drawn by one overlay
+    // SVG appended to the first row's graph cell (see below), so the whole DAG
+    // shares one coordinate space and edges never break across rows.
     const tdGraph = document.createElement('td');
     tdGraph.className = 'col-graph';
     if (i === 0) tdGraph.appendChild(buildGraphSvg(rows));
     tr.appendChild(tdGraph);
 
-    // Description: inline ref pills, then the commit message (git-graph style).
+    // Message: inline ref pills, then the commit subject (EGit / git-graph style).
     const tdDesc = document.createElement('td');
     tdDesc.className = 'col-desc';
     tdDesc.appendChild(refBadgesFor(commit, colorOf.get(commit.sha) ?? row.colorIdx));
@@ -662,20 +673,29 @@ function renderTable(rows) {
     tdDesc.appendChild(text);
     tr.appendChild(tdDesc);
 
-    const tdDate = document.createElement('td');
-    tdDate.className = 'col-date';
-    tdDate.textContent = commit.kind === 'uncommitted' ? '' : formatDate(commit.date);
-    tr.appendChild(tdDate);
-
     const tdAuthor = document.createElement('td');
     tdAuthor.className = 'col-author';
     tdAuthor.textContent = commit.author || '';
+    tdAuthor.title = commit.author || '';
     tr.appendChild(tdAuthor);
 
-    const tdCommit = document.createElement('td');
-    tdCommit.className = 'col-commit';
-    tdCommit.textContent = commit.kind === 'uncommitted' ? '*' : commit.shortSha;
-    tr.appendChild(tdCommit);
+    const tdADate = document.createElement('td');
+    tdADate.className = 'col-adate';
+    tdADate.textContent = commit.kind === 'uncommitted' ? '' : formatDate(commit.date);
+    tdADate.title = commit.date || '';
+    tr.appendChild(tdADate);
+
+    const tdCommitter = document.createElement('td');
+    tdCommitter.className = 'col-committer';
+    tdCommitter.textContent = commit.committer || '';
+    tdCommitter.title = commit.committer || '';
+    tr.appendChild(tdCommitter);
+
+    const tdCDate = document.createElement('td');
+    tdCDate.className = 'col-cdate';
+    tdCDate.textContent = commit.kind === 'uncommitted' ? '' : formatDate(commit.committerDate);
+    tdCDate.title = commit.committerDate || '';
+    tr.appendChild(tdCDate);
 
     tr.addEventListener('click', (e) => selectCommit(commit, tr, e));
     tr.addEventListener('contextmenu', (e) => {
@@ -690,10 +710,12 @@ function renderTable(rows) {
 }
 
 function applyColumnWidths() {
-  const set = (id, w) => { if (w) document.getElementById(id).style.width = w + 'px'; };
-  set('col-date', colWidths.date || 92);
-  set('col-author', colWidths.author || 140);
-  set('col-commit', colWidths.commit || 80);
+  const set = (id, w) => { const el = document.getElementById(id); if (w && el) el.style.width = w + 'px'; };
+  set('col-id', colWidths.id || 80);
+  set('col-author', colWidths.author || 130);
+  set('col-adate', colWidths.adate || 130);
+  set('col-committer', colWidths.committer || 130);
+  set('col-cdate', colWidths.cdate || 130);
 }
 function applyColumnVisibility() {
   const toggle = (cls, show) => {
@@ -701,9 +723,11 @@ function applyColumnVisibility() {
       el.classList.toggle('hidden-col', !show);
     });
   };
-  toggle('col-date', CONFIG.columns.date);
+  toggle('col-id', CONFIG.columns.id);
   toggle('col-author', CONFIG.columns.author);
-  toggle('col-commit', CONFIG.columns.commit);
+  toggle('col-adate', CONFIG.columns.authoredDate);
+  toggle('col-committer', CONFIG.columns.committer);
+  toggle('col-cdate', CONFIG.columns.committedDate);
 }
 
 // keyboard navigation over rows
@@ -844,11 +868,13 @@ function openExpandedRow(commit, tr) {
   }
 }
 
-// LEFT pane: commit metadata + message, formatted as vscode-git-graph does.
+// LEFT pane: commit metadata + message. Shows author AND committer (with their
+// respective dates), matching EGit's commit detail.
 function renderSummary(commit) {
   const host = document.getElementById('cdvSummary');
   if (!host) return;
-  const dateStr = commit.date ? formatLongDate(commit.date) : '';
+  const authoredStr = commit.date ? formatLongDate(commit.date) : '';
+  const committedStr = commit.committerDate ? formatLongDate(commit.committerDate) : '';
 
   const parents = (commit.parents || []).length
     ? (commit.parents || []).map((p) =>
@@ -859,8 +885,8 @@ function renderSummary(commit) {
     '<span class="cdvSummaryTop"><span class="cdvSummaryTopRow"><span class="cdvSummaryKeyValues">' +
       '<b>Commit: </b>' + esc(commit.sha) + '<br>' +
       '<b>Parents: </b>' + parents + '<br>' +
-      '<b>Author: </b>' + esc(commit.author || '') + '<br>' +
-      '<b>Date: </b>' + esc(dateStr) +
+      '<b>Author: </b>' + esc(commit.author || '') + ' &lt;' + esc(authoredStr) + '&gt;<br>' +
+      '<b>Committer: </b>' + esc(commit.committer || '') + ' &lt;' + esc(committedStr) + '&gt;' +
     '</span></span></span><br><br>' +
     '<span class="cdvBody">' + esc(commit.message) + '</span>';
 

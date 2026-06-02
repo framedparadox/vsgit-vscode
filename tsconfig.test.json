@@ -6,6 +6,13 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
-  "include": ["src/git/parsers/**/*.ts"],
+  "include": [
+    "src/git/parsers/**/*.ts",
+    "src/git/GitError.ts",
+    "src/git/argGuard.ts",
+    "src/git/argGuard.test.ts",
+    "src/util/token.ts",
+    "src/util/token.test.ts"
+  ],
   "exclude": ["node_modules"]
 }

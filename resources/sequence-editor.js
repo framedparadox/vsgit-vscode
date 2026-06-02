@@ -14,8 +14,9 @@ const path = require("node:path");
 
 const file = process.argv[2];
 const sockPath = process.env.EGIT_IPC_SOCK;
+const token = process.env.EGIT_IPC_TOKEN;
 
-if (!file || !sockPath) {
+if (!file || !sockPath || !token) {
   // No way to round-trip; leave the file untouched so git proceeds with defaults.
   process.exit(0);
 }
@@ -25,7 +26,8 @@ const kind = base === "git-rebase-todo" ? "sequence" : "commit";
 const content = fs.readFileSync(file, "utf8");
 
 const socket = net.connect(sockPath, () => {
-  const req = JSON.stringify({ kind, content_b64: Buffer.from(content, "utf8").toString("base64") });
+  // The token authenticates us to the extension's IPC server.
+  const req = JSON.stringify({ kind, token, content_b64: Buffer.from(content, "utf8").toString("base64") });
   socket.write(req + "\n");
 });
 

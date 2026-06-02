@@ -1,9 +1,18 @@
 /**
- * Returns the HTML for the History webview. The graph is drawn on a <canvas>
- * lane-by-lane from the commit/parents data the extension posts in. All styling
- * uses VS Code theme variables so it matches the active color theme.
+ * Returns the HTML for the History webview. The commit graph is drawn by a single
+ * overlay SVG spanning every row in one coordinate space — the same robust model
+ * the Git Graph panel uses — sourced from the shared, unit-tested layout module
+ * (resources/graphLayout.js). The previous per-row <canvas> approach drew each
+ * lane in half-row segments, so pass-through branch lines broke apart between
+ * rows; the overlay SVG cannot fall out of alignment because every dot and edge
+ * is positioned from the same row-index → pixel mapping.
+ *
+ * All styling uses VS Code theme variables so it matches the active color theme.
+ *
+ * @param layoutUri webview URI of resources/graphLayout.js (loaded before the
+ *   inline script so `GraphLayout` is available).
  */
-export function historyHtml(nonce: string, cspSource: string): string {
+export function historyHtml(nonce: string, cspSource: string, layoutUri: string): string {
   return /* html */ `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -13,7 +22,7 @@ export function historyHtml(nonce: string, cspSource: string): string {
 <style>
   body { margin: 0; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size);
     color: var(--vscode-foreground); background: var(--vscode-editor-background); }
-  #toolbar { position: sticky; top: 0; display: flex; gap: 6px; padding: 6px 8px;
+  #toolbar { position: sticky; top: 0; z-index: 5; display: flex; gap: 6px; padding: 6px 8px;
     background: var(--vscode-sideBar-background); border-bottom: 1px solid var(--vscode-panel-border); }
   #toolbar input, #toolbar select, #toolbar button {
     font-family: inherit; font-size: inherit; color: var(--vscode-input-foreground);
@@ -25,19 +34,25 @@ export function historyHtml(nonce: string, cspSource: string): string {
   #list { flex: 1; overflow: auto; }
   #details { width: 40%; min-width: 240px; overflow: auto; border-left: 1px solid var(--vscode-panel-border); padding: 8px; }
   table { width: 100%; border-collapse: collapse; }
-  tr.commit { cursor: pointer; }
+  /* Rows are locked to ROW_H (24px) so the single overlay SVG's per-row
+     coordinates line up exactly with the table rows. No vertical padding on
+     commit cells or the dot/line centres would drift. */
+  tr.commit { cursor: pointer; height: 24px; }
+  tr.commit td { height: 24px; max-height: 24px; padding: 0 8px; line-height: 24px; overflow: hidden; }
   tr.commit:hover { background: var(--vscode-list-hoverBackground); }
   tr.commit.selected { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
-  td { padding: 2px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  td.graph { padding: 0; width: 0; }
+  td { white-space: nowrap; text-overflow: ellipsis; }
+  /* The graph cell holds the overlay SVG (in the first row) and must not clip it. */
+  td.graph { padding: 0; position: relative; overflow: visible; white-space: nowrap; }
+  svg.graph-svg { position: absolute; top: 0; left: 0; overflow: visible; pointer-events: none; }
   td.subject { width: 100%; max-width: 0; }
   td.author, td.date, td.sha { color: var(--vscode-descriptionForeground); }
-  .ref { display: inline-block; padding: 0 5px; margin-right: 4px; border-radius: 3px; font-size: 0.85em; }
+  td.sha { font-family: var(--vscode-editor-font-family, monospace); }
+  .ref { display: inline-block; padding: 0 5px; margin-right: 4px; border-radius: 3px; font-size: 0.85em; line-height: 16px; vertical-align: middle; }
   .ref.head { background: var(--vscode-gitDecoration-modifiedResourceForeground, #4a8); color: #000; }
   .ref.localBranch { background: var(--vscode-charts-green, #3a3); color: #000; }
   .ref.remoteBranch { background: var(--vscode-charts-blue, #36c); color: #fff; }
   .ref.tag { background: var(--vscode-charts-yellow, #cc3); color: #000; }
-  canvas { display: block; }
   #details h3 { margin: 0 0 4px; font-size: 1.05em; }
   #details .meta { color: var(--vscode-descriptionForeground); margin-bottom: 8px; }
   #details .body { white-space: pre-wrap; margin-bottom: 10px; padding: 6px; background: var(--vscode-textBlockQuote-background); }
@@ -64,42 +79,26 @@ export function historyHtml(nonce: string, cspSource: string): string {
     <div id="list"><div class="empty">Loading…</div></div>
     <div id="details"><div class="empty">Select a commit</div></div>
   </div>
+<script nonce="${nonce}" src="${layoutUri}"></script>
 <script nonce="${nonce}">
 const vscode = acquireVsCodeApi();
-const ROW_H = 22, LANE_W = 14, DOT_R = 4;
+const SVGNS = 'http://www.w3.org/2000/svg';
+// Pixel tunables — ROW_H MUST match the CSS row height (24px) or the overlay SVG
+// will drift out of alignment with the table rows.
+const ROW_H = 24, COL_W = 14, PAD = 8, DOT_R = 4;
 const colors = ["#e06c75","#61afef","#98c379","#e5c07b","#c678dd","#56b6c2","#d19a66"];
 let commits = [], selected = null;
 
-function laneAssign(list) {
-  // Simple lane layout: track active branches by expected next sha.
-  const lanes = []; // array of sha each lane is currently waiting for
-  const rows = [];
-  for (const c of list) {
-    let lane = lanes.indexOf(c.sha);
-    if (lane === -1) { lane = lanes.indexOf(null); if (lane === -1) { lane = lanes.length; } lanes[lane] = c.sha; }
-    const parentLanes = [];
-    // First parent stays in this lane; others get new lanes.
-    if (c.parents.length === 0) { lanes[lane] = null; }
-    else {
-      lanes[lane] = c.parents[0];
-      parentLanes.push(lane);
-      for (let i = 1; i < c.parents.length; i++) {
-        let pl = lanes.indexOf(c.parents[i]);
-        if (pl === -1) { pl = lanes.indexOf(null); if (pl === -1) pl = lanes.length; lanes[pl] = c.parents[i]; }
-        parentLanes.push(pl);
-      }
-    }
-    rows.push({ commit: c, lane, parentLanes, activeLanes: lanes.slice() });
-  }
-  return rows;
-}
+function laneColor(idx) { return colors[idx % colors.length]; }
 
 function render() {
   const list = document.getElementById('list');
   if (commits.length === 0) { list.innerHTML = '<div class="empty">No commits.</div>'; return; }
-  const rows = laneAssign(commits);
-  const maxLane = Math.max(1, ...rows.map(r => Math.max(r.lane, ...r.parentLanes, r.activeLanes.length))) ;
-  const gw = (maxLane + 1) * LANE_W;
+
+  // One shared, unit-tested layout pass over the whole DAG.
+  const rows = GraphLayout.buildLayout(commits);
+  const maxCols = rows.length ? rows[0].maxCols : 1;
+  const graphW = maxCols * COL_W + PAD * 2;
 
   const table = document.createElement('table');
   rows.forEach((r, idx) => {
@@ -107,48 +106,53 @@ function render() {
     const tr = document.createElement('tr');
     tr.className = 'commit'; tr.dataset.sha = c.sha;
     if (c.sha === selected) tr.classList.add('selected');
-    const refs = c.refs.map(rf => '<span class="ref ' + rf.kind + '">' + esc(rf.name) + '</span>').join('');
+    const refs = (c.refs || []).map(rf => '<span class="ref ' + esc(rf.kind) + '">' + esc(rf.name) + '</span>').join('');
     tr.innerHTML =
-      '<td class="graph"><canvas width="' + gw + '" height="' + ROW_H + '" data-row="' + idx + '"></canvas></td>' +
+      '<td class="graph"></td>' +
       '<td class="subject">' + refs + esc(c.subject) + '</td>' +
       '<td class="author">' + esc(c.authorName) + '</td>' +
       '<td class="date">' + fmtDate(c.authorDate) + '</td>' +
       '<td class="sha">' + esc(c.shortSha) + '</td>';
+    const graphCell = tr.firstChild;
+    graphCell.style.width = graphW + 'px';
+    // The overlay SVG lives in the first row's graph cell and spans every row.
+    if (idx === 0) graphCell.appendChild(buildGraphSvg(rows, graphW));
     tr.addEventListener('click', () => select(c.sha));
     tr.addEventListener('contextmenu', (e) => { e.preventDefault(); select(c.sha); vscode.postMessage({ type: 'context', sha: c.sha }); });
     table.appendChild(tr);
   });
   list.innerHTML = ''; list.appendChild(table);
-  // Draw graph segments per row.
-  rows.forEach((r, idx) => drawRow(table, rows, idx));
 }
 
-function drawRow(table, rows, idx) {
-  const canvas = table.querySelector('canvas[data-row="' + idx + '"]');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const r = rows[idx];
-  const x = (lane) => lane * LANE_W + LANE_W / 2;
-  // Vertical pass-through lines for lanes active in next row.
-  const next = rows[idx + 1];
-  if (next) {
-    next.activeLanes.forEach((sha, lane) => {
-      if (sha == null) return;
-      ctx.strokeStyle = colors[lane % colors.length]; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.moveTo(x(lane), ROW_H/2); ctx.lineTo(x(lane), ROW_H); ctx.stroke();
-    });
-  }
-  // Incoming line from top to this dot.
-  ctx.strokeStyle = colors[r.lane % colors.length]; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(x(r.lane), 0); ctx.lineTo(x(r.lane), ROW_H/2); ctx.stroke();
-  // Connections to parents (drawn into the next rows' lanes).
-  r.parentLanes.forEach((pl) => {
-    ctx.strokeStyle = colors[pl % colors.length];
-    ctx.beginPath(); ctx.moveTo(x(r.lane), ROW_H/2); ctx.lineTo(x(pl), ROW_H); ctx.stroke();
+// Build the single overlay SVG: coloured edges first, commit dots on top.
+function buildGraphSvg(rows, graphW) {
+  const geom = GraphLayout.defaultGeom({ ROW_H: ROW_H, COL_W: COL_W, PAD: PAD, R: DOT_R, style: 'rounded' });
+  const svg = document.createElementNS(SVGNS, 'svg');
+  svg.setAttribute('class', 'graph-svg');
+  svg.setAttribute('width', String(graphW));
+  svg.setAttribute('height', String(rows.length * ROW_H));
+
+  GraphLayout.computeEdges(rows, geom).forEach((e) => {
+    const p = document.createElementNS(SVGNS, 'path');
+    p.setAttribute('d', e.d);
+    p.setAttribute('fill', 'none');
+    p.setAttribute('stroke', laneColor(e.colorIdx));
+    p.setAttribute('stroke-width', '2');
+    p.setAttribute('stroke-linecap', 'round');
+    p.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(p);
   });
-  // The commit dot.
-  ctx.fillStyle = colors[r.lane % colors.length];
-  ctx.beginPath(); ctx.arc(x(r.lane), ROW_H/2, DOT_R, 0, Math.PI*2); ctx.fill();
+  GraphLayout.computeNodes(rows, geom).forEach((n) => {
+    const dot = document.createElementNS(SVGNS, 'circle');
+    dot.setAttribute('cx', String(n.cx));
+    dot.setAttribute('cy', String(n.cy));
+    dot.setAttribute('r', String(DOT_R));
+    dot.setAttribute('fill', laneColor(n.colorIdx));
+    dot.setAttribute('stroke', 'rgba(0,0,0,0.35)');
+    dot.setAttribute('stroke-width', '1');
+    svg.appendChild(dot);
+  });
+  return svg;
 }
 
 function select(sha) {
@@ -161,8 +165,8 @@ function renderDetails(c, files) {
   const d = document.getElementById('details');
   if (!c) { d.innerHTML = '<div class="empty">Select a commit</div>'; return; }
   const fileItems = files.map(f =>
-    '<li class="' + f.status + '" data-path="' + esc(f.path) + '" data-sha="' + c.sha + '">' +
-    f.status + '  ' + esc(f.path) + '</li>').join('');
+    '<li class="' + esc(f.status) + '" data-path="' + esc(f.path) + '" data-sha="' + esc(c.sha) + '">' +
+    esc(f.status) + '  ' + esc(f.path) + '</li>').join('');
   d.innerHTML =
     '<h3>' + esc(c.subject) + '</h3>' +
     '<div class="meta">' + esc(c.shortSha) + ' · ' + esc(c.authorName) + ' &lt;' + esc(c.authorEmail) + '&gt; · ' + fmtDate(c.authorDate) + '</div>' +
@@ -172,7 +176,7 @@ function renderDetails(c, files) {
     li.addEventListener('click', () => vscode.postMessage({ type: 'openFile', sha: li.dataset.sha, path: li.dataset.path })));
 }
 
-function esc(s) { return String(s).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])); }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])); }
 function fmtDate(unix) { const dt = new Date(unix*1000); return dt.toISOString().slice(0,10) + ' ' + dt.toTimeString().slice(0,5); }
 
 function requestLog() {

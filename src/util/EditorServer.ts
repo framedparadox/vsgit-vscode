@@ -3,6 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
 import * as vscode from "vscode";
+import { safeEqual } from "./token";
 
 export interface EditRequest {
   kind: "sequence" | "commit";
@@ -20,6 +21,13 @@ export type EditHandler = (req: EditRequest) => Promise<string | undefined>;
 export class EditorServer implements vscode.Disposable {
   readonly sockPath: string;
   private readonly server: net.Server;
+  /**
+   * Per-session secret. The socket/pipe name is enumerable, so the shim must
+   * echo this token (handed to it only via the child environment) before we
+   * accept rebase-todo / commit-message content — otherwise a local process
+   * could inject or read what git is editing.
+   */
+  private readonly token = crypto.randomBytes(32).toString("hex");
 
   constructor(private readonly handler: EditHandler) {
     this.sockPath = EditorServer.makeSocketPath();
@@ -33,6 +41,7 @@ export class EditorServer implements vscode.Disposable {
     const cmd = `"${process.execPath}" "${shimPath}"`;
     return {
       EGIT_IPC_SOCK: this.sockPath,
+      EGIT_IPC_TOKEN: this.token,
       GIT_SEQUENCE_EDITOR: cmd,
       GIT_EDITOR: cmd,
     };
@@ -42,6 +51,11 @@ export class EditorServer implements vscode.Disposable {
     let buf = "";
     socket.on("data", (chunk) => {
       buf += chunk.toString("utf8");
+      // Bound the buffer so a peer that never sends a newline can't grow memory.
+      if (buf.length > 8 * 1024 * 1024) {
+        socket.destroy();
+        return;
+      }
       const nl = buf.indexOf("\n");
       if (nl === -1) {
         return;
@@ -54,12 +68,25 @@ export class EditorServer implements vscode.Disposable {
 
   private async respond(socket: net.Socket, line: string): Promise<void> {
     let edited: string | undefined;
+    let authed = false;
     try {
-      const req = JSON.parse(line) as { kind: EditRequest["kind"]; content_b64: string };
+      const req = JSON.parse(line) as {
+        kind: EditRequest["kind"];
+        content_b64: string;
+        token?: string;
+      };
+      if (typeof req.token !== "string" || !safeEqual(req.token, this.token)) {
+        socket.write(JSON.stringify({ ok: false }) + "\n");
+        return;
+      }
+      authed = true;
       const content = Buffer.from(req.content_b64, "base64").toString("utf8");
       edited = await this.handler({ kind: req.kind, content });
     } catch {
       edited = undefined;
+    }
+    if (!authed) {
+      return;
     }
     const resp =
       edited === undefined

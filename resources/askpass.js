@@ -11,13 +11,15 @@ const net = require("node:net");
 
 const prompt = process.argv[2] || "";
 const sockPath = process.env.EGIT_ASKPASS_SOCK;
+const token = process.env.EGIT_ASKPASS_TOKEN;
 
-if (!sockPath) {
+if (!sockPath || !token) {
   process.exit(1);
 }
 
 const socket = net.connect(sockPath, () => {
-  socket.write(JSON.stringify({ prompt }) + "\n");
+  // The token authenticates us to the extension's IPC server.
+  socket.write(JSON.stringify({ prompt, token }) + "\n");
 });
 
 let buf = "";

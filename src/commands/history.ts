@@ -8,7 +8,7 @@ export function registerHistoryCommands(
   context: vscode.ExtensionContext,
   manager: RepositoryManager,
 ): HistoryView {
-  const view = new HistoryView(manager);
+  const view = new HistoryView(manager, context.extensionUri);
 
   context.subscriptions.push(
     vscode.commands.registerCommand(

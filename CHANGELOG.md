@@ -1,5 +1,35 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- **History graph rendering**: commit lanes now draw as continuous lines. The
+  per-row `<canvas>` renderer drew pass-through branches in half-row segments, so
+  vertical lines broke apart between rows. The History view now uses the same
+  single-overlay-SVG model as the Git Graph panel, sourced from a shared,
+  unit-tested layout module (`resources/graphLayout.js`).
+- History commits are now fetched in `--topo-order` so a child always precedes
+  its parents — required for correct lane layout.
+
+### Changed
+- New, distinctive activity-bar icon (a commit-graph DAG) so the container no
+  longer reuses the built-in Source Control glyph.
+
+### Security
+- The askpass and editor IPC servers now require a per-session token (passed to
+  the shim via its environment) before responding, preventing a local process
+  from phishing credentials or injecting rebase/commit content over the
+  enumerable socket/pipe. Credential prompts are masked conservatively, and the
+  IPC read buffers are bounded.
+- Added an argument-guard (`safeRef`/`safeRemoteUrl`) that rejects ref/SHA/branch
+  values beginning with `-` (option injection) and the `ext::`/`fd::` remote
+  transports, applied across the webview-reachable git operations and the diff
+  content provider.
+
+### Internal
+- Extracted `parseWorktreeList` and the graph-log line parser into dedicated,
+  unit-tested parser modules. Test suite grows from 36 to 60 cases.
+
 ## [0.1.0] - 2026-06-01
 
 ### Added

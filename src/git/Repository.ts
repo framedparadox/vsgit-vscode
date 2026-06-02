@@ -1,5 +1,6 @@
 import * as path from "node:path";
 import { GitExecutor } from "./GitExecutor";
+import { safeRef } from "./argGuard";
 import { FOR_EACH_REF_FORMAT, parseForEachRef, RefInfo } from "./parsers/refs";
 import { parseStatusV2, StatusResult } from "./parsers/status";
 import {
@@ -12,58 +13,15 @@ import {
 import { parseReflog, REFLOG_FORMAT, ReflogEntry } from "./parsers/reflog";
 import { BlameLine, parseBlamePorcelain } from "./parsers/blame";
 import { ConfigEntry, parseConfigListZ } from "./parsers/config";
+import { parseWorktreeList, WorktreeInfo } from "./parsers/worktree";
+import { GRAPH_LOG_FORMAT, parseGraphLog } from "./parsers/graphLog";
+
+export { WorktreeInfo } from "./parsers/worktree";
 
 export interface RemoteInfo {
   name: string;
   fetchUrl?: string;
   pushUrl?: string;
-}
-
-export interface WorktreeInfo {
-  path: string;
-  head: string;
-  branch: string | undefined;
-  bare: boolean;
-  locked: boolean;
-}
-
-function parseWorktreeList(raw: string): WorktreeInfo[] {
-  const worktrees: WorktreeInfo[] = [];
-  let current: Partial<WorktreeInfo> | undefined;
-  for (const line of raw.split("\n")) {
-    if (line.startsWith("worktree ")) {
-      if (current) {
-        worktrees.push(finishWorktree(current));
-      }
-      current = { path: line.slice("worktree ".length).trim(), bare: false, locked: false };
-    } else if (current) {
-      if (line.startsWith("HEAD ")) {
-        current.head = line.slice(5).trim();
-      } else if (line.startsWith("branch ")) {
-        const ref = line.slice(7).trim();
-        // refs/heads/main -> main
-        current.branch = ref.replace(/^refs\/heads\//, "");
-      } else if (line === "bare") {
-        current.bare = true;
-      } else if (line.startsWith("locked")) {
-        current.locked = true;
-      }
-    }
-  }
-  if (current) {
-    worktrees.push(finishWorktree(current));
-  }
-  return worktrees;
-}
-
-function finishWorktree(partial: Partial<WorktreeInfo>): WorktreeInfo {
-  return {
-    path: partial.path ?? "",
-    head: partial.head ?? "",
-    branch: partial.branch,
-    bare: partial.bare ?? false,
-    locked: partial.locked ?? false,
-  };
 }
 
 export interface StashInfo {
@@ -231,6 +189,7 @@ export class Repository {
    * follow it onto its parent. Fails (and leaves a rebase in progress) on conflict.
    */
   async dropCommit(sha: string): Promise<void> {
+    safeRef(sha, "commit");
     await this.git.run(["rebase", "--onto", `${sha}^`, sha], { cwd: this.root });
   }
 
@@ -259,7 +218,7 @@ export class Repository {
     if (opts.squash) {
       args.push("--squash");
     }
-    args.push(ref);
+    args.push(safeRef(ref));
     await this.git.run(args, { cwd: this.root });
   }
 
@@ -271,7 +230,7 @@ export class Repository {
     if (opts.interactive) {
       args.push("-i");
     }
-    args.push(onto);
+    args.push(safeRef(onto));
     await this.git.run(args, { cwd: this.root, env: opts.env });
   }
 
@@ -580,7 +539,7 @@ export class Repository {
   }
 
   async checkoutRef(ref: string): Promise<void> {
-    await this.git.run(["checkout", ref], { cwd: this.root });
+    await this.git.run(["checkout", safeRef(ref)], { cwd: this.root });
   }
 
   // --- Synchronize (incoming / outgoing) ----------------------------------
@@ -796,8 +755,15 @@ export class Repository {
     file?: string;
     since?: string;
     until?: string;
+    /**
+     * Commit ordering. `topo` lists a child before all of its parents, which the
+     * graph renderer needs to lay out lanes without backtracking edges; `date`
+     * (the default) is reverse-chronological for plain list views.
+     */
+    order?: "date" | "topo";
   } = {}): Promise<Commit[]> {
-    const args = ["log", `--format=${LOG_FORMAT}`, "--date-order"];
+    const orderFlag = options.order === "topo" ? "--topo-order" : "--date-order";
+    const args = ["log", `--format=${LOG_FORMAT}`, orderFlag];
     if (options.limit !== undefined) {
       args.push(`--max-count=${options.limit}`);
     }
@@ -862,47 +828,25 @@ export class Repository {
     // SHA, subject, author name, author date, committer name, committer date,
     // parent SHAs, ref names. EGit's history shows author and committer (and both
     // of their dates) as separate columns, so we capture %cn/%ci alongside %an/%ai.
-    const format = "%H%x00%h%x00%s%x00%an%x00%ai%x00%cn%x00%ci%x00%P%x00%D";
     // --topo-order guarantees a child is always listed before its parents, which
     // keeps the lane layout free of backtracking edges (date-order can interleave
     // branches and place a child after a parent dated earlier).
-    const args = ["log", `--format=${format}`, "--topo-order"];
-    
+    const args = ["log", `--format=${GRAPH_LOG_FORMAT}`, "--topo-order"];
+
     if (options.limit !== undefined) {
       args.push(`--max-count=${options.limit}`);
     }
-    
+
     if (options.all) {
       args.push("--all");
     } else if (options.branches && options.branches.length > 0) {
       for (const branch of options.branches) {
-        args.push(branch);
+        args.push(safeRef(branch, "branch"));
       }
     }
 
     const out = await this.git.stdout(args, { cwd: this.root });
-    const lines = out.trim().split("\n").filter((l) => l.length > 0);
-    
-    const commits = lines.map((line) => {
-      const [sha, shortSha, message, author, date, committer, committerDate, parentsStr, refsStr] =
-        line.split("\x00");
-      const parents = parentsStr ? parentsStr.split(" ") : [];
-      const refs = refsStr
-        ? refsStr.split(", ").map((r) => r.trim().replace(/^HEAD -> /, ""))
-        : [];
-
-      return {
-        sha,
-        shortSha,
-        message,
-        author,
-        date,
-        committer,
-        committerDate,
-        parents,
-        refs,
-      };
-    });
+    const commits = parseGraphLog(out);
 
     // Get branch and tag info
     const branches = this.localBranches.map((b) => ({
@@ -950,15 +894,15 @@ export class Repository {
   // --- Commit operations --------------------------------------------------
 
   async checkoutDetached(sha: string): Promise<void> {
-    await this.git.run(["checkout", sha], { cwd: this.root });
+    await this.git.run(["checkout", safeRef(sha, "commit")], { cwd: this.root });
   }
 
   async cherryPick(sha: string): Promise<void> {
-    await this.git.run(["cherry-pick", sha], { cwd: this.root });
+    await this.git.run(["cherry-pick", safeRef(sha, "commit")], { cwd: this.root });
   }
 
   async revert(sha: string): Promise<void> {
-    await this.git.run(["revert", "--no-edit", sha], { cwd: this.root });
+    await this.git.run(["revert", "--no-edit", safeRef(sha, "commit")], { cwd: this.root });
   }
 
   /** Fetch a specific refspec from a remote (e.g. for GitHub PRs). */
@@ -995,10 +939,12 @@ export class Repository {
   }
 
   async reset(sha: string, mode: "soft" | "mixed" | "hard"): Promise<void> {
-    await this.git.run(["reset", `--${mode}`, sha], { cwd: this.root });
+    await this.git.run(["reset", `--${mode}`, safeRef(sha, "commit")], { cwd: this.root });
   }
 
   async createBranchAt(name: string, sha: string, checkout: boolean): Promise<void> {
+    safeRef(name, "branch name");
+    safeRef(sha, "start point");
     const args = checkout ? ["checkout", "-b", name, sha] : ["branch", name, sha];
     await this.git.run(args, { cwd: this.root });
   }

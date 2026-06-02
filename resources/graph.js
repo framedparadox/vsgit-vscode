@@ -326,98 +326,13 @@ function refBadgesFor(commit, colorIdx) {
 }
 
 // ─── lane layout (two-half connected model, topological) ─────────────────────
-// Ported verbatim. Commits arrive in --topo-order (child before parents). We
-// maintain `lanes[col] = sha that lane flows toward`; each row draws two half-
-// height segment lists (incoming top→centre, outgoing centre→bottom) which line
-// up because consecutive rows share a boundary. Colour is keyed per lane-line by
-// the sha and assigned once, so a branch keeps one stable colour.
+// The layout algorithm lives in the shared, unit-tested module
+// resources/graphLayout.js (GraphLayout), so the Git Graph panel and the History
+// view draw from one identical, verified implementation. Commits arrive in
+// --topo-order (child before parents); each returned row carries its column,
+// stable lane colour, and the incoming/outgoing lane segments used to draw edges.
 function buildLayout(commits) {
-  const rowOf = new Map();
-  commits.forEach((c, i) => rowOf.set(c.sha, i));
-
-  let lanes = [];
-  const lineColor = new Map();
-  let nextColor = 0;
-  const colorFor = (sha) => {
-    if (!lineColor.has(sha)) lineColor.set(sha, nextColor++);
-    return lineColor.get(sha);
-  };
-  const firstFreeIn = (arr) => {
-    for (let i = 0; i < arr.length; i++) if (arr[i] == null) return i;
-    arr.push(null);
-    return arr.length - 1;
-  };
-
-  const rows = commits.map((commit) => {
-    const parentShas = (commit.parents || []).filter((p) => rowOf.has(p));
-    const top = lanes.slice();
-    const bottom = top.slice();
-
-    let myCol = top.indexOf(commit.sha);
-    if (myCol === -1) {
-      myCol = firstFreeIn(bottom);
-      if (myCol >= top.length) top[myCol] = null;
-    }
-    const myColorIdx = colorFor(commit.sha);
-
-    const incoming = [];
-    top.forEach((sha, c) => {
-      if (sha == null) return;
-      incoming.push({
-        fromCol: c,
-        toCol: sha === commit.sha ? myCol : c,
-        colorIdx: colorFor(sha),
-        toNode: sha === commit.sha,
-      });
-    });
-
-    for (let c = 0; c < bottom.length; c++) {
-      if (bottom[c] === commit.sha) bottom[c] = null;
-    }
-
-    const outgoing = [];
-    parentShas.forEach((pSha, pi) => {
-      if (pi === 0) {
-        bottom[myCol] = pSha;
-        if (!lineColor.has(pSha)) lineColor.set(pSha, myColorIdx);
-        outgoing.push({ fromCol: myCol, toCol: myCol, colorIdx: myColorIdx });
-      } else {
-        let targetCol = bottom.indexOf(pSha);
-        if (targetCol === -1) {
-          targetCol = firstFreeIn(bottom);
-          bottom[targetCol] = pSha;
-          colorFor(pSha);
-        }
-        outgoing.push({ fromCol: myCol, toCol: targetCol, colorIdx: colorFor(pSha) });
-      }
-    });
-
-    const parentTargets = new Set(outgoing.map((o) => o.toCol));
-    top.forEach((sha, c) => {
-      if (sha == null || sha === commit.sha) return;
-      if (bottom[c] !== sha) return;
-      if (c === myCol) return;
-      if (parentTargets.has(c)) return;
-      outgoing.push({ fromCol: c, toCol: c, colorIdx: colorFor(sha) });
-    });
-
-    while (bottom.length > 0 && bottom[bottom.length - 1] == null) bottom.pop();
-    lanes = bottom;
-
-    return {
-      commit,
-      col: myCol,
-      colorIdx: myColorIdx,
-      incoming,
-      outgoing,
-      topCols: top.length,
-      bottomCols: lanes.length,
-    };
-  });
-
-  const maxCols = rows.reduce((m, r) => Math.max(m, r.col + 1, r.topCols, r.bottomCols), 1);
-  rows.forEach((r) => { r.maxCols = maxCols; });
-  return rows;
+  return GraphLayout.buildLayout(commits);
 }
 
 // ─── SVG drawing (ported verbatim) ───────────────────────────────────────────

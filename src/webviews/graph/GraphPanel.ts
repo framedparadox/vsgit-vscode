@@ -794,6 +794,9 @@ export class GraphPanel {
     const jsUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, "resources", "graph.js"),
     );
+    const layoutUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "resources", "graphLayout.js"),
+    );
     const csp = [
       "default-src 'none'",
       `style-src ${webview.cspSource}`,
@@ -895,6 +898,7 @@ export class GraphPanel {
 
   <div id="context-menu" class="context-menu"></div>
 
+  <script nonce="${nonce}" src="${layoutUri}"></script>
   <script nonce="${nonce}" src="${jsUri}"></script>
 </body>
 </html>`;

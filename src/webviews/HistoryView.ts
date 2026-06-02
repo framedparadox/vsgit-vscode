@@ -35,7 +35,10 @@ export class HistoryView {
     filters: { search: "", searchBy: "message" },
   };
 
-  constructor(private readonly manager: RepositoryManager) {
+  constructor(
+    private readonly manager: RepositoryManager,
+    private readonly extensionUri: vscode.Uri,
+  ) {
     manager.onDidChange(() => {
       if (this.panel) {
         void this.reload();
@@ -63,10 +66,17 @@ export class HistoryView {
       "egit.history",
       `History: ${this.repo.name}`,
       vscode.ViewColumn.Active,
-      { enableScripts: true, retainContextWhenHidden: true },
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, "resources")],
+      },
     );
     const nonce = makeNonce();
-    this.panel.webview.html = historyHtml(nonce, this.panel.webview.cspSource);
+    const layoutUri = this.panel.webview
+      .asWebviewUri(vscode.Uri.joinPath(this.extensionUri, "resources", "graphLayout.js"))
+      .toString();
+    this.panel.webview.html = historyHtml(nonce, this.panel.webview.cspSource, layoutUri);
     this.panel.onDidDispose(() => (this.panel = undefined));
     this.panel.webview.onDidReceiveMessage((m) => this.onMessage(m));
     await this.reload();
@@ -201,6 +211,9 @@ export class HistoryView {
         searchBy: opts.searchBy,
         since: opts.since,
         until: opts.until,
+        // The history graph lays out lanes from this ordering, so a child must
+        // always precede its parents.
+        order: "topo",
       });
       
       this.state.loadedCommits.push(...commits);

@@ -46,7 +46,7 @@
         {
           "id": "egit",
           "title": "Git (EGit)",
-          "icon": "$(git-branch)"
+          "icon": "resources/icon.svg"
         }
       ]
     },
@@ -2940,7 +2940,7 @@
     "watch": "node esbuild.js --watch",
     "compile": "tsc -p ./",
     "check-types": "tsc --noEmit",
-    "test": "node --test \"out-test/**/*.test.js\"",
+    "test": "node --test \"out-test/**/*.test.js\" \"resources/**/*.test.js\"",
     "pretest": "tsc -p ./tsconfig.test.json"
   },
   "devDependencies": {

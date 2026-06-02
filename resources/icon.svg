@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+  <!-- A commit-graph (DAG) monogram: a main lane with a feature branch that
+       diverges and merges back — distinct from the built-in Source Control fork. -->
+  <!-- main lane -->
+  <path d="M8 4.4 V19.6"/>
+  <!-- feature branch diverging from the main lane and merging back in -->
+  <path d="M8 8 C 8 10.6, 16 9.4, 16 12"/>
+  <path d="M16 12 C 16 14.6, 8 13.4, 8 16"/>
+  <!-- commit nodes -->
+  <circle cx="8" cy="4.4" r="2.3" fill="currentColor" stroke="none"/>
+  <circle cx="16" cy="12" r="2.3" fill="currentColor" stroke="none"/>
+  <circle cx="8" cy="19.6" r="2.3" fill="currentColor" stroke="none"/>
+</svg>

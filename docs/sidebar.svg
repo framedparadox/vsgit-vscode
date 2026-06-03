@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="380" height="440" viewBox="0 0 380 440" font-family="-apple-system, Segoe UI, Ubuntu, sans-serif">
+  <!-- Illustration of the VsGit activity-bar container + tree views (VS Code dark theme). -->
+  <rect width="380" height="440" fill="#1e1e1e"/>
+
+  <!-- activity bar -->
+  <rect x="0" y="0" width="48" height="440" fill="#333333"/>
+  <!-- active VsGit icon (the commit-graph DAG logo), with the active indicator bar -->
+  <rect x="0" y="64" width="2" height="40" fill="#ffffff"/>
+  <g transform="translate(12,72)" fill="none" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8 4.4 V19.6"/>
+    <path d="M8 8 C 8 10.6, 16 9.4, 16 12"/>
+    <path d="M16 12 C 16 14.6, 8 13.4, 8 16"/>
+    <circle cx="8" cy="4.4" r="2.3" fill="#ffffff" stroke="none"/>
+    <circle cx="16" cy="12" r="2.3" fill="#ffffff" stroke="none"/>
+    <circle cx="8" cy="19.6" r="2.3" fill="#ffffff" stroke="none"/>
+  </g>
+  <!-- other (dimmed) activity icons -->
+  <g fill="#858585" font-size="16" text-anchor="middle">
+    <text x="24" y="30">⧉</text>
+    <text x="24" y="142">⌕</text>
+    <text x="24" y="178">⚙</text>
+  </g>
+
+  <!-- side bar panel -->
+  <rect x="48" y="0" width="332" height="440" fill="#252526"/>
+  <text x="64" y="22" fill="#bbbbbb" font-size="11" font-weight="700" letter-spacing="0.5">GIT (VSGIT)</text>
+
+  <!-- REPOSITORIES section -->
+  <rect x="48" y="34" width="332" height="22" fill="#2d2d2d"/>
+  <text x="64" y="49" fill="#cccccc" font-size="11" font-weight="700">▾ REPOSITORIES</text>
+  <g font-size="12.5" fill="#cccccc">
+    <text x="76" y="74">▾ my-app  <tspan fill="#3794ff">↑2 ↓1</tspan></text>
+    <text x="92" y="96">⎇ Branches</text>
+    <text x="108" y="118" fill="#dddddd">● main <tspan fill="#858585">→ origin/main</tspan></text>
+    <text x="108" y="140">feature/login</text>
+    <text x="92" y="162">⌂ Remotes</text>
+    <text x="108" y="184" fill="#dddddd">origin</text>
+    <text x="92" y="206">⌖ Tags</text>
+    <text x="108" y="228" fill="#dddddd">v1.2.0</text>
+  </g>
+
+  <!-- STAGING section -->
+  <rect x="48" y="244" width="332" height="22" fill="#2d2d2d"/>
+  <text x="64" y="259" fill="#cccccc" font-size="11" font-weight="700">▾ STAGING</text>
+  <g font-size="12.5">
+    <text x="76" y="284" fill="#cccccc">▾ Staged Changes <tspan fill="#858585">(1)</tspan></text>
+    <text x="100" y="306" font-family="monospace" fill="#4ec94e">A</text>
+    <text x="118" y="306" fill="#cccccc" font-family="-apple-system, sans-serif">src/auth/index.ts</text>
+
+    <text x="76" y="332" fill="#cccccc">▾ Changes <tspan fill="#858585">(2)</tspan></text>
+    <text x="100" y="354" font-family="monospace" fill="#e2c08d">M</text>
+    <text x="118" y="354" fill="#cccccc" font-family="-apple-system, sans-serif">src/auth/service.ts</text>
+    <text x="100" y="376" font-family="monospace" fill="#e2c08d">M</text>
+    <text x="118" y="376" fill="#cccccc" font-family="-apple-system, sans-serif">README.md</text>
+
+    <text x="76" y="402" fill="#cccccc">▸ Conflicts <tspan fill="#858585">(0)</tspan></text>
+  </g>
+</svg>

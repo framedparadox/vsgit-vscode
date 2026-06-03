@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "out-test",
+    "sourceMap": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": [
+    "src/git/parsers/**/*.ts",
+    "src/git/GitError.ts",
+    "src/git/GitExecutor.ts",
+    "src/git/argGuard.ts",
+    "src/git/argGuard.test.ts",
+    "src/git/Repository.ts",
+    "src/git/Repository.test.ts",
+    "src/util/token.ts",
+    "src/util/token.test.ts"
+  ],
+  "exclude": ["node_modules"]
+}

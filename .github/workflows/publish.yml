@@ -1,0 +1,115 @@
+name: Publish to VS Code Marketplace
+
+# Deploys the extension to the Visual Studio Marketplace when a semver tag is
+# pushed AND that tag points at a commit contained in `main`.
+#
+#   v0.0.2          -> normal release
+#   v0.0.2-beta.1   -> pre-release (published with vsce --pre-release)
+#
+# Note: the Marketplace only accepts a numeric "version" (x.y.z) in
+# package.json; semver pre-release suffixes are NOT allowed there. So for a
+# pre-release, keep package.json at e.g. "0.0.2" and tag it v0.0.2-beta.1 --
+# the workflow compares only the x.y.z core and adds the --pre-release flag.
+#
+# Required repository secret:
+#   VSCE_PAT - Azure DevOps Personal Access Token for the `ajaykontham`
+#              publisher, with the "Marketplace > Manage" scope.
+#              https://code.visualstudio.com/api/working-with-extensions/publishing-extension
+#
+# Typical release flow:
+#   1. bump "version" in package.json (e.g. 0.0.2)
+#   2. git commit + push to main
+#   3. git tag v0.0.2 && git push origin v0.0.2     (or v0.0.2-beta.1 for a pre-release)
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'   # matches v1.2.3 and pre-releases like v1.2.3-beta.1
+
+# Never run two publishes for the same tag at once.
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # needed to create the GitHub Release below
+
+jobs:
+  publish:
+    name: Build, test & publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so we can verify the tag lives on main
+
+      - name: Verify tag is contained in main
+        run: |
+          git fetch --no-tags origin main
+          if git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD; then
+            echo "Tag $GITHUB_REF_NAME ($GITHUB_SHA) is contained in main."
+          else
+            echo "::error::Tag $GITHUB_REF_NAME is not contained in main. Refusing to publish."
+            exit 1
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22   # 22 so `node --test` resolves the out-test glob
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Determine release metadata
+        id: meta
+        run: |
+          TAG="$GITHUB_REF_NAME"
+          CORE="${TAG#v}"        # strip leading "v"
+          CORE="${CORE%%-*}"     # strip any -prerelease suffix -> x.y.z
+          if [[ "$TAG" == *-* ]]; then PRE=true; else PRE=false; fi
+          echo "core=$CORE" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRE" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG core=$CORE prerelease=$PRE"
+
+      - name: Verify tag matches package.json version
+        run: |
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$PKG_VERSION" != "${{ steps.meta.outputs.core }}" ]; then
+            echo "::error::Tag core ${{ steps.meta.outputs.core }} does not match package.json version ($PKG_VERSION)."
+            exit 1
+          fi
+
+      - name: Type-check
+        run: npm run check-types
+
+      - name: Test
+        run: npm test
+
+      # `vsce package` runs the `vscode:prepublish` script (npm run build), so
+      # the production esbuild bundle is produced as part of packaging. The
+      # --pre-release flag (when set) is embedded into the .vsix here.
+      - name: Package extension
+        run: |
+          FLAG=""
+          if [ "${{ steps.meta.outputs.prerelease }}" = "true" ]; then
+            FLAG="--pre-release"
+          fi
+          npx --yes @vscode/vsce package $FLAG --out "git-vscode-${GITHUB_REF_NAME}.vsix"
+
+      # Publish the exact .vsix built above. The pre-release marking is already
+      # baked in, so --pre-release must NOT be repeated here (vsce rejects it
+      # together with --packagePath).
+      - name: Publish to VS Code Marketplace
+        run: npx --yes @vscode/vsce publish --packagePath "git-vscode-${GITHUB_REF_NAME}.vsix"
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: git-vscode-${{ github.ref_name }}.vsix
+          generate_release_notes: true
+          prerelease: ${{ steps.meta.outputs.prerelease == 'true' }}

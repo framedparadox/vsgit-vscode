@@ -73,10 +73,7 @@ export class HistoryView {
       },
     );
     const nonce = makeNonce();
-    const layoutUri = this.panel.webview
-      .asWebviewUri(vscode.Uri.joinPath(this.extensionUri, "resources", "graphLayout.js"))
-      .toString();
-    this.panel.webview.html = historyHtml(nonce, this.panel.webview.cspSource, layoutUri);
+    this.panel.webview.html = historyHtml(nonce, this.panel.webview.cspSource);
     this.panel.onDidDispose(() => (this.panel = undefined));
     this.panel.webview.onDidReceiveMessage((m) => this.onMessage(m));
     await this.reload();

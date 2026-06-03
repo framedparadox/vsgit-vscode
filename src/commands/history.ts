@@ -1,7 +1,6 @@
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { HistoryView } from "../webviews/HistoryView";
-import { GraphPanel } from "../webviews/graph/GraphPanel";
 import { VsgitNode } from "../views/RepositoriesProvider";
 
 /** Registers the command that opens the History webview. */
@@ -15,19 +14,14 @@ export function registerHistoryCommands(
     vscode.commands.registerCommand(
       "vsgit.history.show",
       async (node?: VsgitNode | { repoRoot: string; file?: string }) => {
-        // File-scoped history keeps the dedicated single-file history webview.
-        if (node && "repoRoot" in node && node.file) {
+        // The History view is a linear commit log (distinct from the Git Graph
+        // DAG). Supports both a tree-view node and a file-scoped invocation.
+        if (node && "repoRoot" in node) {
           const repo = manager.getAll().find((r) => r.root === node.repoRoot);
           return view.show(repo, node.file);
         }
-        // Repo-level history opens the detailed Git graph (vscode-git-graph style).
-        let repo;
-        if (node && "repo" in node) {
-          repo = node.repo;
-        } else if (node && "repoRoot" in node) {
-          repo = manager.getAll().find((r) => r.root === node.repoRoot);
-        }
-        GraphPanel.createOrShow(manager, context.extensionUri, repo);
+        const repo = node && "repo" in node ? node.repo : undefined;
+        return view.show(repo);
       },
     ),
 

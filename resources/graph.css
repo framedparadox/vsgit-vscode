@@ -1,0 +1,617 @@
+/* Git Graph webview (vscode-git-graph style).
+ *
+ * Layout: a vertical stack — icon-only toolbar, optional in-progress banner, and
+ * a scrollable commit table. The whole DAG is drawn by one overlay SVG. Ref
+ * labels render inline in the Description column as coloured pills, and clicking
+ * a commit expands a details row directly beneath it (files left, info right).
+ * All colours come from VS Code theme variables. */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  color: var(--vscode-foreground);
+  background-color: var(--vscode-editor-background);
+  overflow: hidden;
+  height: 100vh;
+}
+
+#shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ─── icon-only top toolbar ────────────────────────────────────────────── */
+#toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px;
+  background-color: var(--vscode-sideBar-background);
+  border-bottom: 1px solid var(--vscode-panel-border);
+  flex-wrap: nowrap;
+  overflow: visible;          /* must not clip open dropdown menus */
+  flex-shrink: 0;
+  position: relative;
+  z-index: 20;
+}
+.tb-btn {
+  position: relative;
+  background: transparent;
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
+  border: 1px solid transparent;
+  padding: 4px 6px;
+  cursor: pointer;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.tb-btn:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
+.tb-btn.active { background-color: var(--vscode-inputOption-activeBackground, rgba(14,99,156,0.4)); }
+.tb-ico { display: inline-flex; align-items: center; width: 16px; height: 16px; }
+/* The toolbar octicons ship without an explicit fill (so they'd render solid
+   black). Tint them with the button's themed colour so they track the active VS
+   Code colour theme instead of staying black. */
+.tb-ico svg { display: block; fill: currentColor; }
+.tb-ico svg path { fill: currentColor; }
+.tb-badge {
+  position: absolute;
+  top: -2px;
+  right: -4px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 14px;
+  min-width: 14px;
+  text-align: center;
+  padding: 0 3px;
+  border-radius: 8px;
+  background-color: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  display: none;
+}
+.tb-badge.visible { display: inline-block; }
+.tb-sep { width: 1px; align-self: stretch; margin: 3px 4px; background-color: var(--vscode-panel-border); }
+.tb-spacer { flex: 1; }
+
+/* control-bar labels + repo/branch controls */
+#repoControl, #branchControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 10px;
+}
+.ctrl-label { font-size: 13px; color: var(--vscode-foreground); }
+
+/* Show Remote Branches checkbox (git-graph customCheckbox) */
+#showRemoteBranchesControl {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  margin-right: 10px;
+}
+#showRemoteBranchesControl input { display: none; }
+.customCheckbox {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  border: 1px solid rgba(128, 128, 128, 0.75);
+  border-radius: 3px;
+  vertical-align: middle;
+  position: relative;
+}
+#showRemoteBranchesControl input:checked + .customCheckbox {
+  background-color: var(--vscode-button-background, #0e639c);
+  border-color: var(--vscode-button-background, #0e639c);
+}
+#showRemoteBranchesControl input:checked + .customCheckbox::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--vscode-button-foreground, #fff);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* ─── dropdown component (ported from vscode-git-graph) ─────────────────── */
+.dropdown {
+  display: none;
+  position: relative;
+  font-size: 13px;
+  vertical-align: top;
+  font-weight: normal;
+  text-align: left;
+}
+.dropdown.loaded { display: inline-block; }
+.dropdownCurrentValue {
+  background-color: rgba(128, 128, 128, 0.1);
+  border: 1px solid rgba(128, 128, 128, 0.5);
+  border-radius: 6px;
+  box-sizing: border-box;
+  height: 26px;
+  line-height: 24px;
+  padding: 0 20px 0 10px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  overflow-x: hidden;
+  text-overflow: ellipsis;
+  min-width: 100px;
+  max-width: 240px;
+}
+.dropdownCurrentValue:hover { background-color: rgba(128, 128, 128, 0.2); }
+.dropdownCurrentValue:after {
+  position: absolute;
+  content: "";
+  margin-top: 11px;
+  margin-left: 4px;
+  width: 0;
+  height: 0;
+  border: 4px solid transparent;
+  border-color: var(--vscode-editor-foreground) transparent transparent transparent;
+}
+.dropdown.dropdownOpen .dropdownCurrentValue { border-radius: 6px 6px 0 0; }
+.dropdownMenu {
+  display: none;
+  position: absolute;
+  background-color: var(--vscode-menu-background, #252526);
+  color: var(--vscode-menu-foreground, #ccc);
+  top: 100%;
+  left: 0;
+  z-index: 60;
+  line-height: 20px;
+  border: 1px solid rgba(128, 128, 128, 0.5);
+  border-radius: 0 0 6px 6px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: 297px;
+  margin-top: -1px;
+  white-space: nowrap;
+  min-width: 100%;
+}
+.dropdown.dropdownOpen .dropdownMenu { display: block; }
+.dropdownFilter { position: relative; padding: 3px; user-select: none; }
+.dropdownFilterInput {
+  width: 100%;
+  box-sizing: border-box;
+  background: none;
+  border: 1px solid rgba(128, 128, 128, 0.5);
+  outline: none;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 13px;
+  line-height: 17px;
+  color: var(--vscode-menu-foreground, #ccc);
+}
+.dropdownOption {
+  position: relative;
+  cursor: pointer;
+  padding: 4px 10px;
+  user-select: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.dropdown.multi .dropdownOption { padding-left: 30px; }
+.dropdownOption.selected { background-color: rgba(128, 128, 128, 0.15); }
+.dropdownOption:hover {
+  background-color: var(--vscode-menu-selectionBackground, #094771);
+  color: var(--vscode-menu-selectionForeground, #fff);
+}
+.dropdownOptionMultiSelected { position: absolute; width: 12px; height: 16px; top: 7px; left: 10px; }
+.dropdownOptionMultiSelected svg { fill: var(--vscode-menu-foreground, #ccc); opacity: 0.7; width: 12px; }
+.dropdownOption:hover .dropdownOptionMultiSelected svg { fill: var(--vscode-menu-selectionForeground, #fff); opacity: 0.85; }
+.dropdownNoResults { position: relative; padding: 4px 10px; user-select: none; font-style: italic; }
+
+#commit-count {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  white-space: nowrap;
+}
+
+/* ─── in-progress operation banner ─────────────────────────────────────── */
+#inprogress-banner {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background-color: var(--vscode-inputValidation-warningBackground, rgba(192,128,0,0.2));
+  border-bottom: 1px solid var(--vscode-inputValidation-warningBorder, #c08000);
+  color: var(--vscode-foreground);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+#inprogress-banner.visible { display: flex; }
+#inprogress-text { font-weight: 600; }
+#inprogress-banner .tb-btn {
+  border: 1px solid var(--vscode-button-border, transparent);
+  background-color: var(--vscode-button-secondaryBackground, rgba(255,255,255,0.1));
+  padding: 3px 10px;
+  font-size: 12px;
+}
+#inprogress-banner .tb-btn:hover { background-color: var(--vscode-button-secondaryHoverBackground, rgba(255,255,255,0.2)); }
+
+/* ─── graph (scrollable) ───────────────────────────────────────────────── */
+#main {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+  min-height: 0;
+}
+#main.loading { opacity: 0.45; pointer-events: none; }
+
+#graph-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+#graph-table th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: var(--vscode-sideBar-background);
+  border-bottom: 1px solid var(--vscode-panel-border);
+  font-weight: 600;
+  font-size: 11px;
+  text-align: left;
+  padding: 4px 6px;
+  color: var(--vscode-descriptionForeground);
+  user-select: none;
+}
+#graph-table th .col-resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+}
+
+/* Rows are locked to exactly 24px (= ROW_H in graph.js) so the single overlay
+   SVG's per-row coordinates line up with the table rows. No vertical padding or
+   borders on commit cells, or the centres would drift. The inline ref pills in the
+   Message column are 18px+2px tall; without clamping the row height they would push
+   a row past 24px and throw every dot/line below it out of alignment — so every
+   commit cell hard-clamps its box to 24px and clips vertical overflow. */
+#graph-table tr.commit-row { height: 24px; max-height: 24px; cursor: pointer; }
+#graph-table tr.commit-row td {
+  height: 24px;
+  max-height: 24px;
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 24px;
+  overflow: hidden;
+}
+#graph-table tr.commit-row:hover { background-color: var(--vscode-list-hoverBackground); }
+#graph-table tr.commit-row.selected,
+#graph-table tr.commit-row.commitDetailsOpen {
+  background-color: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}
+#graph-table tr.commit-row.compareSelected {
+  background-color: var(--vscode-list-inactiveSelectionBackground, rgba(128,128,128,0.25));
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+#graph-table tr.commit-row.find-match { background-color: var(--vscode-editor-findMatchHighlightBackground, rgba(234,92,0,0.33)); }
+#graph-table tr.commit-row.find-current { background-color: var(--vscode-editor-findMatchBackground, rgba(234,92,0,0.55)); }
+
+/* graph column: a fixed-width spacer; the overlay SVG lives in the first row's
+   cell and is positioned absolutely so it spans every row in one coordinate
+   space (it must not be clipped). */
+/* The graph cell must NOT clip: its overlay SVG spans every row out of this one
+   cell, so it overrides the row's `overflow:hidden` clamp (higher specificity). */
+#graph-table tr.commit-row td.col-graph { padding: 0; vertical-align: middle; white-space: nowrap; position: relative; overflow: visible; }
+#graph-svg { position: absolute; top: 0; left: 0; overflow: visible; pointer-events: none; z-index: 1; }
+#graph-svg .graph-node { pointer-events: auto; }
+
+td.col-desc {
+  padding: 0 6px;
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+td.col-id, td.col-author, td.col-cdate {
+  padding: 0 6px;
+  vertical-align: middle;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+td.col-id { font-family: var(--vscode-editor-font-family, monospace); }
+
+th.hidden-col, td.hidden-col { display: none; }
+
+tr.commit-row.uncommitted td.col-desc { font-style: italic; color: var(--vscode-descriptionForeground); }
+
+/* flow tracing (dim everything except the traced flow) */
+.graph-line, .graph-node { transition: opacity 0.12s ease; }
+.graph-line.dim, .graph-node.dim { opacity: 0.13; }
+#graph-table tr.commit-row.dimmed { opacity: 0.4; }
+#graph-table tr.commit-row.dimmed .gitRef { opacity: 0.5; }
+#graph-table tr.commit-row.traced td.col-desc { font-weight: 600; }
+
+/* ─── inline ref labels (gitRef pills) — exact vscode-git-graph styling ─── */
+.gitRef {
+  display: inline-block;
+  height: 18px;
+  line-height: 18px;
+  margin-right: 5px;
+  background-color: rgba(128, 128, 128, 0.15);
+  border-radius: 5px;
+  border: 1px solid rgba(128, 128, 128, 0.75);
+  vertical-align: middle;
+  font-size: 12px;
+  cursor: pointer;
+  overflow: hidden;
+  max-width: 240px;
+}
+.gitRef.active { border-color: var(--git-graph-color); }
+.gitRef.active .gitRefName { font-weight: bold; }
+.gitRef > svg {
+  background-color: var(--git-graph-color);
+  fill: var(--vscode-editor-background);
+  width: 14px;
+  height: 14px;
+  padding: 2px;
+  vertical-align: top;
+}
+.gitRefName {
+  display: inline-block;
+  height: 18px;
+  line-height: 18px;
+  padding: 0 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+  vertical-align: top;
+}
+.gitRefName:hover { background-color: rgba(128, 128, 128, 0.1); }
+.desc-text { vertical-align: middle; }
+
+/* ─── inline commit-details view (CDV) ───────────────────────────────────
+   The details panel begins at the Description column: an empty spacer cell
+   sits over the Graph column (so the DAG line shows through), and the panel
+   spans the remaining columns. A header strip holds the title + tree/list view
+   toggle + close button; the body splits into commit metadata (left) and the
+   changed-file pane (right). Colours come straight from the editor-widget theme
+   tokens so the text stays readable in any theme. */
+tr.cdv-row > td.cdv-graph-spacer {
+  padding: 0;
+  /* Transparent so the overlay SVG's branch lines run straight through the gap. */
+  background-color: transparent;
+  position: relative;
+  overflow: visible;
+}
+tr.cdv-row > td.cdv-cell {
+  padding: 0;
+  background-color: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  color: var(--vscode-editor-foreground);
+  border-top: 1px solid var(--vscode-panel-border);
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+#cdv {
+  position: relative;
+  height: 248px;
+  font-size: 13px;
+  line-height: 18px;
+  white-space: normal;
+}
+
+/* header strip: title (left) + view-type toggle + close (right) */
+#cdvHeader {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 6px 0 10px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  background-color: var(--vscode-sideBarSectionHeader-background, rgba(128, 128, 128, 0.1));
+}
+#cdvHeaderTitle {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--vscode-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cdvHeaderSpacer { flex: 1; }
+.cdvHeaderBtn {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
+  flex-shrink: 0;
+}
+.cdvHeaderBtn:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.25)); }
+.cdvHeaderBtn.active { background-color: var(--vscode-inputOption-activeBackground, rgba(128, 128, 128, 0.25)); }
+.cdvHeaderBtn svg {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 3px;
+  top: 3px;
+  fill: currentColor;
+  fill-opacity: 0.75;
+}
+.cdvHeaderBtn:hover svg, .cdvHeaderBtn.active svg { fill-opacity: 1; }
+
+#cdvBody { position: absolute; top: 30px; bottom: 0; left: 0; right: 0; }
+#cdvSummary, #cdvFiles {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+#cdvSummary {
+  left: 0;
+  width: 50%;
+  padding: 10px;
+  border-right: 1px solid var(--vscode-panel-border);
+  user-select: text;
+  -webkit-user-select: text;
+  color: var(--vscode-editor-foreground);
+}
+#cdvFiles { left: 50%; right: 0; padding: 8px 8px 8px 10px; }
+
+.cdvSummaryTop { display: inline-table; width: 100%; }
+.cdvSummaryKeyValues { word-break: break-all; }
+.cdvSummaryKeyValues b { color: var(--vscode-descriptionForeground); font-weight: 600; }
+.cdvInternalLink {
+  color: var(--vscode-textLink-foreground, #4daafc);
+  cursor: pointer;
+}
+.cdvInternalLink:hover { text-decoration: underline; }
+.cdvBody { white-space: pre-wrap; }
+.cdvRefLabel {
+  display: inline-block;
+  padding: 0 6px;
+  margin: 1px 2px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 16px;
+  background-color: rgba(128, 128, 128, 0.2);
+  border: 1px solid rgba(128, 128, 128, 0.5);
+}
+.cdvRefLabel.cdvRef.tag { background-color: rgba(217, 133, 0, 0.25); }
+.cdvRefLabel.cdvRef.remote { background-color: rgba(0, 133, 217, 0.25); }
+.cdvRefLabel.cdvRef.head.active { font-weight: 700; }
+
+.cdvLoading { color: var(--vscode-descriptionForeground); }
+.cdvFilesHead { font-size: 11px; color: var(--vscode-descriptionForeground); margin-bottom: 6px; }
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.file-row:hover { background-color: var(--vscode-list-hoverBackground); }
+.file-status {
+  width: 14px;
+  text-align: center;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.file-status.A { color: #4ec94e; }
+.file-status.M { color: #e2c08d; }
+.file-status.D { color: #f14c4c; }
+.file-status.R { color: #4daafc; }
+.file-status.C { color: #4daafc; }
+.file-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ─── changed-file tree view ──────────────────────────────────────────── */
+.tree-children.collapsed { display: none; }
+.tree-folder-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  user-select: none;
+}
+.tree-folder-row:hover { background-color: var(--vscode-list-hoverBackground); }
+.tree-chevron {
+  display: inline-flex;
+  align-items: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  transition: transform 0.1s ease;
+  transform: rotate(0deg);
+}
+.tree-chevron.expanded { transform: rotate(90deg); }
+.tree-chevron svg { fill: var(--vscode-icon-foreground, var(--vscode-foreground)); fill-opacity: 0.8; }
+.tree-folder-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--vscode-foreground);
+}
+
+/* ─── find widget ──────────────────────────────────────────────────────── */
+#find-widget {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  position: absolute;
+  top: 44px;
+  right: 16px;
+  z-index: 50;
+  background-color: var(--vscode-editorWidget-background, #252526);
+  border: 1px solid var(--vscode-editorWidget-border, #454545);
+  border-radius: 4px;
+  padding: 4px 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+#find-widget.visible { display: flex; }
+#find-input {
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, #555);
+  padding: 2px 6px;
+  border-radius: 2px;
+  font-size: 12px;
+  width: 200px;
+}
+#find-widget button {
+  background: transparent;
+  color: var(--vscode-foreground);
+  border: none;
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 3px;
+}
+#find-widget button:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
+#find-count { font-size: 11px; color: var(--vscode-descriptionForeground); min-width: 48px; text-align: center; }
+
+/* ─── context menu ─────────────────────────────────────────────────────── */
+.context-menu {
+  position: fixed;
+  background-color: var(--vscode-menu-background, #252526);
+  color: var(--vscode-menu-foreground, #ccc);
+  border: 1px solid var(--vscode-menu-border, #454545);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  padding: 4px 0;
+  z-index: 1000;
+  min-width: 200px;
+  display: none;
+}
+.context-menu.visible { display: block; }
+.context-menu-item { padding: 5px 16px; cursor: pointer; font-size: 12px; white-space: nowrap; }
+.context-menu-item:hover { background-color: var(--vscode-menu-selectionBackground, #094771); color: var(--vscode-menu-selectionForeground, #fff); }
+.context-menu-separator { height: 1px; background-color: var(--vscode-menu-separatorBackground, #454545); margin: 4px 0; }
+.context-menu-title { padding: 4px 16px; font-size: 11px; color: var(--vscode-descriptionForeground); cursor: default; }
+
+/* ─── loading / empty ──────────────────────────────────────────────────── */
+#loading, #empty-state {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--vscode-descriptionForeground);
+  font-size: 13px;
+}

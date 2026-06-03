@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="380" viewBox="0 0 960 380" font-family="-apple-system, Segoe UI, Ubuntu, sans-serif">
+  <!-- Illustration of the VsGit "Git Graph" panel (VS Code dark theme). -->
+  <rect width="960" height="380" fill="#1e1e1e"/>
+
+  <!-- toolbar -->
+  <rect x="0" y="0" width="960" height="38" fill="#252526"/>
+  <rect x="0" y="37" width="960" height="1" fill="#3c3c3c"/>
+  <rect x="12" y="9" width="150" height="20" rx="6" fill="#2d2d2d" stroke="#555" stroke-width="1"/>
+  <text x="22" y="23" fill="#cccccc" font-size="12">Repo: my-app  ▾</text>
+  <rect x="172" y="9" width="140" height="20" rx="6" fill="#2d2d2d" stroke="#555" stroke-width="1"/>
+  <text x="182" y="23" fill="#cccccc" font-size="12">Branches: Show All ▾</text>
+  <text x="330" y="23" fill="#cccccc" font-size="12">☑ Show Remote Branches</text>
+  <!-- right-aligned icon buttons -->
+  <g fill="#cccccc" font-size="13" text-anchor="middle">
+    <text x="780" y="24">⟱</text><text x="812" y="24">⟰</text><text x="844" y="24">⭮</text>
+    <text x="876" y="24">✚</text><text x="908" y="24">⎇</text><text x="940" y="24">⟳</text>
+  </g>
+
+  <!-- column headers -->
+  <g fill="#858585" font-size="11" font-weight="700">
+    <text x="14" y="58">Graph</text>
+    <text x="150" y="58">Description</text>
+    <text x="600" y="58">Author</text>
+    <text x="740" y="58">Date</text>
+    <text x="880" y="58">Commit</text>
+  </g>
+  <rect x="0" y="64" width="960" height="1" fill="#3c3c3c"/>
+
+  <!-- ===== graph lanes ===== -->
+  <!-- lane geometry: lane0 (blue) x=34, lane1 (pink) x=62; rows step 34px from y=86 -->
+  <!-- blue main lane: straight through every row -->
+  <path d="M34 86 L34 290" fill="none" stroke="#0085d9" stroke-width="2.4"/>
+  <!-- pink feature branch: branches off main at the lower dot, merges back at the upper merge dot -->
+  <path d="M34 256 C 34 244, 62 248, 62 234 L62 154 C 62 140, 34 144, 34 132"
+        fill="none" stroke="#d9008f" stroke-width="2.4"/>
+
+  <!-- selected-row highlight -->
+  <rect x="0" y="173" width="960" height="26" fill="#094771" opacity="0.55"/>
+
+  <!-- commit dots -->
+  <g stroke="#000" stroke-opacity="0.35">
+    <circle cx="34" cy="98"  r="4.6" fill="#0085d9"/>
+    <circle cx="34" cy="132" r="4.6" fill="#0085d9"/>
+    <circle cx="62" cy="166" r="4.6" fill="#d9008f"/>
+    <circle cx="34" cy="200" r="4.6" fill="#0085d9"/>
+    <circle cx="62" cy="234" r="4.6" fill="#d9008f"/>
+    <circle cx="34" cy="256" r="4.6" fill="#0085d9"/>
+    <circle cx="34" cy="290" r="4.6" fill="#0085d9"/>
+  </g>
+
+  <!-- ===== description column: ref pills + subjects ===== -->
+  <g font-size="12.5">
+    <!-- row 1: HEAD -> main + origin/main pills -->
+    <g>
+      <rect x="150" y="90" width="76" height="17" rx="5" fill="#2a2a2a" stroke="#0085d9"/>
+      <rect x="150" y="90" width="16" height="17" fill="#0085d9"/>
+      <text x="170" y="103" fill="#cccccc" font-weight="700">main</text>
+      <rect x="232" y="90" width="92" height="17" rx="5" fill="#2a2a2a" stroke="#777"/>
+      <rect x="232" y="90" width="16" height="17" fill="#0085d9"/>
+      <text x="252" y="103" fill="#bbbbbb">origin/main</text>
+      <text x="334" y="103" fill="#dddddd">Merge pull request #142 from feature/login</text>
+    </g>
+    <text x="150" y="137" fill="#dddddd">Wire up OAuth callback handler</text>
+    <text x="150" y="171" fill="#dddddd">Add login form component</text>
+    <!-- selected row subject -->
+    <text x="150" y="205" fill="#ffffff" font-weight="600">Refactor auth service into module</text>
+    <text x="150" y="239" fill="#dddddd">Scaffold feature/login branch</text>
+    <!-- tag pill -->
+    <g>
+      <rect x="150" y="248" width="74" height="17" rx="5" fill="#2a2a2a" stroke="#d98500"/>
+      <rect x="150" y="248" width="16" height="17" fill="#d98500"/>
+      <text x="170" y="261" fill="#cccccc">v1.2.0</text>
+      <text x="232" y="261" fill="#dddddd">Release 1.2.0</text>
+    </g>
+    <text x="150" y="295" fill="#dddddd">Bump dependencies</text>
+  </g>
+
+  <!-- author / date / commit columns -->
+  <g font-size="11.5" fill="#9a9a9a">
+    <text x="600" y="103">Ada Lovelace</text>   <text x="740" y="103">2 hours ago</text>  <text x="880" y="103" font-family="monospace">a1b2c3d</text>
+    <text x="600" y="137">Grace Hopper</text>   <text x="740" y="137">5 hours ago</text>  <text x="880" y="137" font-family="monospace">e4f5a6b</text>
+    <text x="600" y="171">Grace Hopper</text>   <text x="740" y="171">6 hours ago</text>  <text x="880" y="171" font-family="monospace">7c8d9e0</text>
+    <text x="600" y="205" fill="#dddddd">Ada Lovelace</text> <text x="740" y="205" fill="#dddddd">yesterday</text> <text x="880" y="205" font-family="monospace" fill="#dddddd">1f2e3d4</text>
+    <text x="600" y="239">Ada Lovelace</text>   <text x="740" y="239">yesterday</text>   <text x="880" y="239" font-family="monospace">5a6b7c8</text>
+    <text x="600" y="273">Linus T.</text>       <text x="740" y="273">3 days ago</text>  <text x="880" y="273" font-family="monospace">9d0e1f2</text>
+    <text x="600" y="295">Linus T.</text>       <text x="740" y="295">4 days ago</text>  <text x="880" y="295" font-family="monospace">3a4b5c6</text>
+  </g>
+
+  <!-- inline commit-details panel (expanded under the selected row) -->
+  <rect x="0" y="199" width="960" height="150" fill="#232323"/>
+  <rect x="0" y="199" width="960" height="1" fill="#3c3c3c"/>
+  <text x="16" y="221" fill="#858585" font-size="11" font-weight="700">COMMIT</text>
+  <g font-size="12" fill="#cccccc">
+    <text x="16" y="242"><tspan fill="#858585">Commit: </tspan>1f2e3d4c5b6a79880abc...</text>
+    <text x="16" y="261"><tspan fill="#858585">Parents: </tspan>5a6b7c8</text>
+    <text x="16" y="280"><tspan fill="#858585">Author: </tspan>Ada Lovelace &lt;ada@calc.io&gt;</text>
+    <text x="16" y="299"><tspan fill="#858585">Committer: </tspan>Ada Lovelace</text>
+    <text x="16" y="326" fill="#dddddd">Refactor auth service into a self-contained module</text>
+  </g>
+  <rect x="480" y="199" width="1" height="150" fill="#3c3c3c"/>
+  <text x="496" y="221" fill="#858585" font-size="11" font-weight="700">2 CHANGED FILES</text>
+  <g font-size="12.5" font-family="monospace">
+    <text x="496" y="244"><tspan fill="#e2c08d">M</tspan> <tspan fill="#cccccc" font-family="sans-serif">src/auth/service.ts</tspan></text>
+    <text x="496" y="266"><tspan fill="#4ec94e">A</tspan> <tspan fill="#cccccc" font-family="sans-serif">src/auth/index.ts</tspan></text>
+  </g>
+</svg>

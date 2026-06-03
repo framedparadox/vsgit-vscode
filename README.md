@@ -5,9 +5,9 @@ binary directly — no libgit2, no reimplementation of git in JavaScript — and
 surfaces **160+ commands** across every Git workflow through dedicated views,
 webviews, and an interactive commit graph.
 
-![VsGit Git Graph](docs/git-graph.svg)
+![VsGit Git Graph](docs/git-graph.png)
 
-> The images in this README are vector **illustrations** of the interface (the
+> The images in this README are static **illustrations** of the interface (the
 > graph is rendered exactly this way from live repository data); they are not
 > live photographs of a running editor.
 
@@ -62,7 +62,7 @@ config, hooks, credential helpers, and aliases apply.
 
 ### Git Graph
 
-![Git Graph panel](docs/git-graph.svg)
+![Git Graph panel](docs/git-graph.png)
 
 Colour-coded lanes, `HEAD → main` / remote / tag ref pills, a selected-row
 commit-details panel (metadata on the left, changed files on the right), and
@@ -71,7 +71,7 @@ Committed Date** (each toggleable).
 
 ### Activity bar & trees
 
-![Sidebar views](docs/sidebar.svg)
+![Sidebar views](docs/sidebar.png)
 
 The VsGit container uses its own commit-graph logo (distinct from the built-in
 Source Control icon) and hosts the Repositories and Staging trees, among others.

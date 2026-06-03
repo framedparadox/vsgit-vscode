@@ -3,16 +3,16 @@
   "displayName": "VsGit",
   "description": "VsGit-style Git client for VS Code: Repositories, Staging, History, Graph, Compare, Worktrees, LFS, Gerrit, and more.",
   "version": "0.1.0",
-  "publisher": "ajaykontham",
+  "publisher": "framedparadox",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ajaykontham/git-vscode"
+    "url": "https://github.com/framedparadox/vsgit-vscode.git"
   },
   "bugs": {
-    "url": "https://github.com/ajaykontham/git-vscode/issues"
+    "url": "https://github.com/framedparadox/vsgit-vscode/issues"
   },
-  "homepage": "https://github.com/ajaykontham/git-vscode#readme",
+  "homepage": "https://github.com/framedparadox/vsgit-vscode#readme",
   "keywords": [
     "git",
     "vsgit",

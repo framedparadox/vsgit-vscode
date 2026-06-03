@@ -1,6 +1,6 @@
 # Git (VsGit) for VS Code
 
-A full-featured, EGit-inspired Git client for VS Code. VsGit spawns the `git`
+A full-featured, Git client for VS Code. VsGit spawns the `git`
 binary directly — no libgit2, no reimplementation of git in JavaScript — and
 surfaces **160+ commands** across every Git workflow through dedicated views,
 webviews, and an interactive commit graph.
@@ -66,7 +66,7 @@ config, hooks, credential helpers, and aliases apply.
 
 Colour-coded lanes, `HEAD → main` / remote / tag ref pills, a selected-row
 commit-details panel (metadata on the left, changed files on the right), and
-EGit-style columns: **Graph · Description · Author · Authored Date · Committer ·
+Eclipse Git-style columns: **Graph · Description · Author · Authored Date · Committer ·
 Committed Date** (each toggleable).
 
 ### Activity bar & trees

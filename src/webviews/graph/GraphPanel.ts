@@ -103,7 +103,7 @@ export class GraphPanel {
 
     const panel = vscode.window.createWebviewPanel(
       "vsgit.graph",
-      "Git Graph",
+      "VsGit Graph",
       column || vscode.ViewColumn.One,
       {
         enableScripts: true,
@@ -140,14 +140,12 @@ export class GraphPanel {
       data: {
         palette: c.get<string[]>("graph.colours"),
         style: c.get<string>("graph.style", "rounded"),
-        dateFormat: c.get<string>("graph.dateFormat", "relative"),
+        dateFormat: c.get<string>("graph.dateFormat", "standard"),
         showRemoteBranches: c.get<boolean>("graph.showRemoteBranches", true),
         showSidebar: c.get<boolean>("graph.showSidebar", true),
         columns: {
           id: c.get<boolean>("graph.showIdColumn", true),
           author: c.get<boolean>("graph.showAuthorColumn", true),
-          authoredDate: c.get<boolean>("graph.showAuthoredDateColumn", true),
-          committer: c.get<boolean>("graph.showCommitterColumn", true),
           committedDate: c.get<boolean>("graph.showCommittedDateColumn", true),
         },
       },
@@ -811,7 +809,7 @@ export class GraphPanel {
   <meta http-equiv="Content-Security-Policy" content="${csp}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="${cssUri}">
-  <title>Git Graph</title>
+  <title>VsGit Graph</title>
 </head>
 <body>
   <div id="shell">
@@ -857,30 +855,27 @@ export class GraphPanel {
     <div id="main">
       <div id="loading">Loading graph…</div>
       <div id="empty-state" style="display:none">No Git repository is active.</div>
-      <!-- Column layout mirrors VsGit's history view:
-           Id | (graph rail) | Message | Author | Authored Date | Committer | Committed Date.
-           The graph rail is its own fixed-width column right after Id so the overlay
-           SVG keeps a clean, uniform coordinate space; ref pills + message text live
-           in the Message column, exactly as VsGit renders them. -->
+      <!-- Column layout mirrors vscode-git-graph:
+           Graph | Description | Author | Date | Commit.
+           The graph rail is the FIRST column so the overlay SVG keeps a clean,
+           uniform coordinate space anchored to the table's left edge; ref pills +
+           message text live in the Description column, and the abbreviated commit
+           hash (Commit) is the LAST column. -->
       <table id="graph-table">
         <colgroup>
-          <col id="col-id" class="col-id">
           <col id="col-graph">
           <col id="col-desc">
           <col id="col-author" class="col-author">
-          <col id="col-adate" class="col-adate">
-          <col id="col-committer" class="col-committer">
           <col id="col-cdate" class="col-cdate">
+          <col id="col-id" class="col-id">
         </colgroup>
         <thead>
           <tr>
-            <th class="col-id">Id<span class="col-resizer" data-col="id"></span></th>
-            <th>Graph</th>
-            <th>Message<span class="col-resizer" data-col="desc"></span></th>
+            <th class="col-graph-head">Graph</th>
+            <th>Description<span class="col-resizer" data-col="desc"></span></th>
             <th class="col-author">Author<span class="col-resizer" data-col="author"></span></th>
-            <th class="col-adate">Authored Date<span class="col-resizer" data-col="adate"></span></th>
-            <th class="col-committer">Committer<span class="col-resizer" data-col="committer"></span></th>
-            <th class="col-cdate">Committed Date<span class="col-resizer" data-col="cdate"></span></th>
+            <th class="col-cdate">Date<span class="col-resizer" data-col="cdate"></span></th>
+            <th class="col-id">Commit<span class="col-resizer" data-col="id"></span></th>
           </tr>
         </thead>
         <tbody id="graph-body"></tbody>

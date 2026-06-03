@@ -87,6 +87,27 @@ export function registerStashCommands(
     );
   });
 
+  reg("vsgit.stash.clearAll", async (node) => {
+    const repo = await resolveRepo(manager, node as VsgitNode);
+    if (!repo) {
+      return;
+    }
+    if (repo.stashes.length === 0) {
+      vscode.window.showInformationMessage("No stashes to clear.");
+      return;
+    }
+    const count = repo.stashes.length;
+    const confirm = await vscode.window.showWarningMessage(
+      `Drop all ${count} stash ${count === 1 ? "entry" : "entries"}? This cannot be undone.`,
+      { modal: true },
+      "Clear All",
+    );
+    if (confirm !== "Clear All") {
+      return;
+    }
+    await withProgress(manager, "Clear all stashes", () => repo.stashClear());
+  });
+
   reg("vsgit.stash.branch", async (node) => {
     const n = node as VsgitNode;
     if (!n || n.type !== "stash") {

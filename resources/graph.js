@@ -29,10 +29,10 @@ let CONFIG = {
   palette: ['#0085d9','#d9008f','#00d90a','#d98500','#a300d9','#ff0000',
             '#00d9cc','#e138e8','#85d900','#dc5b23','#6f24d6','#ffcc00'],
   style: 'rounded',
-  dateFormat: 'relative',
-  // VsGit-style columns: Id | Graph | Message | Author | Authored Date |
-  // Committer | Committed Date. Id/Graph/Message are always shown; the rest toggle.
-  columns: { id: true, author: true, authoredDate: true, committer: true, committedDate: true },
+  dateFormat: 'standard',
+  // git-graph-style columns: Graph | Description | Author | Date | Commit.
+  // Graph/Description are always shown; Author, Date and Commit (id) toggle.
+  columns: { id: true, author: true, committedDate: true },
   showRemoteBranches: true,
   showSidebar: true,
 };
@@ -45,6 +45,12 @@ let selectedSha = null;
 let compareSha = null;      // 2nd commit for CTRL/CMD-click comparison
 let findMatches = [];
 let findIndex = -1;
+
+// Commit-details file pane: 'tree' (folder hierarchy) or 'list' (flat). Persisted
+// so the choice survives refreshes, and the most-recent file payload is cached so
+// toggling the view re-renders without a round-trip to the host.
+let cdvFileViewMode = (vscode.getState() || {}).cdvFileViewMode || 'tree';
+let cdvFilesCache = null;   // { sha, toSha?, files }
 
 // Control-bar dropdowns + branch filter. SHOW_ALL is the multi-select "Show All"
 // pseudo-value (always the first branch option), matching vscode-git-graph.
@@ -86,6 +92,8 @@ const SVG_ICONS = {
   info: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="16" viewBox="0 0 14 16"><path fill-rule="evenodd" d="M6.3 5.69a.942.942 0 0 1-.28-.7c0-.28.09-.52.28-.7.19-.18.42-.28.7-.28.28 0 .52.09.7.28.18.19.28.42.28.7 0 .28-.09.52-.28.7a1 1 0 0 1-.7.3c-.28 0-.52-.11-.7-.3zM8 7.99c-.02-.25-.11-.48-.31-.69-.2-.19-.42-.3-.69-.31H6c-.27.02-.48.13-.69.31-.2.2-.3.44-.31.69h1v3c.02.27.11.5.31.69.2.2.42.31.69.31h1c.27 0 .48-.11.69-.31.2-.19.3-.42.31-.69H8V7.98v.01zM7 2.3c-3.14 0-5.7 2.54-5.7 5.68 0 3.14 2.56 5.7 5.7 5.7s5.7-2.55 5.7-5.7c0-3.15-2.56-5.69-5.7-5.69v.01zM7 .98c3.86 0 7 3.14 7 7s-3.14 7-7 7-7-3.12-7-7 3.14-7 7-7z"/></svg>',
   close: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14"><path fill-rule="evenodd" d="M3.8,2.4L2.4,3.8L5.7,7L2.4,10.2L3.8,11.6L7,8.3L10.2,11.6L11.6,10.2L8.3,7L11.6,3.8L10.2,2.4L7,5.7L3.8,2.4z"/></svg>',
   fileList: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M 2,3 V 4.5 H 4 V 3 Z M 5.5,3 V 4.5 H 18 V 3 Z M 2,7 V 8.5 H 4 V 7 Z M 5.5,7 V 8.5 H 18 V 7 Z M 2,11 v 1.5 H 4 V 11 Z m 3.5,0 v 1.5 H 18 V 11 Z M 2,15 v 1.5 H 4 V 15 Z m 3.5,0 v 1.5 H 18 V 15 Z"/></svg>',
+  fileTree: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2 3v1.5h4V3H2zm6 0v1.5h10V3H8zM2 7v1.5h4V7H2zm6 4v1.5h4V11H8zm0 4v1.5h4V15H8zm-3-7.75v8.5H6.5V15H12v-1.5H6.5v-2.75H12V9.25H6.5V7.25H5z"/></svg>',
+  chevron: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M6 4l4 4-4 4V4z"/></svg>',
   pull: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="16" viewBox="0 0 14 16"><path fill-rule="evenodd" d="M7 7V3H5l3-3 3 3H9v4H7zm5-1.41L13.41 7H13v6c0 .55-.45 1-1 1H2c-.55 0-1-.45-1-1V7H.59L2 5.59V13h10V5.59zM7 9v4H5l3 3 3-3H9V9H7z" transform="translate(0,-1)"/></svg>',
   push: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="16" viewBox="0 0 14 16"><path fill-rule="evenodd" d="M7 9V5H5l3-3 3 3H9v4H7zm-5 4h10v1H2v-1z"/></svg>',
   merge: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="16" viewBox="0 0 12 16"><path fill-rule="evenodd" d="M10 7c-.73 0-1.38.41-1.73 1.02V8C7.22 7.98 6 7.64 5.14 6.98c-.75-.58-1.5-1.61-1.89-2.44A1.993 1.993 0 0 0 2 .99C.89.99 0 1.89 0 3a2 2 0 0 0 1 1.72v6.56c-.59.35-1 .99-1 1.72 0 1.11.89 2 2 2 1.11 0 2-.89 2-2 0-.53-.2-1-.53-1.36.85.83 1.86 1.45 3.02 1.65.5.12 1.01.16 1.51.16v-.02c.36.61 1 1.02 1.73 1.02 1.11 0 2-.89 2-2 0-1.11-.89-2-2-2zM2 1.8c.66 0 1.2.55 1.2 1.2 0 .65-.55 1.2-1.2 1.2C1.35 4.2.8 3.65.8 3c0-.65.55-1.2 1.2-1.2zm0 12.41c-.66 0-1.2-.55-1.2-1.2 0-.65.55-1.2 1.2-1.2.65 0 1.2.55 1.2 1.2 0 .65-.55 1.2-1.2 1.2zm8-3c-.66 0-1.2-.55-1.2-1.2 0-.65.55-1.2 1.2-1.2.65 0 1.2.55 1.2 1.2 0 .65-.55 1.2-1.2 1.2z"/></svg>',
@@ -343,14 +351,19 @@ function buildLayout(commits) {
 // per-row half-SVGs did. cyOf(rowIdx) is the exact vertical centre of that row.
 const SVGNS = 'http://www.w3.org/2000/svg';
 const cx = (c) => PAD + c * COL_W + COL_W / 2;
-// When a commit-details row is expanded inline, every graph row BELOW it is
-// pushed down by the panel's height. The overlay SVG accounts for that with the
-// same offset so dots/lines stay aligned with the (shifted) table rows.
-let expandAfterRow = -1;   // row index the CDV is inserted after (-1 = none)
-let expandGap = 0;         // measured CDV height in px
+// Each commit dot sits at the MEASURED vertical centre of its table row, so dots
+// line up exactly even when font metrics or ref pills make a row a fraction taller
+// than ROW_H, and the alignment stays correct when an expanded details row pushes
+// the rows below it down. `rowCenters` (px, relative to the overlay's origin) and
+// `graphHeight` are filled by rebuildGraphOverlay() after each render; before the
+// first measurement we fall back to the nominal ROW_H grid.
+let rowCenters = [];
+let graphHeight = 0;
 function cyOf(rowIdx) {
-  const base = rowIdx * ROW_H + ROW_H / 2;
-  return (expandAfterRow >= 0 && rowIdx > expandAfterRow) ? base + expandGap : base;
+  if (rowIdx >= 0 && rowIdx < rowCenters.length && rowCenters[rowIdx] != null) {
+    return rowCenters[rowIdx];
+  }
+  return rowIdx * ROW_H + ROW_H / 2;
 }
 
 // One smooth/angular transition between two adjacent row centres (x1,y1)->(x2,y2).
@@ -400,7 +413,7 @@ function commitToParentPath(commitCol, commitRow, laneCol, parentCol, parentRow)
 function buildGraphSvg(rows) {
   const maxCols = rows.length ? rows[0].maxCols : 1;
   const w = maxCols * COL_W + PAD * 2;
-  const h = rows.length * ROW_H + (expandAfterRow >= 0 ? expandGap : 0);
+  const h = graphHeight || rows.length * ROW_H;
   const svg = document.createElementNS(SVGNS, 'svg');
   svg.setAttribute('id', 'graph-svg');
   svg.setAttribute('width', String(w));
@@ -440,15 +453,18 @@ function buildGraphSvg(rows) {
     });
   });
 
-  // Dots on top of the lines.
+  // Dots on top of the lines. Each dot is its own pointer target: clicking a node
+  // selects exactly that commit (and opens its details) regardless of which row
+  // the overlay SVG physically lives in, and right-click opens the commit menu.
   rows.forEach((row, i) => {
+    const commit = row.commit;
     const dot = document.createElementNS(SVGNS, 'circle');
     dot.setAttribute('cx', String(cx(row.col)));
     dot.setAttribute('cy', String(cyOf(i)));
     dot.setAttribute('r', String(R));
     dot.setAttribute('class', 'graph-node');
-    dot.dataset.sha = row.commit.sha;
-    if (row.commit.kind === 'uncommitted') {
+    dot.dataset.sha = commit.sha;
+    if (commit.kind === 'uncommitted') {
       dot.setAttribute('fill', 'var(--vscode-editor-background)');
       dot.setAttribute('stroke', laneColor(row.colorIdx));
       dot.setAttribute('stroke-width', '2');
@@ -457,19 +473,52 @@ function buildGraphSvg(rows) {
       dot.setAttribute('stroke', 'rgba(0,0,0,0.35)');
       dot.setAttribute('stroke-width', '1');
     }
+    dot.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const tr = document.querySelector('#graph-body tr[data-sha="' + cssEsc(commit.sha) + '"]');
+      selectCommit(commit, tr, e);
+    });
+    dot.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (commit.kind === 'uncommitted') return;
+      showCommitMenu(e.clientX, e.clientY, commit);
+    });
     svg.appendChild(dot);
   });
 
   return svg;
 }
 
-// Rebuild the overlay SVG in place (used after a CDV row opens/closes, which
-// shifts the rows below it). Preserves current trace dimming.
-function redrawGraph() {
+// Measure the real vertical centre of every commit row and (re)build the overlay
+// SVG into the first commit row's graph cell. Called after the table renders and
+// whenever a details row opens/closes (which shifts the rows below it). Measuring
+// the live DOM keeps dots centred on their rows and lines continuous across the
+// expanded-row gap — exactly like vscode-git-graph.
+function rebuildGraphOverlay() {
+  const tbody = document.getElementById('graph-body');
+  if (!tbody || !layoutRows.length) return;
+  const firstCell = tbody.querySelector('tr.commit-row td.col-graph');
+  if (!firstCell) return;
+
+  const trBySha = new Map();
+  tbody.querySelectorAll('tr.commit-row').forEach((tr) => {
+    if (tr.dataset.sha) trBySha.set(tr.dataset.sha, tr);
+  });
+  const originTop = firstCell.getBoundingClientRect().top;
+  let maxBottom = 0;
+  rowCenters = layoutRows.map((r) => {
+    const tr = trBySha.get(r.commit.sha);
+    if (!tr) return null;
+    const rect = tr.getBoundingClientRect();
+    maxBottom = Math.max(maxBottom, rect.bottom - originTop);
+    return rect.top - originTop + rect.height / 2;
+  });
+  graphHeight = maxBottom;
+
   const old = document.getElementById('graph-svg');
-  if (!old || !layoutRows.length) return;
-  const fresh = buildGraphSvg(layoutRows);
-  old.replaceWith(fresh);
+  if (old) old.remove();
+  firstCell.appendChild(buildGraphSvg(layoutRows));
   applyTrace();
 }
 
@@ -560,24 +609,17 @@ function renderTable(rows) {
     tr.dataset.sha = commit.sha;
     if (commit.sha === selectedSha) tr.classList.add('selected');
 
-    // Column order mirrors VsGit: Id | Graph | Message | Author | Authored Date |
-    // Committer | Committed Date.
-
-    // Id: the abbreviated commit hash (VsGit's leading column).
-    const tdId = document.createElement('td');
-    tdId.className = 'col-id';
-    tdId.textContent = commit.kind === 'uncommitted' ? '*' : commit.shortSha;
-    tr.appendChild(tdId);
+    // Column order mirrors vscode-git-graph: Graph | Description | Author |
+    // Date | Commit.
 
     // Graph: a fixed-size spacer cell; all lines + dots are drawn by one overlay
     // SVG appended to the first row's graph cell (see below), so the whole DAG
     // shares one coordinate space and edges never break across rows.
     const tdGraph = document.createElement('td');
     tdGraph.className = 'col-graph';
-    if (i === 0) tdGraph.appendChild(buildGraphSvg(rows));
     tr.appendChild(tdGraph);
 
-    // Message: inline ref pills, then the commit subject (VsGit / git-graph style).
+    // Description: inline ref pills, then the commit subject (git-graph style).
     const tdDesc = document.createElement('td');
     tdDesc.className = 'col-desc';
     tdDesc.appendChild(refBadgesFor(commit, colorOf.get(commit.sha) ?? row.colorIdx));
@@ -594,23 +636,17 @@ function renderTable(rows) {
     tdAuthor.title = commit.author || '';
     tr.appendChild(tdAuthor);
 
-    const tdADate = document.createElement('td');
-    tdADate.className = 'col-adate';
-    tdADate.textContent = commit.kind === 'uncommitted' ? '' : formatDate(commit.date);
-    tdADate.title = commit.date || '';
-    tr.appendChild(tdADate);
-
-    const tdCommitter = document.createElement('td');
-    tdCommitter.className = 'col-committer';
-    tdCommitter.textContent = commit.committer || '';
-    tdCommitter.title = commit.committer || '';
-    tr.appendChild(tdCommitter);
-
     const tdCDate = document.createElement('td');
     tdCDate.className = 'col-cdate';
     tdCDate.textContent = commit.kind === 'uncommitted' ? '' : formatDate(commit.committerDate);
     tdCDate.title = commit.committerDate || '';
     tr.appendChild(tdCDate);
+
+    // Commit: the abbreviated commit hash (git-graph's trailing column).
+    const tdId = document.createElement('td');
+    tdId.className = 'col-id';
+    tdId.textContent = commit.kind === 'uncommitted' ? '*' : commit.shortSha;
+    tr.appendChild(tdId);
 
     tr.addEventListener('click', (e) => selectCommit(commit, tr, e));
     tr.addEventListener('contextmenu', (e) => {
@@ -622,15 +658,15 @@ function renderTable(rows) {
   });
   tbody.appendChild(frag);
   applyColumnVisibility();
+  // Build the overlay SVG now that the rows are in the DOM and measurable.
+  rebuildGraphOverlay();
 }
 
 function applyColumnWidths() {
   const set = (id, w) => { const el = document.getElementById(id); if (w && el) el.style.width = w + 'px'; };
   set('col-id', colWidths.id || 80);
   set('col-author', colWidths.author || 130);
-  set('col-adate', colWidths.adate || 130);
-  set('col-committer', colWidths.committer || 130);
-  set('col-cdate', colWidths.cdate || 130);
+  set('col-cdate', colWidths.cdate || 150);
 }
 function applyColumnVisibility() {
   const toggle = (cls, show) => {
@@ -640,8 +676,6 @@ function applyColumnVisibility() {
   };
   toggle('col-id', CONFIG.columns.id);
   toggle('col-author', CONFIG.columns.author);
-  toggle('col-adate', CONFIG.columns.authoredDate);
-  toggle('col-committer', CONFIG.columns.committer);
   toggle('col-cdate', CONFIG.columns.committedDate);
 }
 
@@ -671,14 +705,13 @@ function selectIndex(i) {
 // metadata + message on the RIGHT (per the requested layout).
 function removeExpandedRow() {
   const ex = document.getElementById('cdv-row');
+  const had = !!ex;
   if (ex) ex.remove();
+  cdvFilesCache = null;
   document.querySelectorAll('#graph-body tr.commitDetailsOpen').forEach((r) =>
     r.classList.remove('commitDetailsOpen'));
-  if (expandAfterRow >= 0) {
-    expandAfterRow = -1;
-    expandGap = 0;
-    redrawGraph();
-  }
+  // Re-measure so the rows that were pushed down snap back into alignment.
+  if (had) rebuildGraphOverlay();
 }
 
 function selectCommit(commit, tr, ev) {
@@ -731,35 +764,50 @@ function openExpandedRow(commit, tr) {
   if (!tr) return;
   tr.classList.add('commitDetailsOpen');
 
-  // Inline CDV layout, replicated from vscode-git-graph:
-  //   #cdvContent (left:0; right:32) > #cdvSummary (left 50%) + #cdvFiles (right
-  //   50%) + #cdvDivider, then #cdvControls (32px strip) holding the close + file
-  //   view-type buttons. The expanded row spans the full table width.
+  // Inline CDV layout (vscode-git-graph style), but anchored so the details panel
+  // begins at the Description column — the first cell is an empty spacer over the
+  // Graph column so the DAG line continues to show through, and the panel itself
+  // spans the remaining columns. A header strip carries the title plus the
+  // tree/list view toggle and the close button; the body splits into commit
+  // metadata (left) and changed files (right).
   const colCount = tr.children.length;
   const row = document.createElement('tr');
   row.id = 'cdv-row';
   row.className = 'cdv-row';
+
+  const spacer = document.createElement('td');
+  spacer.className = 'col-graph cdv-graph-spacer';
+  row.appendChild(spacer);
+
   const td = document.createElement('td');
-  td.colSpan = colCount;
+  td.colSpan = colCount - 1;
   td.className = 'cdv-cell';
   row.appendChild(td);
 
+  const title = commit.kind === 'uncommitted'
+    ? 'Uncommitted Changes'
+    : 'Commit ' + esc(commit.shortSha);
   const cdv = document.createElement('div');
   cdv.id = 'cdv';
   cdv.innerHTML =
-    '<div id="cdvContent">' +
+    '<div id="cdvHeader">' +
+      '<span id="cdvHeaderTitle">' + title + '</span>' +
+      '<span class="cdvHeaderSpacer"></span>' +
+      '<div id="cdvViewTree" class="cdvHeaderBtn cdvViewBtn" title="Tree View">' + SVG_ICONS.fileTree + '</div>' +
+      '<div id="cdvViewList" class="cdvHeaderBtn cdvViewBtn" title="List View">' + SVG_ICONS.fileList + '</div>' +
+      '<div id="cdvClose" class="cdvHeaderBtn" title="Close">' + SVG_ICONS.close + '</div>' +
+    '</div>' +
+    '<div id="cdvBody">' +
       '<div id="cdvSummary"></div>' +
       '<div id="cdvFiles"><div class="cdvLoading">Loading changed files…</div></div>' +
-      '<div id="cdvDivider"></div>' +
-    '</div>' +
-    '<div id="cdvControls">' +
-      '<div id="cdvClose" class="cdvControlBtn" title="Close">' + SVG_ICONS.close + '</div>' +
-      '<div id="cdvFileViewTypeTree" class="cdvControlBtn cdvFileViewTypeBtn active" title="File Tree View">' + SVG_ICONS.fileList + '</div>' +
     '</div>';
   td.appendChild(cdv);
 
   tr.insertAdjacentElement('afterend', row);
 
+  syncFileViewButtons();
+  cdv.querySelector('#cdvViewTree').addEventListener('click', (e) => { e.stopPropagation(); setFileViewMode('tree'); });
+  cdv.querySelector('#cdvViewList').addEventListener('click', (e) => { e.stopPropagation(); setFileViewMode('list'); });
   cdv.querySelector('#cdvClose').addEventListener('click', (e) => {
     e.stopPropagation();
     removeExpandedRow();
@@ -773,14 +821,28 @@ function openExpandedRow(commit, tr) {
     renderSummary(commit);
   }
 
-  // Push the graph rows below this commit down by the panel's height, and redraw
-  // the overlay SVG with the same offset so dots/lines stay aligned.
-  const idx = layoutRows.findIndex((r) => r.commit.sha === commit.sha);
-  if (idx >= 0) {
-    expandAfterRow = idx;
-    expandGap = row.getBoundingClientRect().height || cdv.offsetHeight || 160;
-    redrawGraph();
+  // The inserted details row pushes the rows below it down; re-measure so the
+  // dots stay centred and the edges run continuously through the new gap (the
+  // graph lines keep flowing past the open commit, exactly like git-graph).
+  rebuildGraphOverlay();
+}
+
+// Tree/list view-type toggle for the changed-file pane.
+function setFileViewMode(mode) {
+  if (cdvFileViewMode === mode) return;
+  cdvFileViewMode = mode;
+  vscode.setState({ ...vscode.getState(), cdvFileViewMode: mode });
+  syncFileViewButtons();
+  if (cdvFilesCache) {
+    if (cdvFilesCache.toSha) renderComparisonFiles(cdvFilesCache.sha, cdvFilesCache.toSha, cdvFilesCache.files);
+    else renderFiles(cdvFilesCache.sha, cdvFilesCache.files);
   }
+}
+function syncFileViewButtons() {
+  const tree = document.getElementById('cdvViewTree');
+  const list = document.getElementById('cdvViewList');
+  if (tree) tree.classList.toggle('active', cdvFileViewMode === 'tree');
+  if (list) list.classList.toggle('active', cdvFileViewMode === 'list');
 }
 
 // LEFT pane: commit metadata + message. Shows author AND committer (with their
@@ -796,12 +858,21 @@ function renderSummary(commit) {
         '<span class="cdvInternalLink" data-sha="' + esc(p) + '">' + esc(p) + '</span>').join(', ')
     : 'None';
 
+  // Refs (branches / tags / remotes) pointing at this commit, so clicking a node
+  // surfaces its branch/tag membership directly in the details.
+  const refsHtml = (commit.refs || []).length
+    ? (commit.refs || []).map((r) =>
+        '<span class="cdvRefLabel ' + refKindClass(r.type).replace('gitRef', 'cdvRef') + '">' +
+        esc(r.name) + '</span>').join(' ')
+    : '';
+
   host.innerHTML =
     '<span class="cdvSummaryTop"><span class="cdvSummaryTopRow"><span class="cdvSummaryKeyValues">' +
       '<b>Commit: </b>' + esc(commit.sha) + '<br>' +
       '<b>Parents: </b>' + parents + '<br>' +
       '<b>Author: </b>' + esc(commit.author || '') + ' &lt;' + esc(authoredStr) + '&gt;<br>' +
       '<b>Committer: </b>' + esc(commit.committer || '') + ' &lt;' + esc(committedStr) + '&gt;' +
+      (refsHtml ? '<br><b>Refs: </b>' + refsHtml : '') +
     '</span></span></span><br><br>' +
     '<span class="cdvBody">' + esc(commit.message) + '</span>';
 
@@ -824,39 +895,107 @@ function selectShaIfPresent(sha) {
   if (row) { selectCommit(row.commit, tr); tr.scrollIntoView({ block: 'center' }); }
 }
 
-// RIGHT pane: the changed-file list.
+// RIGHT pane: the changed-file list, rendered as a folder tree or a flat list
+// per the current view-type toggle.
 function renderFiles(sha, files) {
   if (selectedSha !== sha) return;
+  cdvFilesCache = { sha, files };
   const host = document.getElementById('cdvFiles');
   if (!host) return;
+  renderFilePane(host, files, sha === '*uncommitted*' ? null : (f) => {
+    vscode.postMessage({ type: 'openFileDiff', data: { sha, path: f.path } });
+  });
+}
+
+// Shared renderer for the changed-file pane (commit or comparison).
+function renderFilePane(host, files, onOpen, emptyText) {
   if (!files || files.length === 0) {
-    host.innerHTML = '<div class="cdvFilesHead">No file changes.</div>';
+    host.innerHTML = '<div class="cdvFilesHead">' + (emptyText || 'No file changes.') + '</div>';
     return;
   }
-  host.innerHTML = '<div class="cdvFilesHead">' + files.length + ' changed file' + (files.length === 1 ? '' : 's') + '</div>';
+  host.innerHTML = '';
+  const head = document.createElement('div');
+  head.className = 'cdvFilesHead';
+  head.textContent = files.length + ' changed file' + (files.length === 1 ? '' : 's');
+  host.appendChild(head);
+  host.appendChild(cdvFileViewMode === 'tree' ? buildFileTree(files, onOpen) : buildFileList(files, onOpen));
+}
+
+function makeFileRow(f, onOpen, label) {
+  const fileRow = document.createElement('div');
+  fileRow.className = 'file-row';
+  const st = document.createElement('span');
+  const code = (f.status || 'M').charAt(0).toUpperCase();
+  st.className = 'file-status ' + code;
+  st.textContent = code;
+  const p = document.createElement('span');
+  p.className = 'file-path';
+  p.textContent = label;
+  p.title = f.path;
+  fileRow.appendChild(st);
+  fileRow.appendChild(p);
+  if (onOpen) fileRow.addEventListener('click', () => onOpen(f));
+  return fileRow;
+}
+
+function buildFileList(files, onOpen) {
   const list = document.createElement('div');
   list.className = 'cdvFileList';
-  files.forEach((f) => {
-    const fileRow = document.createElement('div');
-    fileRow.className = 'file-row';
-    const st = document.createElement('span');
-    const code = (f.status || 'M').charAt(0).toUpperCase();
-    st.className = 'file-status ' + code;
-    st.textContent = code;
-    const p = document.createElement('span');
-    p.className = 'file-path';
-    p.textContent = f.path;
-    p.title = f.path;
-    fileRow.appendChild(st);
-    fileRow.appendChild(p);
-    if (sha !== '*uncommitted*') {
-      fileRow.addEventListener('click', () => {
-        vscode.postMessage({ type: 'openFileDiff', data: { sha, path: f.path } });
-      });
-    }
-    list.appendChild(fileRow);
+  files.slice().sort((a, b) => a.path.localeCompare(b.path)).forEach((f) => {
+    list.appendChild(makeFileRow(f, onOpen, f.path));
   });
-  host.appendChild(list);
+  return list;
+}
+
+// Build a nested folder tree from flat file paths and render collapsible folders.
+function buildFileTree(files, onOpen) {
+  const root = { dirs: new Map(), files: [] };
+  files.forEach((f) => {
+    const parts = f.path.split('/');
+    let node = root;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const seg = parts[i];
+      if (!node.dirs.has(seg)) node.dirs.set(seg, { dirs: new Map(), files: [] });
+      node = node.dirs.get(seg);
+    }
+    node.files.push({ file: f, name: parts[parts.length - 1] });
+  });
+  const container = document.createElement('div');
+  container.className = 'cdvFileList cdvFileTree';
+  renderTreeLevel(root, container, onOpen, 0);
+  return container;
+}
+
+function renderTreeLevel(node, parent, onOpen, depth) {
+  Array.from(node.dirs.keys()).sort((a, b) => a.localeCompare(b)).forEach((name) => {
+    const dir = node.dirs.get(name);
+    const folderRow = document.createElement('div');
+    folderRow.className = 'tree-folder-row';
+    folderRow.style.paddingLeft = (4 + depth * 14) + 'px';
+    const chev = document.createElement('span');
+    chev.className = 'tree-chevron expanded';
+    chev.innerHTML = SVG_ICONS.chevron;
+    const fname = document.createElement('span');
+    fname.className = 'tree-folder-name';
+    fname.textContent = name;
+    folderRow.appendChild(chev);
+    folderRow.appendChild(fname);
+    const childrenWrap = document.createElement('div');
+    childrenWrap.className = 'tree-children';
+    renderTreeLevel(dir, childrenWrap, onOpen, depth + 1);
+    folderRow.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const collapsed = childrenWrap.classList.toggle('collapsed');
+      chev.classList.toggle('expanded', !collapsed);
+    });
+    parent.appendChild(folderRow);
+    parent.appendChild(childrenWrap);
+  });
+  node.files.sort((a, b) => a.name.localeCompare(b.name)).forEach((entry) => {
+    const row = makeFileRow(entry.file, onOpen, entry.name);
+    row.style.paddingLeft = (4 + depth * 14 + 16) + 'px';
+    parent.appendChild(row);
+  });
 }
 
 // ─── context menus (ported) ──────────────────────────────────────────────────
@@ -1019,13 +1158,17 @@ function formatDate(dateStr) {
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return dateStr;
   if (CONFIG.dateFormat === 'iso') return d.toISOString().slice(0, 19).replace('T', ' ');
-  if (CONFIG.dateFormat === 'standard') return d.toLocaleString();
-  const diff = Date.now() - d.getTime();
-  if (diff < 60000) return 'just now';
-  if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
-  if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
-  if (diff < 7 * 86400000) return Math.floor(diff / 86400000) + 'd ago';
-  return d.toLocaleDateString();
+  if (CONFIG.dateFormat === 'relative') {
+    const diff = Date.now() - d.getTime();
+    if (diff < 60000) return 'just now';
+    if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+    if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+    if (diff < 7 * 86400000) return Math.floor(diff / 86400000) + 'd ago';
+    return d.toLocaleDateString();
+  }
+  // 'standard' (default): an absolute date + time, e.g. "2 Jun 2026, 14:32".
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) +
+    ', ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }
 function esc(s) {
   return String(s == null ? '' : s)
@@ -1148,34 +1291,12 @@ window.addEventListener('message', (event) => {
 });
 
 function renderComparisonFiles(fromSha, toSha, files) {
+  cdvFilesCache = { sha: fromSha, toSha, files };
   const host = document.getElementById('cdvFiles');
   if (!host) return;
-  if (!files || files.length === 0) {
-    host.innerHTML = '<div class="cdvFilesHead">No differences.</div>';
-    return;
-  }
-  host.innerHTML = '<div class="cdvFilesHead">' + files.length + ' changed file' + (files.length === 1 ? '' : 's') + '</div>';
-  const list = document.createElement('div');
-  list.className = 'cdvFileList';
-  files.forEach((f) => {
-    const fileRow = document.createElement('div');
-    fileRow.className = 'file-row';
-    const st = document.createElement('span');
-    const code = (f.status || 'M').charAt(0).toUpperCase();
-    st.className = 'file-status ' + code;
-    st.textContent = code;
-    const p = document.createElement('span');
-    p.className = 'file-path';
-    p.textContent = f.path;
-    p.title = f.path;
-    fileRow.appendChild(st);
-    fileRow.appendChild(p);
-    fileRow.addEventListener('click', () => {
-      vscode.postMessage({ type: 'openComparisonDiff', data: { from: fromSha, to: toSha, path: f.path } });
-    });
-    list.appendChild(fileRow);
-  });
-  host.appendChild(list);
+  renderFilePane(host, files, (f) => {
+    vscode.postMessage({ type: 'openComparisonDiff', data: { from: fromSha, to: toSha, path: f.path } });
+  }, 'No differences.');
 }
 
 function renderRepoDropdown(repos) {

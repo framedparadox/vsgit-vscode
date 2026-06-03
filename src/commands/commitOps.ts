@@ -252,6 +252,61 @@ export function registerCommitOpsCommands(
     }
   });
 
+  // ── Branches / tags containing a commit ──────────────────────────────────
+
+  reg("vsgit.commit.showContaining", async (node) => {
+    const n = node as VsgitNode | undefined;
+    const repo = n && "repo" in n ? n.repo : await resolveRepo(manager, undefined);
+    if (!repo) return;
+
+    let sha: string | undefined;
+    if (n && n.type === "stash") {
+      sha = n.ref;
+    } else {
+      const commits = await repo.log({ limit: 200, all: true });
+      const pick = await vscode.window.showQuickPick(
+        commits.map((c) => ({
+          label: `$(git-commit) ${c.shortSha}`,
+          description: c.subject,
+          detail: `${c.authorName}  ${new Date(c.authorDate * 1000).toLocaleDateString()}`,
+          sha: c.sha,
+        })),
+        { placeHolder: "Select commit to inspect" },
+      );
+      if (!pick) return;
+      sha = pick.sha;
+    }
+
+    try {
+      const [branches, tags, described] = await Promise.all([
+        repo.branchesContaining(sha),
+        repo.tagsContaining(sha),
+        repo.describe(sha),
+      ]);
+
+      const items: vscode.QuickPickItem[] = [
+        { label: `$(git-commit) ${described}`, description: "git describe" },
+      ];
+      if (branches.length > 0) {
+        items.push({ label: "Branches", kind: vscode.QuickPickItemKind.Separator });
+        items.push(...branches.map((b) => ({ label: `$(git-branch) ${b}` })));
+      }
+      if (tags.length > 0) {
+        items.push({ label: "Tags", kind: vscode.QuickPickItemKind.Separator });
+        items.push(...tags.map((t) => ({ label: `$(tag) ${t}` })));
+      }
+      if (branches.length === 0 && tags.length === 0) {
+        items.push({ label: "$(info) Not contained in any branch or tag" });
+      }
+
+      await vscode.window.showQuickPick(items, {
+        placeHolder: `${sha.slice(0, 8)} — branches & tags containing this commit`,
+      });
+    } catch (e) {
+      vscode.window.showErrorMessage(`Failed to inspect commit: ${errMsg(e)}`);
+    }
+  });
+
   // ── Merge Tool (per-file) ─────────────────────────────────────────────────
 
   reg("vsgit.mergeTool", async (node) => {

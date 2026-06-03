@@ -4,6 +4,7 @@ import { RepositoryManager } from "../git/RepositoryManager";
 import { VsgitNode } from "../views/RepositoriesProvider";
 import { Repository } from "../git/Repository";
 import { resolveRepo, withProgress, errMsg } from "./shared";
+import { safeRef } from "../git/argGuard";
 import { confirmDestructiveAction, DestructiveOperations } from "../util/confirmation";
 
 /**
@@ -25,7 +26,9 @@ export function registerBranchCommands(
           return;
         }
         try {
-          await git.run(["checkout", target.name], { cwd: target.repo.root });
+          await git.run(["checkout", safeRef(target.name, "branch")], {
+            cwd: target.repo.root,
+          });
           await manager.refreshAll();
           vscode.window.setStatusBarMessage(
             `Checked out ${target.name}`,
@@ -59,10 +62,11 @@ export function registerBranchCommands(
         if (!checkout) {
           return;
         }
+        const safeName = safeRef(name.trim(), "branch");
         const args =
           checkout === "Create and checkout"
-            ? ["checkout", "-b", name.trim()]
-            : ["branch", name.trim()];
+            ? ["checkout", "-b", safeName]
+            : ["branch", safeName];
         try {
           await git.run(args, { cwd: repo.root });
           await manager.refreshAll();
@@ -92,7 +96,7 @@ export function registerBranchCommands(
         }
         const flag = confirm === "Force Delete" ? "-D" : "-d";
         try {
-          await git.run(["branch", flag, target.name], {
+          await git.run(["branch", flag, safeRef(target.name, "branch")], {
             cwd: target.repo.root,
           });
           await manager.refreshAll();

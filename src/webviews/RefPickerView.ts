@@ -3,6 +3,7 @@ import * as path from "node:path";
 import * as fs from "node:fs";
 import * as vscode from "vscode";
 import { Repository } from "../git/Repository";
+import { isOptionLike } from "../git/argGuard";
 import { refPickerHtml } from "./refPickerHtml";
 
 interface RefEntry {
@@ -208,15 +209,25 @@ async function resolveSpecialRefs(repo: Repository): Promise<RefEntry[]> {
 }
 
 async function resolveRef(repo: Repository, name: string): Promise<string | undefined> {
+  // `name` can be a symref target read from a ref file (see below), i.e. it
+  // originates from repository contents. Reject anything git would parse as an
+  // option so it cannot smuggle a flag into `rev-parse --verify`.
+  if (isOptionLike(name)) return undefined;
   // First try git rev-parse to handle both symbolic and packed refs
   try {
     const out = await (repo as unknown as { git: { stdout: (args: string[], opts?: object) => Promise<string> } })
-      .git.stdout(["rev-parse", "--verify", name], { cwd: repo.root });
+      .git.stdout(["rev-parse", "--verify", "--end-of-options", name], { cwd: repo.root });
     return out.trim() || undefined;
   } catch {
-    // Try reading the file directly for special refs
+    // Try reading the file directly for special refs. A crafted symref target
+    // (e.g. "ref: ../../etc/passwd") must not escape the git dir, so resolve
+    // and confine the path before touching the filesystem.
     const gitDir = await getGitDir(repo);
-    const filePath = path.join(gitDir, name);
+    const filePath = path.resolve(gitDir, name);
+    const root = path.resolve(gitDir);
+    if (filePath !== root && !filePath.startsWith(root + path.sep)) {
+      return undefined;
+    }
     if (fs.existsSync(filePath)) {
       const content = fs.readFileSync(filePath, "utf8").trim();
       // Handle symrefs like "ref: refs/heads/main"
@@ -231,9 +242,10 @@ async function resolveRef(repo: Repository, name: string): Promise<string | unde
 }
 
 async function resolveSubject(repo: Repository, sha: string): Promise<string> {
+  if (isOptionLike(sha)) return "";
   try {
     const out = await (repo as unknown as { git: { stdout: (args: string[], opts?: object) => Promise<string> } })
-      .git.stdout(["log", "-1", "--format=%s", sha], { cwd: repo.root });
+      .git.stdout(["log", "-1", "--format=%s", "--end-of-options", sha], { cwd: repo.root });
     return out.trim();
   } catch {
     return "";

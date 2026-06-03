@@ -125,6 +125,31 @@ export function registerWorktreeCommands(
     }
   });
 
+  reg("vsgit.worktree.move", async (node: unknown) => {
+    const n = node as WorktreeNode | undefined;
+    if (!n || n.type !== "worktree") return;
+    const repo = n.manager.getAll().find((r) => r.root === n.repo_root);
+    if (!repo) return;
+
+    const target = await vscode.window.showOpenDialog({
+      canSelectFiles: false,
+      canSelectFolders: true,
+      canSelectMany: false,
+      title: "Select new parent folder for the worktree",
+    });
+    if (!target || target.length === 0) return;
+    const dest = path.join(target[0].fsPath, path.basename(n.info.path));
+
+    try {
+      await withProgress(n.manager, `Move worktree → ${dest}`, () =>
+        repo.worktreeMove(n.info.path, dest),
+      );
+      vscode.window.showInformationMessage(`Worktree moved to ${dest}`);
+    } catch (e) {
+      vscode.window.showErrorMessage(`Move worktree failed: ${errMsg(e)}`);
+    }
+  });
+
   reg("vsgit.worktree.prune", async () => {
     const repos = manager.getAll();
     if (repos.length === 0) return;

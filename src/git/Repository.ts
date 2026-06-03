@@ -1,6 +1,6 @@
 import * as path from "node:path";
 import { GitExecutor } from "./GitExecutor";
-import { safeRef } from "./argGuard";
+import { safeRef, safeRemoteUrl } from "./argGuard";
 import { FOR_EACH_REF_FORMAT, parseForEachRef, RefInfo } from "./parsers/refs";
 import { parseStatusV2, StatusResult } from "./parsers/status";
 import {
@@ -176,12 +176,17 @@ export class Repository {
   // --- Branch / merge / rebase --------------------------------------------
 
   async renameBranch(oldName: string, newName: string): Promise<void> {
-    await this.git.run(["branch", "-m", oldName, newName], { cwd: this.root });
+    await this.git.run(
+      ["branch", "-m", safeRef(oldName, "branch"), safeRef(newName, "branch")],
+      { cwd: this.root },
+    );
   }
 
   /** Delete a local branch (-d, or -D when force). */
   async deleteBranch(name: string, force: boolean): Promise<void> {
-    await this.git.run(["branch", force ? "-D" : "-d", name], { cwd: this.root });
+    await this.git.run(["branch", force ? "-D" : "-d", safeRef(name, "branch")], {
+      cwd: this.root,
+    });
   }
 
   /**
@@ -195,8 +200,9 @@ export class Repository {
 
   /** Set (or clear) the upstream tracking ref for a local branch. */
   async setUpstream(branch: string, upstream?: string): Promise<void> {
+    safeRef(branch, "branch");
     const args = upstream
-      ? ["branch", `--set-upstream-to=${upstream}`, branch]
+      ? ["branch", `--set-upstream-to=${safeRef(upstream, "upstream")}`, branch]
       : ["branch", "--unset-upstream", branch];
     await this.git.run(args, { cwd: this.root });
   }
@@ -250,16 +256,23 @@ export class Repository {
   // --- Remotes / transport ------------------------------------------------
 
   async addRemote(name: string, url: string): Promise<void> {
-    await this.git.run(["remote", "add", name, url], { cwd: this.root });
+    await this.git.run(
+      ["remote", "add", safeRef(name, "remote"), safeRemoteUrl(url)],
+      { cwd: this.root },
+    );
   }
 
   async removeRemote(name: string): Promise<void> {
-    await this.git.run(["remote", "remove", name], { cwd: this.root });
+    await this.git.run(["remote", "remove", safeRef(name, "remote")], {
+      cwd: this.root,
+    });
   }
 
   /** Prune stale remote-tracking refs that no longer exist on the remote. */
   async pruneRemote(name: string): Promise<void> {
-    await this.git.run(["remote", "prune", name], { cwd: this.root });
+    await this.git.run(["remote", "prune", safeRef(name, "remote")], {
+      cwd: this.root,
+    });
   }
 
   // --- Maintenance --------------------------------------------------------
@@ -284,13 +297,17 @@ export class Repository {
   }
 
   async renameRemote(oldName: string, newName: string): Promise<void> {
-    await this.git.run(["remote", "rename", oldName, newName], {
-      cwd: this.root,
-    });
+    await this.git.run(
+      ["remote", "rename", safeRef(oldName, "remote"), safeRef(newName, "remote")],
+      { cwd: this.root },
+    );
   }
 
   async setRemoteUrl(name: string, url: string): Promise<void> {
-    await this.git.run(["remote", "set-url", name, url], { cwd: this.root });
+    await this.git.run(
+      ["remote", "set-url", safeRef(name, "remote"), safeRemoteUrl(url)],
+      { cwd: this.root },
+    );
   }
 
   async fetch(
@@ -308,7 +325,7 @@ export class Repository {
       args.push("--tags");
     }
     if (remote && !opts.all) {
-      args.push(remote);
+      args.push(safeRef(remote, "remote"));
     }
     await this.git.run(args, { cwd: this.root, env: opts.env });
   }
@@ -321,9 +338,9 @@ export class Repository {
       args.push("--rebase");
     }
     if (opts.remote) {
-      args.push(opts.remote);
+      args.push(safeRef(opts.remote, "remote"));
       if (opts.branch) {
-        args.push(opts.branch);
+        args.push(safeRef(opts.branch, "branch"));
       }
     }
     await this.git.run(args, { cwd: this.root, env: opts.env });
@@ -350,9 +367,9 @@ export class Repository {
     if (opts.tags) {
       args.push("--tags");
     }
-    args.push(opts.remote);
+    args.push(safeRef(opts.remote, "remote"));
     if (opts.refspec) {
-      args.push(opts.refspec);
+      args.push(safeRef(opts.refspec, "refspec"));
     }
     await this.git.run(args, { cwd: this.root, env: opts.env });
   }
@@ -360,14 +377,16 @@ export class Repository {
   // --- Tags ---------------------------------------------------------------
 
   async deleteTag(name: string): Promise<void> {
-    await this.git.run(["tag", "-d", name], { cwd: this.root });
+    await this.git.run(["tag", "-d", safeRef(name, "tag")], { cwd: this.root });
   }
 
-  async pushTag(remote: string, name: string, env?: NodeJS.ProcessEnv): Promise<void> {
-    await this.git.run(["push", remote, `refs/tags/${name}`], {
-      cwd: this.root,
-      env,
-    });
+  async pushTag(remote: string, name: string, force = false): Promise<void> {
+    const args = ["push", safeRef(remote, "remote")];
+    if (force) {
+      args.push("--force");
+    }
+    args.push(`refs/tags/${safeRef(name, "tag")}`);
+    await this.git.run(args, { cwd: this.root });
   }
 
   // --- Gerrit / LFS -------------------------------------------------------
@@ -379,7 +398,7 @@ export class Repository {
     env?: NodeJS.ProcessEnv,
   ): Promise<void> {
     await this.git.run(
-      ["push", remote, `HEAD:refs/for/${targetBranch}`],
+      ["push", safeRef(remote, "remote"), `HEAD:refs/for/${safeRef(targetBranch, "branch")}`],
       { cwd: this.root, env },
     );
   }
@@ -413,23 +432,24 @@ export class Repository {
 
   /** Track file pattern with LFS. */
   async lfsTrack(pattern: string): Promise<void> {
-    await this.git.run(["lfs", "track", pattern], { cwd: this.root });
+    await this.git.run(["lfs", "track", "--", pattern], { cwd: this.root });
   }
 
   /** Untrack file pattern from LFS. */
   async lfsUntrack(pattern: string): Promise<void> {
-    await this.git.run(["lfs", "untrack", pattern], { cwd: this.root });
+    await this.git.run(["lfs", "untrack", "--", pattern], { cwd: this.root });
   }
 
   /** Lock file on LFS remote. */
   async lfsLock(file: string): Promise<void> {
-    await this.git.run(["lfs", "lock", file], { cwd: this.root });
+    await this.git.run(["lfs", "lock", "--", file], { cwd: this.root });
   }
 
   /** Unlock file on LFS remote. */
   async lfsUnlock(file: string, force?: boolean): Promise<void> {
-    const args = ["lfs", "unlock", file];
+    const args = ["lfs", "unlock"];
     if (force) args.push("--force");
+    args.push("--", file);
     await this.git.run(args, { cwd: this.root });
   }
 
@@ -458,23 +478,33 @@ export class Repository {
 
   /** Add note to commit. */
   async notesAdd(ref: string, message: string): Promise<void> {
-    await this.git.run(["notes", "add", "-m", message, ref], { cwd: this.root });
+    await this.git.run(["notes", "add", "-m", message, safeRef(ref, "commit")], {
+      cwd: this.root,
+    });
   }
 
   /** Edit note for commit (replaces existing). */
   async notesEdit(ref: string, message: string): Promise<void> {
-    await this.git.run(["notes", "add", "-f", "-m", message, ref], { cwd: this.root });
+    await this.git.run(
+      ["notes", "add", "-f", "-m", message, safeRef(ref, "commit")],
+      { cwd: this.root },
+    );
   }
 
   /** Remove note from commit. */
   async notesRemove(ref: string): Promise<void> {
-    await this.git.run(["notes", "remove", ref], { cwd: this.root });
+    await this.git.run(["notes", "remove", safeRef(ref, "commit")], {
+      cwd: this.root,
+    });
   }
 
   /** Show notes for commit. Returns empty string if no notes. */
   async notesShow(ref: string): Promise<string> {
+    // Guard outside the try so an option-injection attempt surfaces as an error
+    // rather than being silently swallowed as "no notes".
+    const safe = safeRef(ref, "commit");
     try {
-      return await this.git.stdout(["notes", "show", ref], { cwd: this.root });
+      return await this.git.stdout(["notes", "show", safe], { cwd: this.root });
     } catch {
       return "";
     }
@@ -484,21 +514,26 @@ export class Repository {
 
   /** Lock worktree to prevent pruning. */
   async worktreeLock(path: string, reason?: string): Promise<void> {
-    const args = ["worktree", "lock", path];
+    // `git worktree lock` has no `--` separator, so the worktree path itself
+    // must not be parseable as an option. Keep flags first, path last.
+    const args = ["worktree", "lock"];
     if (reason) args.push("--reason", reason);
+    args.push(safeRef(path, "worktree path"));
     await this.git.run(args, { cwd: this.root });
   }
 
   /** Unlock worktree. */
   async worktreeUnlock(path: string): Promise<void> {
-    await this.git.run(["worktree", "unlock", path], { cwd: this.root });
+    await this.git.run(["worktree", "unlock", safeRef(path, "worktree path")], {
+      cwd: this.root,
+    });
   }
 
   // --- Git Archive --------------------------------------------------------
 
   /** Create archive from ref. Format: zip, tar, tar.gz, etc. */
   async archive(ref: string, format: string, output: string, prefix?: string): Promise<void> {
-    const args = ["archive", `--format=${format}`, `--output=${output}`, ref];
+    const args = ["archive", `--format=${format}`, `--output=${output}`, safeRef(ref)];
     if (prefix) args.push(`--prefix=${prefix}`);
     await this.git.run(args, { cwd: this.root });
   }
@@ -507,25 +542,22 @@ export class Repository {
 
   /** Add subtree from external repository. */
   async subtreeAdd(prefix: string, repository: string, ref?: string): Promise<void> {
-    const args = ["subtree", "add", "--prefix", prefix, repository];
-    if (ref) args.push(ref);
-    else args.push("master");
+    const args = ["subtree", "add", "--prefix", prefix, safeRemoteUrl(repository, "repository")];
+    args.push(ref ? safeRef(ref) : "master");
     await this.git.run(args, { cwd: this.root });
   }
 
   /** Pull subtree updates from external repository. */
   async subtreePull(prefix: string, repository: string, ref?: string): Promise<void> {
-    const args = ["subtree", "pull", "--prefix", prefix, repository];
-    if (ref) args.push(ref);
-    else args.push("master");
+    const args = ["subtree", "pull", "--prefix", prefix, safeRemoteUrl(repository, "repository")];
+    args.push(ref ? safeRef(ref) : "master");
     await this.git.run(args, { cwd: this.root });
   }
 
   /** Push subtree changes to external repository. */
   async subtreePush(prefix: string, repository: string, ref?: string): Promise<void> {
-    const args = ["subtree", "push", "--prefix", prefix, repository];
-    if (ref) args.push(ref);
-    else args.push("master");
+    const args = ["subtree", "push", "--prefix", prefix, safeRemoteUrl(repository, "repository")];
+    args.push(ref ? safeRef(ref) : "master");
     await this.git.run(args, { cwd: this.root });
   }
 
@@ -591,12 +623,19 @@ export class Repository {
     key: string,
     value: string,
   ): Promise<void> {
+    // `key` arrives from the config webview (postMessage) and lands in option
+    // position. `git config` has no `--` separator, so reject option-like keys
+    // to stop a key such as `--global`/`--unset` from being parsed as a flag.
+    // (`value` may legitimately start with "-", and git treats it positionally
+    // once `key` precedes it, so it is left unguarded.)
+    safeRef(key, "config key");
     await this.git.run(["config", `--${scope}`, key, value], {
       cwd: this.root,
     });
   }
 
   async unsetConfig(scope: "local" | "global", key: string): Promise<void> {
+    safeRef(key, "config key");
     await this.git.run(["config", `--${scope}`, "--unset-all", key], {
       cwd: this.root,
     });
@@ -616,21 +655,26 @@ export class Repository {
   }
 
   async stashApply(ref: string): Promise<void> {
-    await this.git.run(["stash", "apply", ref], { cwd: this.root });
+    await this.git.run(["stash", "apply", safeRef(ref, "stash")], { cwd: this.root });
   }
 
   async stashPop(ref: string): Promise<void> {
-    await this.git.run(["stash", "pop", ref], { cwd: this.root });
+    await this.git.run(["stash", "pop", safeRef(ref, "stash")], { cwd: this.root });
   }
 
   async stashDrop(ref: string): Promise<void> {
-    await this.git.run(["stash", "drop", ref], { cwd: this.root });
+    await this.git.run(["stash", "drop", safeRef(ref, "stash")], { cwd: this.root });
+  }
+
+  /** Drop every stash entry (git stash clear). Irreversible. */
+  async stashClear(): Promise<void> {
+    await this.git.run(["stash", "clear"], { cwd: this.root });
   }
 
   /** Files changed in a stash, name-status. */
   async stashFiles(ref: string): Promise<CommitFile[]> {
     const out = await this.git.stdout(
-      ["stash", "show", "--name-status", "-z", ref],
+      ["stash", "show", "--name-status", "-z", safeRef(ref, "stash")],
       { cwd: this.root },
     );
     return parseNameStatus(out);
@@ -639,7 +683,9 @@ export class Repository {
   // --- Submodules ---------------------------------------------------------
 
   async submoduleAdd(url: string, pathArg: string): Promise<void> {
-    await this.git.run(["submodule", "add", url, pathArg], { cwd: this.root });
+    await this.git.run(["submodule", "add", "--", safeRemoteUrl(url), pathArg], {
+      cwd: this.root,
+    });
   }
 
   async submoduleInit(pathArg?: string): Promise<void> {
@@ -674,7 +720,7 @@ export class Repository {
   /** Reflog for a ref (default HEAD). */
   async reflog(ref = "HEAD", limit = 200): Promise<ReflogEntry[]> {
     const out = await this.git.stdout(
-      ["reflog", `--format=${REFLOG_FORMAT}`, `--max-count=${limit}`, ref],
+      ["reflog", `--format=${REFLOG_FORMAT}`, `--max-count=${limit}`, safeRef(ref)],
       { cwd: this.root },
     );
     return parseReflog(out);
@@ -792,7 +838,7 @@ export class Repository {
       }
     }
     if (options.revRange) {
-      args.push(options.revRange);
+      args.push(safeRef(options.revRange, "rev range"));
     }
     if (options.file) {
       args.push("--follow", "--", options.file);
@@ -876,7 +922,7 @@ export class Repository {
   /** Files touched by a commit (name-status, rename-aware). */
   async commitFiles(sha: string): Promise<CommitFile[]> {
     const out = await this.git.stdout(
-      ["show", "--name-status", "-z", "-M", "--format=", sha],
+      ["show", "--name-status", "-z", "-M", "--format=", safeRef(sha, "commit")],
       { cwd: this.root },
     );
     return parseNameStatus(out);
@@ -885,10 +931,40 @@ export class Repository {
   /** Files changed between two refs (name-status, rename-aware). */
   async diffFiles(ref1: string, ref2: string): Promise<CommitFile[]> {
     const out = await this.git.stdout(
-      ["diff", "--name-status", "-z", "-M", ref1, ref2],
+      ["diff", "--name-status", "-z", "-M", safeRef(ref1), safeRef(ref2)],
       { cwd: this.root },
     );
     return parseNameStatus(out);
+  }
+
+  /** Local + remote branches that contain a commit (git branch --contains). */
+  async branchesContaining(sha: string): Promise<string[]> {
+    const out = await this.git.stdout(
+      ["branch", "-a", `--contains=${safeRef(sha, "commit")}`, "--format=%(refname:short)"],
+      { cwd: this.root },
+    );
+    return out.split("\n").map((l) => l.trim()).filter((l) => l !== "");
+  }
+
+  /** Tags that contain a commit (git tag --contains). */
+  async tagsContaining(sha: string): Promise<string[]> {
+    const out = await this.git.stdout(
+      ["tag", `--contains=${safeRef(sha, "commit")}`],
+      { cwd: this.root },
+    );
+    return out.split("\n").map((l) => l.trim()).filter((l) => l !== "");
+  }
+
+  /**
+   * Tag-relative name of a commit (git describe). `--always` falls back to an
+   * abbreviated SHA when no tag is reachable, so this never throws on a valid ref.
+   */
+  async describe(sha = "HEAD"): Promise<string> {
+    const out = await this.git.stdout(
+      ["describe", "--tags", "--always", safeRef(sha, "commit")],
+      { cwd: this.root },
+    );
+    return out.trim();
   }
 
   // --- Commit operations --------------------------------------------------
@@ -907,7 +983,10 @@ export class Repository {
 
   /** Fetch a specific refspec from a remote (e.g. for GitHub PRs). */
   async fetchRefspec(remote: string, refspec: string, env?: NodeJS.ProcessEnv): Promise<void> {
-    await this.git.run(["fetch", remote, refspec], { cwd: this.root, env });
+    await this.git.run(
+      ["fetch", safeRef(remote, "remote"), safeRef(refspec, "refspec")],
+      { cwd: this.root, env },
+    );
   }
 
   /** Verify the GPG signature on a commit. */
@@ -919,7 +998,7 @@ export class Repository {
   }> {
     try {
       const out = await this.git.stdout(
-        ["verify-commit", "--verbose", sha],
+        ["verify-commit", "--verbose", safeRef(sha, "commit")],
         { cwd: this.root },
       );
       const signerMatch = /Good signature from "(.+)"/i.exec(out);
@@ -956,6 +1035,8 @@ export class Repository {
     sign = false,
     force = false,
   ): Promise<void> {
+    safeRef(name, "tag");
+    safeRef(sha, "commit");
     let args: string[];
     if (sign) {
       args = ["tag", "-s", name, "-m", message ?? name, sha];
@@ -972,9 +1053,10 @@ export class Repository {
 
   /** Delete a remote tag by pushing an empty refspec. */
   async deleteRemoteTag(remote: string, name: string): Promise<void> {
-    await this.git.run(["push", remote, `:refs/tags/${name}`], {
-      cwd: this.root,
-    });
+    await this.git.run(
+      ["push", safeRef(remote, "remote"), `:refs/tags/${safeRef(name, "tag")}`],
+      { cwd: this.root },
+    );
   }
 
   /** Checkout a remote branch creating a local tracking branch. */
@@ -982,21 +1064,23 @@ export class Repository {
     remoteBranch: string,
     localName: string,
   ): Promise<void> {
-    await this.git.run(["checkout", "-b", localName, "--track", remoteBranch], {
-      cwd: this.root,
-    });
+    await this.git.run(
+      ["checkout", "-b", safeRef(localName, "branch"), "--track", safeRef(remoteBranch, "branch")],
+      { cwd: this.root },
+    );
   }
 
   /** Delete a remote branch via push with empty src refspec. */
   async deleteRemoteBranch(remote: string, branch: string): Promise<void> {
-    await this.git.run(["push", remote, `:refs/heads/${branch}`], {
-      cwd: this.root,
-    });
+    await this.git.run(
+      ["push", safeRef(remote, "remote"), `:refs/heads/${safeRef(branch, "branch")}`],
+      { cwd: this.root },
+    );
   }
 
   /** Replace a working-tree file with its content at a given ref. */
   async replaceWithRef(relPath: string, ref: string): Promise<void> {
-    await this.git.run(["checkout", ref, "--", relPath], { cwd: this.root });
+    await this.git.run(["checkout", safeRef(ref), "--", relPath], { cwd: this.root });
   }
 
   /** Set or clear git update-index --assume-unchanged for paths. */
@@ -1020,6 +1104,36 @@ export class Repository {
     await this.git.run(["rm", "--cached", "--", ...paths], { cwd: this.root });
   }
 
+  /**
+   * Delete tracked files from both the working tree and the index (git rm).
+   * `recursive` (-r) is required to remove tracked directories.
+   */
+  async removeFiles(
+    paths: string[],
+    opts: { force?: boolean; recursive?: boolean } = {},
+  ): Promise<void> {
+    if (paths.length === 0) {
+      return;
+    }
+    const args = ["rm"];
+    if (opts.force) {
+      args.push("-f");
+    }
+    if (opts.recursive) {
+      args.push("-r");
+    }
+    // Paths follow `--`, so a name beginning with "-" is data, not an option.
+    args.push("--", ...paths);
+    await this.git.run(args, { cwd: this.root });
+  }
+
+  /** Move or rename a tracked file/directory (git mv). */
+  async moveFile(source: string, dest: string): Promise<void> {
+    // `git mv` honours the `--` separator, so option-like paths are inert and
+    // need no safeRef (mirrors stage()/untrack()).
+    await this.git.run(["mv", "--", source, dest], { cwd: this.root });
+  }
+
   /** Remove untracked files/dirs (git clean -fd). */
   async cleanUntracked(paths?: string[]): Promise<void> {
     const args = ["clean", "-fd"];
@@ -1031,9 +1145,10 @@ export class Repository {
 
   /** Create a branch from a stash entry and apply it (git stash branch). */
   async stashBranch(name: string, stashRef: string): Promise<void> {
-    await this.git.run(["stash", "branch", name, stashRef], {
-      cwd: this.root,
-    });
+    await this.git.run(
+      ["stash", "branch", safeRef(name, "branch"), safeRef(stashRef, "stash")],
+      { cwd: this.root },
+    );
   }
 
   /** List all worktrees. Returns raw porcelain output lines grouped per worktree. */
@@ -1050,6 +1165,7 @@ export class Repository {
     branch: string,
     createBranch = false,
   ): Promise<void> {
+    safeRef(branch, "branch");
     const args = ["worktree", "add"];
     if (createBranch) {
       args.push("-b", branch);
@@ -1071,6 +1187,16 @@ export class Repository {
     await this.git.run(args, { cwd: this.root });
   }
 
+  /** Move a linked worktree to a new location (git worktree move). */
+  async worktreeMove(from: string, to: string): Promise<void> {
+    // `git worktree move` has no `--` separator, so both paths sit in option
+    // position — guard them like worktreeLock().
+    await this.git.run(
+      ["worktree", "move", safeRef(from, "worktree path"), safeRef(to, "destination path")],
+      { cwd: this.root },
+    );
+  }
+
   /** Prune stale worktree administrative files. */
   async worktreePrune(): Promise<void> {
     await this.git.run(["worktree", "prune"], { cwd: this.root });
@@ -1085,7 +1211,7 @@ export class Repository {
   async bisectMark(good: boolean, sha?: string): Promise<string> {
     const args = ["bisect", good ? "good" : "bad"];
     if (sha) {
-      args.push(sha);
+      args.push(safeRef(sha, "commit"));
     }
     return this.git.stdout(args, { cwd: this.root });
   }

@@ -10,6 +10,9 @@ import { Repository } from "./Repository";
  * refresh after both in-extension and external git operations.
  */
 export class RepositoryManager implements vscode.Disposable {
+  /** Top-level `.git` entries whose changes are pure noise (no state change). */
+  private static readonly IGNORED_GIT_FILES = /^(index|.*\.lock)$/i;
+
   private readonly repositories = new Map<string, Repository>();
   private readonly watchers = new Map<string, fs.FSWatcher>();
   private readonly git = new GitExecutor();
@@ -87,7 +90,22 @@ export class RepositoryManager implements vscode.Disposable {
       const watcher = fs.watch(
         gitDir,
         { recursive: false },
-        () => this.scheduleRefresh(),
+        (_event, filename) => {
+          // Ignore index/lock churn. `git status` (run on every refresh)
+          // opportunistically rewrites `.git/index`, and git briefly creates
+          // `*.lock` files; reacting to those would bounce straight back into
+          // another refresh, producing a continuous refresh loop ("twitching").
+          const name =
+            typeof filename === "string"
+              ? filename
+              : filename
+                ? Buffer.from(filename).toString()
+                : "";
+          if (name && RepositoryManager.IGNORED_GIT_FILES.test(name)) {
+            return;
+          }
+          this.scheduleRefresh();
+        },
       );
       this.watchers.set(root, watcher);
     } catch (err) {

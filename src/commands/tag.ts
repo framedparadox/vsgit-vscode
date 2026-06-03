@@ -21,6 +21,22 @@ export function registerTagCommands(
     if (!name) {
       return;
     }
+
+    // If the tag already exists, offer a force re-tag (otherwise git would fail).
+    const exists = repo.tags.some((t) => t.shortName === name);
+    let force = false;
+    if (exists) {
+      const choice = await vscode.window.showWarningMessage(
+        `Tag '${name}' already exists. Force re-tag it to point at HEAD?`,
+        { modal: true },
+        "Force Re-tag",
+      );
+      if (choice !== "Force Re-tag") {
+        return;
+      }
+      force = true;
+    }
+
     const kind = await vscode.window.showQuickPick(
       ["Lightweight", "Annotated", "Signed (GPG)"],
       { placeHolder: "Tag type" },
@@ -41,14 +57,35 @@ export function registerTagCommands(
         return;
       }
     }
-    await withProgress(manager, `Create tag ${name}`, () =>
-      repo.createTagAt(
+
+    // Optionally push the tag to a remote straight after creating it.
+    const pushChoice = await vscode.window.showQuickPick(
+      ["Create only", "Create and push"],
+      { placeHolder: "Push the tag to a remote?" },
+    );
+    if (!pushChoice) {
+      return;
+    }
+    let remote: string | undefined;
+    if (pushChoice === "Create and push") {
+      remote = await pickRemote(repo);
+      if (!remote) {
+        return;
+      }
+    }
+
+    await withProgress(manager, `Create tag ${name}`, async () => {
+      await repo.createTagAt(
         name,
         "HEAD",
         message || undefined,
         kind === "Signed (GPG)",
-      ),
-    );
+        force,
+      );
+      if (remote) {
+        await repo.pushTag(remote, name, force);
+      }
+    });
   });
 
   reg("vsgit.tag.delete", async (node) => {

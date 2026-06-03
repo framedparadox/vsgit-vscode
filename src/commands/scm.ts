@@ -185,6 +185,71 @@ export function registerSCMCommands(
     }
   });
 
+  // Rename/move a tracked file (git mv)
+  reg("vsgit.scm.rename", async (...resourceStates: unknown[]) => {
+    const uris = resourceStates
+      .filter((r): r is { resourceUri: vscode.Uri } =>
+        typeof r === 'object' && r !== null && 'resourceUri' in r
+      )
+      .map((r) => r.resourceUri);
+    if (uris.length === 0) return;
+
+    const repo = findRepoForUri(manager, uris[0]);
+    if (!repo) return;
+
+    const rel = uris[0].fsPath.slice(repo.root.length + 1);
+    const newRel = await vscode.window.showInputBox({
+      prompt: "New path (relative to the repository root)",
+      value: rel,
+      valueSelection: [rel.lastIndexOf("/") + 1, rel.length],
+      validateInput: (v) =>
+        v.trim() === "" ? "Path required" : v.trim() === rel ? "Unchanged" : undefined,
+    });
+    if (!newRel || newRel.trim() === rel) return;
+
+    try {
+      await withProgress(
+        manager,
+        `Rename ${path.basename(rel)} → ${path.basename(newRel.trim())}`,
+        () => repo.moveFile(rel, newRel.trim()),
+      );
+      vscode.window.showInformationMessage(`Renamed to ${newRel.trim()}`);
+    } catch (e) {
+      vscode.window.showErrorMessage(`Rename failed: ${errMsg(e)}`);
+    }
+  });
+
+  // Delete tracked file(s) from the working tree and index (git rm)
+  reg("vsgit.scm.delete", async (...resourceStates: unknown[]) => {
+    const uris = resourceStates
+      .filter((r): r is { resourceUri: vscode.Uri } =>
+        typeof r === 'object' && r !== null && 'resourceUri' in r
+      )
+      .map((r) => r.resourceUri);
+    if (uris.length === 0) return;
+
+    const repo = findRepoForUri(manager, uris[0]);
+    if (!repo) return;
+
+    const files = uris.map((u) => u.fsPath.slice(repo.root.length + 1));
+    const confirmed = await confirmDestructiveAction({
+      operation: DestructiveOperations.DISCARD_CHANGES,
+      message: `Delete ${files.length} file(s) from the working tree and index (git rm)? This cannot be undone.`,
+      items: files,
+    });
+
+    if (!confirmed) return;
+
+    try {
+      await withProgress(manager, `Deleting ${files.length} file(s)`, () =>
+        repo.removeFiles(files, { force: true }),
+      );
+      vscode.window.showInformationMessage(`Deleted ${files.length} file(s)`);
+    } catch (e) {
+      vscode.window.showErrorMessage(`Failed to delete files: ${errMsg(e)}`);
+    }
+  });
+
   // Stage all in group
   reg("vsgit.scm.stageAll", async (group: unknown) => {
     // group.resourceStates contains all files in the group

@@ -130,7 +130,7 @@ export function registerPatchCommands(
     if (mode.startsWith("Apply (stage")) {
       args.push("--index");
     }
-    args.push(patchUri.fsPath);
+    args.push("--", patchUri.fsPath);
 
     await withProgress(manager, `Apply patch: ${path.basename(patchUri.fsPath)}`, async () => {
       await git.run(args, { cwd: repo!.root });

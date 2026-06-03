@@ -44,7 +44,16 @@ export class RepositoriesProvider
 
   private abCache = new Map<string, { ahead: number; behind: number }>();
 
-  constructor(private readonly manager: RepositoryManager) {
+  /**
+   * `flat` mode renders only the list of repositories (no expandable Local
+   * Branches / Tags / … sub-groups) — used by the top-level "Repositories" view.
+   * The default tree mode (the "Git Repositories" view) expands each repo into
+   * its branches, tags, remotes, stashes, and submodules.
+   */
+  constructor(
+    private readonly manager: RepositoryManager,
+    private readonly flat = false,
+  ) {
     manager.onDidChange(() => this.refresh());
   }
 
@@ -75,7 +84,9 @@ export class RepositoriesProvider
       case "repo": {
         const item = new vscode.TreeItem(
           node.repo.name,
-          vscode.TreeItemCollapsibleState.Expanded,
+          this.flat
+            ? vscode.TreeItemCollapsibleState.None
+            : vscode.TreeItemCollapsibleState.Expanded,
         );
         const ab = this.abCache.get(node.repo.root);
         const abParts: string[] = [];
@@ -163,6 +174,10 @@ export class RepositoriesProvider
     }
 
     if (node.type === "repo") {
+      // Flat mode: repositories are leaf nodes (no Branches / Tags / … groups).
+      if (this.flat) {
+        return [];
+      }
       const repo = node.repo;
       return (Object.keys(GROUP_LABELS) as GroupKind[]).map(
         (group) => ({ type: "group", repo, group }) as VsgitNode,

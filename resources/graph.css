@@ -40,7 +40,7 @@ body {
 .tb-btn {
   position: relative;
   background: transparent;
-  color: var(--vscode-foreground);
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
   border: 1px solid transparent;
   padding: 4px 6px;
   cursor: pointer;
@@ -53,7 +53,11 @@ body {
 .tb-btn:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
 .tb-btn.active { background-color: var(--vscode-inputOption-activeBackground, rgba(14,99,156,0.4)); }
 .tb-ico { display: inline-flex; align-items: center; width: 16px; height: 16px; }
-.tb-ico svg { display: block; }
+/* The toolbar octicons ship without an explicit fill (so they'd render solid
+   black). Tint them with the button's themed colour so they track the active VS
+   Code colour theme instead of staying black. */
+.tb-ico svg { display: block; fill: currentColor; }
+.tb-ico svg path { fill: currentColor; }
 .tb-badge {
   position: absolute;
   top: -2px;
@@ -318,7 +322,7 @@ td.col-desc {
   white-space: nowrap;
   font-size: 12px;
 }
-td.col-id, td.col-author, td.col-adate, td.col-committer, td.col-cdate {
+td.col-id, td.col-author, td.col-cdate {
   padding: 0 6px;
   vertical-align: middle;
   white-space: nowrap;
@@ -379,45 +383,76 @@ tr.commit-row.uncommitted td.col-desc { font-style: italic; color: var(--vscode-
 .gitRefName:hover { background-color: rgba(128, 128, 128, 0.1); }
 .desc-text { vertical-align: middle; }
 
-/* ─── inline commit-details view (CDV) — replicated from vscode-git-graph ─
-   #cdvSummary = LEFT 50% (commit metadata + body); #cdvFiles = RIGHT 50%
-   (changed files); #cdvDivider at 50%; #cdvControls = 32px strip on the far
-   right (close + view-type buttons). */
+/* ─── inline commit-details view (CDV) ───────────────────────────────────
+   The details panel begins at the Description column: an empty spacer cell
+   sits over the Graph column (so the DAG line shows through), and the panel
+   spans the remaining columns. A header strip holds the title + tree/list view
+   toggle + close button; the body splits into commit metadata (left) and the
+   changed-file pane (right). Colours come straight from the editor-widget theme
+   tokens so the text stays readable in any theme. */
+tr.cdv-row > td.cdv-graph-spacer {
+  padding: 0;
+  /* Transparent so the overlay SVG's branch lines run straight through the gap. */
+  background-color: transparent;
+  position: relative;
+  overflow: visible;
+}
 tr.cdv-row > td.cdv-cell {
   padding: 0;
-  background-color: rgba(128, 128, 128, 0.1);
+  background-color: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  color: var(--vscode-editor-foreground);
+  border-top: 1px solid var(--vscode-panel-border);
+  border-bottom: 1px solid var(--vscode-panel-border);
 }
 #cdv {
   position: relative;
-  height: 240px;
+  height: 248px;
   font-size: 13px;
   line-height: 18px;
   white-space: normal;
 }
-#cdvContent { position: absolute; top: 0; bottom: 0; left: 0; right: 32px; }
-#cdvControls { position: absolute; top: 0; bottom: 0; right: 0; width: 32px; }
 
-.cdvControlBtn {
+/* header strip: title (left) + view-type toggle + close (right) */
+#cdvHeader {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 6px 0 10px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  background-color: var(--vscode-sideBarSectionHeader-background, rgba(128, 128, 128, 0.1));
+}
+#cdvHeaderTitle {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--vscode-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cdvHeaderSpacer { flex: 1; }
+.cdvHeaderBtn {
   position: relative;
-  margin: 4px;
   width: 24px;
   height: 24px;
   border-radius: 4px;
   cursor: pointer;
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
+  flex-shrink: 0;
 }
-.cdvControlBtn:hover { background-color: rgba(128, 128, 128, 0.25); }
-.cdvControlBtn.active { background-color: rgba(128, 128, 128, 0.25); }
-.cdvControlBtn svg {
+.cdvHeaderBtn:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.25)); }
+.cdvHeaderBtn.active { background-color: var(--vscode-inputOption-activeBackground, rgba(128, 128, 128, 0.25)); }
+.cdvHeaderBtn svg {
   position: absolute;
-  width: 20px;
-  height: 20px;
-  left: 2px;
-  top: 2px;
-  fill: var(--vscode-editor-foreground);
-  fill-opacity: 0.6;
+  width: 18px;
+  height: 18px;
+  left: 3px;
+  top: 3px;
+  fill: currentColor;
+  fill-opacity: 0.75;
 }
-.cdvControlBtn:hover svg, .cdvControlBtn.active svg { fill-opacity: 0.85; }
+.cdvHeaderBtn:hover svg, .cdvHeaderBtn.active svg { fill-opacity: 1; }
 
+#cdvBody { position: absolute; top: 30px; bottom: 0; left: 0; right: 0; }
 #cdvSummary, #cdvFiles {
   position: absolute;
   top: 0;
@@ -430,12 +465,12 @@ tr.cdv-row > td.cdv-cell {
   left: 0;
   width: 50%;
   padding: 10px;
-  border-right: 1px solid rgba(128, 128, 128, 0.2);
+  border-right: 1px solid var(--vscode-panel-border);
   user-select: text;
   -webkit-user-select: text;
+  color: var(--vscode-editor-foreground);
 }
 #cdvFiles { left: 50%; right: 0; padding: 8px 8px 8px 10px; }
-#cdvDivider { position: absolute; top: 0; bottom: 0; left: 50%; width: 6px; cursor: col-resize; }
 
 .cdvSummaryTop { display: inline-table; width: 100%; }
 .cdvSummaryKeyValues { word-break: break-all; }
@@ -446,6 +481,19 @@ tr.cdv-row > td.cdv-cell {
 }
 .cdvInternalLink:hover { text-decoration: underline; }
 .cdvBody { white-space: pre-wrap; }
+.cdvRefLabel {
+  display: inline-block;
+  padding: 0 6px;
+  margin: 1px 2px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 16px;
+  background-color: rgba(128, 128, 128, 0.2);
+  border: 1px solid rgba(128, 128, 128, 0.5);
+}
+.cdvRefLabel.cdvRef.tag { background-color: rgba(217, 133, 0, 0.25); }
+.cdvRefLabel.cdvRef.remote { background-color: rgba(0, 133, 217, 0.25); }
+.cdvRefLabel.cdvRef.head.active { font-weight: 700; }
 
 .cdvLoading { color: var(--vscode-descriptionForeground); }
 .cdvFilesHead { font-size: 11px; color: var(--vscode-descriptionForeground); margin-bottom: 6px; }
@@ -472,6 +520,37 @@ tr.cdv-row > td.cdv-cell {
 .file-status.R { color: #4daafc; }
 .file-status.C { color: #4daafc; }
 .file-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ─── changed-file tree view ──────────────────────────────────────────── */
+.tree-children.collapsed { display: none; }
+.tree-folder-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  user-select: none;
+}
+.tree-folder-row:hover { background-color: var(--vscode-list-hoverBackground); }
+.tree-chevron {
+  display: inline-flex;
+  align-items: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  transition: transform 0.1s ease;
+  transform: rotate(0deg);
+}
+.tree-chevron.expanded { transform: rotate(90deg); }
+.tree-chevron svg { fill: var(--vscode-icon-foreground, var(--vscode-foreground)); fill-opacity: 0.8; }
+.tree-folder-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--vscode-foreground);
+}
 
 /* ─── find widget ──────────────────────────────────────────────────────── */
 #find-widget {

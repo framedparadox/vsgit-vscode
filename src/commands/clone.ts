@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import { GitExecutor } from "../git/GitExecutor";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { AskpassServer } from "../util/AskpassServer";
+import { safeRef, safeRemoteUrl } from "../git/argGuard";
 import { errMsg } from "./shared";
 
 /**
@@ -50,14 +51,27 @@ export function registerCloneCommands(
         return;
       }
 
+      // The URL and branch flow straight to `git clone`; guard the URL against
+      // ext::/fd:: remote-helper transports (arbitrary command execution) and
+      // reject option-like values so neither can be parsed by git as a flag.
+      let safeUrl: string;
+      let safeBranch: string | undefined;
+      try {
+        safeUrl = safeRemoteUrl(url.trim());
+        safeBranch = branch.trim() ? safeRef(branch.trim(), "branch") : undefined;
+      } catch (e) {
+        vscode.window.showErrorMessage(`Clone failed: ${errMsg(e)}`);
+        return;
+      }
+
       const args = ["clone", "--progress"];
-      if (branch.trim()) {
-        args.push("--branch", branch.trim());
+      if (safeBranch) {
+        args.push("--branch", safeBranch);
       }
       if (recursive === "Yes") {
         args.push("--recurse-submodules");
       }
-      args.push(url.trim());
+      args.push("--", safeUrl);
 
       const askpass = new AskpassServer();
       try {

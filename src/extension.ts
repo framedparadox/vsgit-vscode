@@ -62,6 +62,18 @@ export async function activate(
     ),
   );
 
+  // "Repositories": a flat list of repositories only. The top-level action
+  // toolbar (fetch / pull / push / history / clone / refresh / …) lives on this
+  // view's title bar.
+  const reposListProvider = new RepositoriesProvider(manager, true);
+  context.subscriptions.push(
+    vscode.window.createTreeView("vsgit.repositoriesList", {
+      treeDataProvider: reposListProvider,
+    }),
+  );
+
+  // "Git Repositories": the full tree — each repo expands into Local Branches,
+  // Remote Branches, Tags, Remotes, Stashes, and Submodules.
   const repositoriesProvider = new RepositoriesProvider(manager);
   context.subscriptions.push(
     vscode.window.createTreeView("vsgit.repositories", {
@@ -148,7 +160,7 @@ export async function activate(
   registerCompareCommands(context, manager, compareProvider);
 
   const quickDiff = new VsgitQuickDiffProvider(manager);
-  const scm = vscode.scm.createSourceControl("vsgit", "Git (VsGit)");
+  const scm = vscode.scm.createSourceControl("vsgit", "VsGit");
   scm.quickDiffProvider = quickDiff;
   context.subscriptions.push(scm);
 

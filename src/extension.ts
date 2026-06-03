@@ -54,6 +54,25 @@ export async function activate(
   const manager = new RepositoryManager();
   context.subscriptions.push(manager);
 
+  // Gate the advanced sidebar sections (Staging, Reflog, Synchronize, Worktrees,
+  // Conflicts, Compare) behind a setting so the panel defaults to just
+  // Repositories / Commit / Git Repositories. A `when`-clause context key hides
+  // them reliably regardless of any cached view-visibility state.
+  const syncAdvancedViewsContext = () => {
+    const show = vscode.workspace
+      .getConfiguration("vsgit")
+      .get<boolean>("showAdvancedViews", false);
+    void vscode.commands.executeCommand("setContext", "vsgit.advancedViews", show);
+  };
+  syncAdvancedViewsContext();
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration("vsgit.showAdvancedViews")) {
+        syncAdvancedViewsContext();
+      }
+    }),
+  );
+
   // Read-only content provider backing the diff editors.
   context.subscriptions.push(
     vscode.workspace.registerTextDocumentContentProvider(

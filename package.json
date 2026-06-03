@@ -69,43 +69,43 @@
           "id": "vsgit.repositories",
           "name": "Git Repositories",
           "icon": "$(source-control)",
-          "visibility": "hidden"
+          "visibility": "visible"
         },
         {
           "id": "vsgit.staging",
           "name": "Staging",
           "icon": "$(git-commit)",
-          "visibility": "hidden"
+          "when": "vsgit.advancedViews"
         },
         {
           "id": "vsgit.reflog",
           "name": "Reflog",
           "icon": "$(history)",
-          "visibility": "hidden"
+          "when": "vsgit.advancedViews"
         },
         {
           "id": "vsgit.synchronize",
           "name": "Synchronize",
           "icon": "$(sync)",
-          "visibility": "hidden"
+          "when": "vsgit.advancedViews"
         },
         {
           "id": "vsgit.worktrees",
           "name": "Worktrees",
           "icon": "$(folder-library)",
-          "visibility": "hidden"
+          "when": "vsgit.advancedViews"
         },
         {
           "id": "vsgit.conflicts",
           "name": "Conflicts",
           "icon": "$(warning)",
-          "visibility": "hidden"
+          "when": "vsgit.advancedViews"
         },
         {
           "id": "vsgit.compare",
           "name": "Compare",
           "icon": "$(git-compare)",
-          "visibility": "hidden"
+          "when": "vsgit.advancedViews"
         }
       ]
     },
@@ -2831,6 +2831,11 @@
     "configuration": {
       "title": "VsGit",
       "properties": {
+        "vsgit.showAdvancedViews": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show the advanced sidebar sections (Staging, Reflog, Synchronize, Worktrees, Conflicts, Compare). When off, only Repositories, Commit, and Git Repositories are shown."
+        },
         "vsgit.commit.gpgSign": {
           "type": "boolean",
           "default": false,

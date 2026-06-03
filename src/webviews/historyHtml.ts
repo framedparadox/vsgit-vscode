@@ -74,16 +74,33 @@ export function historyHtml(nonce: string, cspSource: string): string {
   #details .meta b { color: var(--vscode-foreground); font-weight: 600; }
   #details .body { white-space: pre-wrap; margin-bottom: 12px; padding: 8px; border-radius: 3px;
     background: var(--vscode-textBlockQuote-background); border-left: 3px solid var(--vscode-textBlockQuote-border, #555); }
-  #details .files-head { font-size: 0.85em; color: var(--vscode-descriptionForeground); margin-bottom: 4px; }
+  #details .files-head { display: flex; align-items: center; gap: 8px; font-size: 0.85em;
+    color: var(--vscode-descriptionForeground); margin-bottom: 4px; }
+  #details .files-view-toggle { margin-left: auto; display: inline-flex; gap: 2px; }
+  .fv-btn { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px;
+    border-radius: 4px; cursor: pointer; color: var(--vscode-icon-foreground, var(--vscode-foreground)); }
+  .fv-btn:hover { background: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
+  .fv-btn.active { background: var(--vscode-inputOption-activeBackground, rgba(128,128,128,0.25)); }
+  .fv-btn svg { width: 16px; height: 16px; fill: currentColor; fill-opacity: 0.85; }
+
   #files { padding-left: 0; margin: 0; }
-  #files li { cursor: pointer; list-style: none; padding: 2px 4px; border-radius: 3px; display: flex; gap: 6px; align-items: center;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #files li:hover { background: var(--vscode-list-hoverBackground); }
-  #files .st { flex: 0 0 auto; width: 14px; text-align: center; font-weight: 700; font-family: var(--vscode-editor-font-family, monospace); }
-  #files .A .st, #files li.A { color: var(--vscode-gitDecoration-addedResourceForeground); }
-  #files .D .st, #files li.D { color: var(--vscode-gitDecoration-deletedResourceForeground); }
-  #files .M .st, #files li.M { color: var(--vscode-gitDecoration-modifiedResourceForeground); }
-  #files .R .st, #files li.R { color: var(--vscode-gitDecoration-renamedResourceForeground, #6cf); }
+  .file-row { cursor: pointer; padding: 2px 4px; border-radius: 3px; display: flex; gap: 6px; align-items: center;
+    white-space: nowrap; overflow: hidden; }
+  .file-row:hover { background: var(--vscode-list-hoverBackground); }
+  .file-row .st { flex: 0 0 auto; width: 14px; text-align: center; font-weight: 700; font-family: var(--vscode-editor-font-family, monospace); }
+  .file-row .fp { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-row.A .st { color: var(--vscode-gitDecoration-addedResourceForeground); }
+  .file-row.D .st { color: var(--vscode-gitDecoration-deletedResourceForeground); }
+  .file-row.M .st { color: var(--vscode-gitDecoration-modifiedResourceForeground); }
+  .file-row.R .st { color: var(--vscode-gitDecoration-renamedResourceForeground, #6cf); }
+
+  .tree-folder { display: flex; align-items: center; gap: 4px; padding: 2px 4px; border-radius: 3px; cursor: pointer; user-select: none; white-space: nowrap; }
+  .tree-folder:hover { background: var(--vscode-list-hoverBackground); }
+  .tree-folder .chev { display: inline-flex; align-items: center; width: 16px; height: 16px; flex: 0 0 auto; transition: transform 0.1s ease; }
+  .tree-folder .chev.expanded { transform: rotate(90deg); }
+  .tree-folder .chev svg { width: 16px; height: 16px; fill: var(--vscode-icon-foreground, var(--vscode-foreground)); fill-opacity: 0.8; }
+  .tree-folder .fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tree-children.collapsed { display: none; }
   .empty { padding: 16px; color: var(--vscode-descriptionForeground); }
 </style>
 </head>
@@ -104,6 +121,14 @@ export function historyHtml(nonce: string, cspSource: string): string {
 <script nonce="${nonce}">
 const vscode = acquireVsCodeApi();
 let commits = [], selected = null, hasMore = false, compareMode = null;
+// Changed-file pane view: 'tree' (folder hierarchy) or 'list' (flat) — same
+// toggle the Git Graph commit-details pane offers. Persisted across reloads.
+let fileViewMode = (vscode.getState() || {}).historyFileViewMode || 'tree';
+let detailsData = null; // { commit, files } — cached so the toggle re-renders.
+
+const ICON_TREE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2 3v1.5h4V3H2zm6 0v1.5h10V3H8zM2 7v1.5h4V7H2zm6 4v1.5h4V11H8zm0 4v1.5h4V15H8zm-3-7.75v8.5H6.5V15H12v-1.5H6.5v-2.75H12V9.25H6.5V7.25H5z"/></svg>';
+const ICON_LIST = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M 2,3 V 4.5 H 4 V 3 Z M 5.5,3 V 4.5 H 18 V 3 Z M 2,7 V 8.5 H 4 V 7 Z M 5.5,7 V 8.5 H 18 V 7 Z M 2,11 v 1.5 H 4 V 11 Z m 3.5,0 v 1.5 H 18 V 11 Z M 2,15 v 1.5 H 4 V 15 Z m 3.5,0 v 1.5 H 18 V 15 Z"/></svg>';
+const ICON_CHEVRON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M6 4l4 4-4 4V4z"/></svg>';
 
 function render() {
   const list = document.getElementById('list');
@@ -149,13 +174,9 @@ function select(sha) {
 
 function renderDetails(c, files) {
   const d = document.getElementById('details');
-  if (!c) { d.innerHTML = '<div class="empty">Select a commit to see its details.</div>'; return; }
+  if (!c) { detailsData = null; d.innerHTML = '<div class="empty">Select a commit to see its details.</div>'; return; }
   files = files || [];
-  const fileItems = files.map((f) => {
-    const code = String(f.status || 'M').charAt(0).toUpperCase();
-    return '<li class="' + esc(code) + '" data-path="' + esc(f.path) + '" data-sha="' + esc(c.sha) + '">' +
-      '<span class="st">' + esc(code) + '</span><span>' + esc(f.path) + '</span></li>';
-  }).join('');
+  detailsData = { commit: c, files };
   d.innerHTML =
     '<h3>' + esc(c.subject) + '</h3>' +
     '<div class="meta">' +
@@ -164,10 +185,96 @@ function renderDetails(c, files) {
       '<b>Date:</b> ' + fmtDate(c.authorDate) +
     '</div>' +
     (c.body ? '<div class="body">' + esc(c.body) + '</div>' : '') +
-    '<div class="files-head">' + files.length + ' changed file' + (files.length === 1 ? '' : 's') + '</div>' +
-    '<ul id="files">' + (fileItems || '<li class="empty">No files</li>') + '</ul>';
-  d.querySelectorAll('#files li[data-path]').forEach((li) =>
-    li.addEventListener('click', () => vscode.postMessage({ type: 'openFile', sha: li.dataset.sha, path: li.dataset.path })));
+    '<div class="files-head">' +
+      '<span>' + files.length + ' changed file' + (files.length === 1 ? '' : 's') + '</span>' +
+      '<span class="files-view-toggle">' +
+        '<span id="fvTree" class="fv-btn" title="Tree View">' + ICON_TREE + '</span>' +
+        '<span id="fvList" class="fv-btn" title="List View">' + ICON_LIST + '</span>' +
+      '</span>' +
+    '</div>' +
+    '<div id="files"></div>';
+  syncFileViewButtons();
+  document.getElementById('fvTree').addEventListener('click', () => setFileViewMode('tree'));
+  document.getElementById('fvList').addEventListener('click', () => setFileViewMode('list'));
+  renderFilePane(c.sha, files);
+}
+
+function renderFilePane(sha, files) {
+  const host = document.getElementById('files');
+  if (!host) return;
+  host.innerHTML = '';
+  if (!files.length) { host.innerHTML = '<div class="empty">No files</div>'; return; }
+  host.appendChild(fileViewMode === 'tree' ? buildFileTree(sha, files) : buildFileList(sha, files));
+}
+
+function setFileViewMode(mode) {
+  if (fileViewMode === mode) return;
+  fileViewMode = mode;
+  vscode.setState({ ...(vscode.getState() || {}), historyFileViewMode: mode });
+  syncFileViewButtons();
+  if (detailsData) renderFilePane(detailsData.commit.sha, detailsData.files);
+}
+function syncFileViewButtons() {
+  const tree = document.getElementById('fvTree'), list = document.getElementById('fvList');
+  if (tree) tree.classList.toggle('active', fileViewMode === 'tree');
+  if (list) list.classList.toggle('active', fileViewMode === 'list');
+}
+
+function makeFileRow(sha, f, label) {
+  const row = document.createElement('div');
+  const code = String(f.status || 'M').charAt(0).toUpperCase();
+  row.className = 'file-row ' + code;
+  row.title = f.path;
+  row.innerHTML = '<span class="st">' + esc(code) + '</span><span class="fp">' + esc(label) + '</span>';
+  row.addEventListener('click', () => vscode.postMessage({ type: 'openFile', sha, path: f.path }));
+  return row;
+}
+
+function buildFileList(sha, files) {
+  const wrap = document.createElement('div');
+  files.slice().sort((a, b) => a.path.localeCompare(b.path)).forEach((f) => wrap.appendChild(makeFileRow(sha, f, f.path)));
+  return wrap;
+}
+
+function buildFileTree(sha, files) {
+  const root = { dirs: new Map(), files: [] };
+  files.forEach((f) => {
+    const parts = f.path.split('/');
+    let node = root;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const seg = parts[i];
+      if (!node.dirs.has(seg)) node.dirs.set(seg, { dirs: new Map(), files: [] });
+      node = node.dirs.get(seg);
+    }
+    node.files.push({ file: f, name: parts[parts.length - 1] });
+  });
+  const wrap = document.createElement('div');
+  renderTreeLevel(sha, root, wrap, 0);
+  return wrap;
+}
+
+function renderTreeLevel(sha, node, parent, depth) {
+  Array.from(node.dirs.keys()).sort((a, b) => a.localeCompare(b)).forEach((name) => {
+    const dir = node.dirs.get(name);
+    const folder = document.createElement('div');
+    folder.className = 'tree-folder';
+    folder.style.paddingLeft = (4 + depth * 14) + 'px';
+    folder.innerHTML = '<span class="chev expanded">' + ICON_CHEVRON + '</span><span class="fname">' + esc(name) + '</span>';
+    const children = document.createElement('div');
+    children.className = 'tree-children';
+    renderTreeLevel(sha, dir, children, depth + 1);
+    folder.addEventListener('click', () => {
+      const collapsed = children.classList.toggle('collapsed');
+      folder.querySelector('.chev').classList.toggle('expanded', !collapsed);
+    });
+    parent.appendChild(folder);
+    parent.appendChild(children);
+  });
+  node.files.sort((a, b) => a.name.localeCompare(b.name)).forEach((entry) => {
+    const row = makeFileRow(sha, entry.file, entry.name);
+    row.style.paddingLeft = (4 + depth * 14 + 16) + 'px';
+    parent.appendChild(row);
+  });
 }
 
 function applyCompareBanner() {

@@ -24,6 +24,17 @@ interface WebviewCommit {
   kind?: "commit" | "uncommitted";
 }
 
+interface CreateTagRequest {
+  sha: string;
+  name: string;
+  message?: string;
+  annotate?: boolean;
+  sign?: boolean;
+  force?: boolean;
+  push?: boolean;
+  remote?: string;
+}
+
 /**
  * Git Graph webview panel (vscode-git-graph style) on top of the existing git
  * plumbing: an icon-only action toolbar (Pull / Push / Fetch / Commit / Branch /
@@ -377,7 +388,7 @@ export class GraphPanel {
           return;
 
         case "createTag":
-          await this.createTag((message.data as { sha: string }).sha);
+          await this.createTag(message.data as CreateTagRequest);
           return;
 
         case "merge":
@@ -493,18 +504,26 @@ export class GraphPanel {
     await this.refresh();
   }
 
-  private async createTag(sha: string): Promise<void> {
-    const name = await vscode.window.showInputBox({
-      prompt: "Enter tag name",
-      placeHolder: "v1.0.0",
-    });
+  private async createTag(request: CreateTagRequest): Promise<void> {
+    const name = request.name.trim();
     if (!name) return;
-    const msg = await vscode.window.showInputBox({
-      prompt: "Enter tag message (optional)",
-      placeHolder: "Release version 1.0.0",
-    });
-    await this.repo.createTagAt(name, sha, msg, false);
-    this.notify(`Tag '${name}' created`);
+    let remote: string | undefined;
+    if (request.push) {
+      remote = request.remote?.trim() || (await this.pickRemote());
+      if (!remote) return;
+    }
+    const message = request.message?.trim() || undefined;
+    await this.repo.createTagAt(
+      name,
+      request.sha,
+      request.sign === true || request.annotate === true ? message ?? name : undefined,
+      request.sign === true,
+      request.force === true,
+    );
+    if (remote) {
+      await this.repo.pushTag(remote, name, request.force === true);
+    }
+    this.notify(request.push ? `Tag '${name}' created and pushed` : `Tag '${name}' created`);
     await this.refresh();
   }
 
@@ -892,6 +911,49 @@ export class GraphPanel {
   </div>
 
   <div id="context-menu" class="context-menu"></div>
+
+  <div id="create-tag-modal" class="modal-backdrop" hidden>
+    <form id="create-tag-form" class="modal" autocomplete="off">
+      <div class="modal-header">
+        <h2>Create Tag</h2>
+        <button type="button" class="modal-close" id="create-tag-close" title="Close">x</button>
+      </div>
+      <div class="modal-body">
+        <label class="field">
+          <span>Tag Name</span>
+          <input id="create-tag-name" type="text" placeholder="v1.0.0" required>
+        </label>
+        <label class="field">
+          <span>Commit</span>
+          <input id="create-tag-sha" type="text" readonly>
+        </label>
+        <label class="check-row">
+          <input id="create-tag-annotated" type="checkbox">
+          <span>Annotated Tag</span>
+        </label>
+        <label class="check-row">
+          <input id="create-tag-signed" type="checkbox">
+          <span>Sign Tag with GPG</span>
+        </label>
+        <label class="field">
+          <span>Message</span>
+          <textarea id="create-tag-message" rows="4" placeholder="Release version 1.0.0"></textarea>
+        </label>
+        <label class="check-row">
+          <input id="create-tag-force" type="checkbox">
+          <span>Force replace existing tag</span>
+        </label>
+        <label class="check-row">
+          <input id="create-tag-push" type="checkbox">
+          <span>Push tag after creation</span>
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="tb-btn" id="create-tag-cancel">Cancel</button>
+        <button type="submit" class="tb-btn primary">Create Tag</button>
+      </div>
+    </form>
+  </div>
 
   <script nonce="${nonce}" src="${layoutUri}"></script>
   <script nonce="${nonce}" src="${jsUri}"></script>

@@ -3,6 +3,7 @@ import { RepositoryManager } from "../git/RepositoryManager";
 import { Repository } from "../git/Repository";
 import { VsgitNode } from "../views/RepositoriesProvider";
 import { resolveRepo, withProgress } from "./shared";
+import { showCreateTagDialog } from "../webviews/CreateTagDialog";
 
 /** Tag operations: create (lightweight/annotated/signed), delete, checkout, push. */
 export function registerTagCommands(
@@ -17,15 +18,17 @@ export function registerTagCommands(
     if (!repo) {
       return;
     }
-    const name = await vscode.window.showInputBox({ prompt: "Tag name" });
+    const request = await showCreateTagDialog(context.extensionUri, "HEAD");
+    if (!request) {
+      return;
+    }
+    const name = request.name.trim();
     if (!name) {
       return;
     }
-
-    // If the tag already exists, offer a force re-tag (otherwise git would fail).
+    const message = request.message?.trim() || undefined;
     const exists = repo.tags.some((t) => t.shortName === name);
-    let force = false;
-    if (exists) {
+    if (exists && !request.force) {
       const choice = await vscode.window.showWarningMessage(
         `Tag '${name}' already exists. Force re-tag it to point at HEAD?`,
         { modal: true },
@@ -34,40 +37,10 @@ export function registerTagCommands(
       if (choice !== "Force Re-tag") {
         return;
       }
-      force = true;
     }
 
-    const kind = await vscode.window.showQuickPick(
-      ["Lightweight", "Annotated", "Signed (GPG)"],
-      { placeHolder: "Tag type" },
-    );
-    if (!kind) {
-      return;
-    }
-    let message: string | undefined;
-    if (kind !== "Lightweight") {
-      message = await vscode.window.showInputBox({
-        prompt: "Tag message",
-        validateInput: (v) =>
-          kind === "Signed (GPG)" && v.trim() === ""
-            ? "Signed tags need a message"
-            : undefined,
-      });
-      if (message === undefined) {
-        return;
-      }
-    }
-
-    // Optionally push the tag to a remote straight after creating it.
-    const pushChoice = await vscode.window.showQuickPick(
-      ["Create only", "Create and push"],
-      { placeHolder: "Push the tag to a remote?" },
-    );
-    if (!pushChoice) {
-      return;
-    }
     let remote: string | undefined;
-    if (pushChoice === "Create and push") {
+    if (request.push) {
       remote = await pickRemote(repo);
       if (!remote) {
         return;
@@ -78,12 +51,12 @@ export function registerTagCommands(
       await repo.createTagAt(
         name,
         "HEAD",
-        message || undefined,
-        kind === "Signed (GPG)",
-        force,
+        request.sign || request.annotate ? message ?? name : undefined,
+        request.sign,
+        request.force || exists,
       );
       if (remote) {
-        await repo.pushTag(remote, name, force);
+        await repo.pushTag(remote, name, request.force || exists);
       }
     });
   });

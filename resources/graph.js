@@ -1041,7 +1041,7 @@ function showCommitMenu(x, y, commit) {
     { title: commit.shortSha },
     { label: 'Checkout Commit…', action: () => send('checkout', sha) },
     { label: 'Create Branch Here…', action: () => send('createBranch', { sha }) },
-    { label: 'Create Tag Here…', action: () => send('createTag', { sha }) },
+    { label: 'Create Tag Here…', action: () => openCreateTagModal(commit) },
     { sep: true },
     { label: 'Merge into Current Branch…', action: () => send('merge', sha) },
     { label: 'Rebase Current Branch onto This…', action: () => send('rebase', sha) },
@@ -1061,6 +1061,42 @@ function showCommitMenu(x, y, commit) {
     { label: 'Copy SHA (full)', action: () => send('copyCommitSha', sha) },
   ]);
   placeMenu(menu, x, y);
+}
+
+function openCreateTagModal(commit) {
+  const backdrop = document.getElementById('create-tag-modal');
+  const form = document.getElementById('create-tag-form');
+  const name = document.getElementById('create-tag-name');
+  const sha = document.getElementById('create-tag-sha');
+  const annotated = document.getElementById('create-tag-annotated');
+  const signed = document.getElementById('create-tag-signed');
+  const message = document.getElementById('create-tag-message');
+  const force = document.getElementById('create-tag-force');
+  const push = document.getElementById('create-tag-push');
+
+  form.dataset.sha = commit.sha;
+  name.value = '';
+  sha.value = commit.shortSha || commit.sha.slice(0, 8);
+  annotated.checked = false;
+  signed.checked = false;
+  message.value = '';
+  message.disabled = true;
+  force.checked = false;
+  push.checked = false;
+  backdrop.hidden = false;
+  name.focus();
+}
+
+function closeCreateTagModal() {
+  document.getElementById('create-tag-modal').hidden = true;
+}
+
+function syncCreateTagMessageState() {
+  const annotated = document.getElementById('create-tag-annotated');
+  const signed = document.getElementById('create-tag-signed');
+  const message = document.getElementById('create-tag-message');
+  message.disabled = !annotated.checked && !signed.checked;
+  if (message.disabled) message.value = '';
 }
 function showRefMenu(x, y, ref) {
   const send = (type, data) => vscode.postMessage({ type, data });
@@ -1375,10 +1411,47 @@ function wireControls() {
   document.getElementById('find-next').addEventListener('click', () => findNext(1));
   document.getElementById('find-close').addEventListener('click', closeFind);
 
+  const createTagModal = document.getElementById('create-tag-modal');
+  const createTagForm = document.getElementById('create-tag-form');
+  const createTagAnnotated = document.getElementById('create-tag-annotated');
+  const createTagSigned = document.getElementById('create-tag-signed');
+  createTagAnnotated.addEventListener('change', syncCreateTagMessageState);
+  createTagSigned.addEventListener('change', () => {
+    if (createTagSigned.checked) createTagAnnotated.checked = true;
+    syncCreateTagMessageState();
+  });
+  document.getElementById('create-tag-close').addEventListener('click', closeCreateTagModal);
+  document.getElementById('create-tag-cancel').addEventListener('click', closeCreateTagModal);
+  createTagModal.addEventListener('click', (e) => {
+    if (e.target === createTagModal) closeCreateTagModal();
+  });
+  createTagForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = document.getElementById('create-tag-name').value.trim();
+    const message = document.getElementById('create-tag-message').value.trim();
+    const signed = document.getElementById('create-tag-signed').checked;
+    if (!name) return;
+    if (signed && !message) {
+      document.getElementById('create-tag-message').focus();
+      return;
+    }
+    send('createTag', {
+      sha: createTagForm.dataset.sha,
+      name,
+      message: message || undefined,
+      annotate: document.getElementById('create-tag-annotated').checked,
+      sign: signed,
+      force: document.getElementById('create-tag-force').checked,
+      push: document.getElementById('create-tag-push').checked,
+    });
+    closeCreateTagModal();
+  });
+
   // global keys
   document.addEventListener('keydown', (e) => {
     const typing = e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA');
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') { e.preventDefault(); openFind(); }
+    if (e.key === 'Escape' && !createTagModal.hidden) { e.preventDefault(); closeCreateTagModal(); }
+    else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') { e.preventDefault(); openFind(); }
     else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r') { e.preventDefault(); document.getElementById('main').classList.add('loading'); send('refresh'); }
     else if (!typing && e.key === 'ArrowDown') { e.preventDefault(); moveSelection(1); }
     else if (!typing && e.key === 'ArrowUp') { e.preventDefault(); moveSelection(-1); }

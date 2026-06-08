@@ -14,6 +14,7 @@ interface HistoryState {
   loadedCommits: Commit[];
   hasMore: boolean;
   currentBranch: string | "all";
+  filePath?: string;
   compareMode: { ref1: string; ref2: string } | null;
   filters: {
     search: string;
@@ -53,9 +54,9 @@ export class HistoryView {
       return;
     }
     if (file) {
-      // File-specific history
-      this.state.filters.search = file;
-      this.state.filters.searchBy = "message"; // Will be filtered by file path in query
+      this.state.filePath = file;
+    } else {
+      this.state.filePath = undefined;
     }
     if (this.panel) {
       this.panel.reveal();
@@ -190,7 +191,23 @@ export class HistoryView {
       this.state.filters.until = opts.until;
     }
     try {
-      const pageSize = vscode.workspace.getConfiguration("vsgit").get<number>("graph.pageSize", 200);
+      const config = vscode.workspace.getConfiguration("vsgit");
+      const pageSize = Math.max(1, config.get<number>("graph.pageSize", 200));
+      const maxCommits = Math.max(1, config.get<number>("history.maxCommits", 500));
+      const remaining = maxCommits - this.state.loadedCommits.length;
+      if (remaining <= 0) {
+        this.state.hasMore = false;
+        this.post({
+          type: "commits",
+          commits: this.state.loadedCommits,
+          hasMore: false,
+          currentBranch: this.state.currentBranch,
+          filePath: this.state.filePath,
+          compareMode: this.state.compareMode,
+        });
+        return;
+      }
+      const limit = Math.min(pageSize, remaining);
       
       let revRange: string | undefined;
       if (this.state.compareMode) {
@@ -201,11 +218,12 @@ export class HistoryView {
 
       const commits = await this.repo.log({
         all: opts.branch === "all" && !this.state.compareMode,
-        limit: pageSize,
+        limit,
         skip: this.state.loadedCommits.length,
         revRange,
         search: opts.search || undefined,
         searchBy: opts.searchBy,
+        file: this.state.filePath,
         since: opts.since,
         until: opts.until,
         // The history graph lays out lanes from this ordering, so a child must
@@ -214,7 +232,8 @@ export class HistoryView {
       });
       
       this.state.loadedCommits.push(...commits);
-      this.state.hasMore = commits.length === pageSize;
+      this.state.hasMore =
+        this.state.loadedCommits.length < maxCommits && commits.length === limit;
       
       for (const c of this.state.loadedCommits) {
         this.commitsBySha.set(c.sha, c);
@@ -225,6 +244,7 @@ export class HistoryView {
         commits: this.state.loadedCommits,
         hasMore: this.state.hasMore,
         currentBranch: this.state.currentBranch,
+        filePath: this.state.filePath,
         compareMode: this.state.compareMode,
       });
     } catch (e) {

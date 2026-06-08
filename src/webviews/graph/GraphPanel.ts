@@ -916,7 +916,7 @@ export class GraphPanel {
     <form id="create-tag-form" class="modal" autocomplete="off">
       <div class="modal-header">
         <h2>Create Tag</h2>
-        <button type="button" class="modal-close" id="create-tag-close" title="Close">x</button>
+        <button type="button" class="modal-close" id="create-tag-close" title="Close" aria-label="Close">&times;</button>
       </div>
       <div class="modal-body">
         <label class="field">

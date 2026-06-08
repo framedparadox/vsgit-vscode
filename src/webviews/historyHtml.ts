@@ -31,14 +31,15 @@ export function historyHtml(nonce: string, cspSource: string): string {
   #toolbar button:hover { background: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-secondaryBackground)); }
   #search { flex: 1; min-width: 80px; }
 
-  #compareBanner { display: none; align-items: center; gap: 8px; padding: 5px 10px; font-size: 0.9em;
+  #scopeBanner { display: none; align-items: center; gap: 8px; padding: 5px 10px; font-size: 0.9em;
     background: var(--vscode-inputValidation-infoBackground, rgba(0,120,215,0.1));
     border-bottom: 1px solid var(--vscode-inputValidation-infoBorder, #06c); }
-  #compareBanner.on { display: flex; }
-  #compareBanner button { background: transparent; border: none; color: var(--vscode-textLink-foreground); cursor: pointer; }
+  #scopeBanner.on { display: flex; }
+  #scopeBanner button { background: transparent; border: none; color: var(--vscode-textLink-foreground); cursor: pointer; }
+  #scopeText { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   #layout { display: flex; height: calc(100vh - 37px); }
-  #layout.compare { height: calc(100vh - 37px - 28px); }
+  #layout.scoped { height: calc(100vh - 37px - 28px); }
   #list { flex: 1; overflow: auto; padding: 2px 0; }
   #details { width: 40%; min-width: 260px; overflow: auto; border-left: 1px solid var(--vscode-panel-border); padding: 10px 12px; }
 
@@ -113,14 +114,14 @@ export function historyHtml(nonce: string, cspSource: string): string {
     <button id="btnFilter" title="Filter by Branch…">⎇ Branch</button>
     <button id="refresh" title="Refresh">↺</button>
   </div>
-  <div id="compareBanner"><span id="compareText"></span><button id="clearCompare">Clear</button></div>
+  <div id="scopeBanner"><span id="scopeText"></span><button id="clearCompare">Clear</button></div>
   <div id="layout">
     <div id="list"><div class="empty">Loading…</div></div>
     <div id="details"><div class="empty">Select a commit to see its details.</div></div>
   </div>
 <script nonce="${nonce}">
 const vscode = acquireVsCodeApi();
-let commits = [], selected = null, hasMore = false, compareMode = null;
+let commits = [], selected = null, hasMore = false, compareMode = null, filePath = null;
 // Changed-file pane view: 'tree' (folder hierarchy) or 'list' (flat) — same
 // toggle the Git Graph commit-details pane offers. Persisted across reloads.
 let fileViewMode = (vscode.getState() || {}).historyFileViewMode || 'tree';
@@ -278,16 +279,23 @@ function renderTreeLevel(sha, node, parent, depth) {
 }
 
 function applyCompareBanner() {
-  const banner = document.getElementById('compareBanner');
+  const banner = document.getElementById('scopeBanner');
   const layout = document.getElementById('layout');
   if (compareMode) {
-    document.getElementById('compareText').textContent =
+    document.getElementById('scopeText').textContent =
       'Comparing ' + compareMode.ref1 + ' … ' + compareMode.ref2;
+    document.getElementById('clearCompare').style.display = '';
     banner.classList.add('on');
-    layout.classList.add('compare');
+    layout.classList.add('scoped');
+  } else if (filePath) {
+    document.getElementById('scopeText').textContent = 'File history: ' + filePath;
+    document.getElementById('clearCompare').style.display = 'none';
+    banner.classList.add('on');
+    layout.classList.add('scoped');
   } else {
+    document.getElementById('clearCompare').style.display = 'none';
     banner.classList.remove('on');
-    layout.classList.remove('compare');
+    layout.classList.remove('scoped');
   }
 }
 
@@ -322,6 +330,7 @@ window.addEventListener('message', (e) => {
     commits = m.commits || [];
     hasMore = !!m.hasMore;
     compareMode = m.compareMode || null;
+    filePath = m.filePath || null;
     applyCompareBanner();
     render();
   } else if (m.type === 'details') {

@@ -641,15 +641,19 @@ tr.cdv-row > td.cdv-cell {
   font-weight: 600;
 }
 .modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 24px;
   height: 24px;
+  padding: 0;
   border: none;
   border-radius: 3px;
   background: transparent;
   color: var(--vscode-foreground);
   cursor: pointer;
   font-size: 16px;
-  line-height: 20px;
+  line-height: 1;
 }
 .modal-close:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
 .modal-body {
@@ -699,6 +703,7 @@ tr.cdv-row > td.cdv-cell {
 .check-row input { margin: 0; }
 .modal-footer {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 8px;
   padding: 10px 14px 12px;

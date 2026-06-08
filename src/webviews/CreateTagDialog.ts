@@ -95,14 +95,19 @@ function createTagHtml(nonce: string, cspSource: string, shaLabel: string): stri
     font-weight: 600;
   }
   .close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: 24px;
     height: 24px;
+    padding: 0;
     border: none;
     border-radius: 3px;
     background: transparent;
     color: var(--vscode-foreground);
     cursor: pointer;
     font-size: 16px;
+    line-height: 1;
   }
   .close:hover { background: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
   main {
@@ -150,6 +155,10 @@ function createTagHtml(nonce: string, cspSource: string, shaLabel: string): stri
     border-top: 1px solid var(--vscode-editorWidget-border, #454545);
   }
   button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 26px;
     font-family: inherit;
     font-size: 12px;
     padding: 5px 12px;
@@ -173,7 +182,7 @@ function createTagHtml(nonce: string, cspSource: string, shaLabel: string): stri
     <form id="form" autocomplete="off">
       <header>
         <h1>Create Tag</h1>
-        <button type="button" class="close" id="close" title="Close">x</button>
+        <button type="button" class="close" id="close" title="Close" aria-label="Close">&times;</button>
       </header>
       <main>
         <label class="field">

@@ -3,6 +3,7 @@ import assert from "node:assert";
 import { Repository } from "./Repository";
 import { GitExecutor, GitResult, GitRunOptions } from "./GitExecutor";
 import { GitError } from "./GitError";
+import { LOG_FORMAT } from "./parsers/log";
 
 /**
  * These tests verify the SECURITY WIRING of Repository: that every method which
@@ -539,6 +540,22 @@ test("log: rejects option-like revRange", async () => {
   git.calls = [];
   await repo.log({ revRange: "main...feature", order: "topo" });
   assert.ok(git.calls[0].args.includes("main...feature"));
+});
+
+test("log: scopes file history after revision arguments", async () => {
+  const { repo, git } = makeRepo();
+  await repo.log({ all: true, limit: 25, skip: 5, file: "src/example.ts" });
+  assert.deepStrictEqual(git.calls[0].args, [
+    "log",
+    `--format=${LOG_FORMAT}`,
+    "--date-order",
+    "--max-count=25",
+    "--skip=5",
+    "--all",
+    "--follow",
+    "--",
+    "src/example.ts",
+  ]);
 });
 
 test("graphLog: rejects option-like branch in the branches list", async () => {

@@ -216,9 +216,27 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
   <div id="empty" class="empty">No Git repository is active.</div>
   <div id="root" style="display:none">
     <div id="message-box">
+      <div id="commit-header">
+        <div id="commit-title">
+          <span class="title">Commit</span>
+          <span id="branch-name"></span>
+        </div>
+        <div id="commit-actions">
+          <button id="view-tree" class="header-btn" title="Tree View" aria-label="Tree View">
+            <svg class="header-icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M2 2h4v3H2V2zm7 0h4v3H9V2zM2 11h4v3H2v-3zm3-5h1v1.5h3V6h1v1.5h3V10h-1V8.5H6V10H5V8.5H3V10H2V7.5h3V6z"/>
+            </svg>
+          </button>
+          <button id="view-list" class="header-btn" title="List View" aria-label="List View">
+            <svg class="header-icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M2 3h2v2H2V3zm3.5.25H14v1.5H5.5v-1.5zM2 7h2v2H2V7zm3.5.25H14v1.5H5.5v-1.5zM2 11h2v2H2v-2zm3.5.25H14v1.5H5.5v-1.5z"/>
+            </svg>
+          </button>
+          <button id="commit-btn" class="primary" title="Commit staged changes">Commit</button>
+        </div>
+      </div>
       <textarea id="message" placeholder="Message (commit on this branch)"></textarea>
       <div id="commit-bar">
-        <button id="commit-btn" class="primary" title="Commit staged changes">Commit</button>
         <label class="opt"><input type="checkbox" id="opt-amend"> Amend</label>
         <label class="opt"><input type="checkbox" id="opt-signoff"> Sign off</label>
         <label class="opt"><input type="checkbox" id="opt-gpg"> GPG</label>

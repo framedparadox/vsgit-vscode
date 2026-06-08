@@ -194,6 +194,10 @@ export class HistoryView {
       const config = vscode.workspace.getConfiguration("vsgit");
       const pageSize = Math.max(1, config.get<number>("graph.pageSize", 200));
       const maxCommits = Math.max(1, config.get<number>("history.maxCommits", 500));
+      const sortOrder = config.get<"date" | "author-date" | "topo">(
+        "graph.sortOrder",
+        "date",
+      );
       const remaining = maxCommits - this.state.loadedCommits.length;
       if (remaining <= 0) {
         this.state.hasMore = false;
@@ -226,9 +230,7 @@ export class HistoryView {
         file: this.state.filePath,
         since: opts.since,
         until: opts.until,
-        // The history graph lays out lanes from this ordering, so a child must
-        // always precede its parents.
-        order: "topo",
+        order: sortOrder,
       });
       
       this.state.loadedCommits.push(...commits);

@@ -118,8 +118,17 @@ export class RepositoryManager implements vscode.Disposable {
     this.watchers.delete(root);
   }
 
+  private autoRefreshEnabled(): boolean {
+    return vscode.workspace
+      .getConfiguration("vsgit")
+      .get<boolean>("autoRefresh", true);
+  }
+
   /** Debounce bursts of filesystem events into a single refresh. */
   private scheduleRefresh(): void {
+    if (!this.autoRefreshEnabled()) {
+      return;
+    }
     if (this.refreshTimer) {
       clearTimeout(this.refreshTimer);
     }

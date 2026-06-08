@@ -157,6 +157,8 @@ export class GraphPanel {
         columns: {
           id: c.get<boolean>("graph.showIdColumn", true),
           author: c.get<boolean>("graph.showAuthorColumn", true),
+          authoredDate: c.get<boolean>("graph.showAuthoredDateColumn", true),
+          committer: c.get<boolean>("graph.showCommitterColumn", true),
           committedDate: c.get<boolean>("graph.showCommittedDateColumn", true),
         },
       },
@@ -874,8 +876,8 @@ export class GraphPanel {
     <div id="main">
       <div id="loading">Loading graph…</div>
       <div id="empty-state" style="display:none">No Git repository is active.</div>
-      <!-- Column layout mirrors vscode-git-graph:
-           Graph | Description | Author | Date | Commit.
+      <!-- Column layout mirrors VsGit / EGit-style history:
+           Graph | Description | Author | Authored Date | Committer | Committed Date | Commit.
            The graph rail is the FIRST column so the overlay SVG keeps a clean,
            uniform coordinate space anchored to the table's left edge; ref pills +
            message text live in the Description column, and the abbreviated commit
@@ -885,6 +887,8 @@ export class GraphPanel {
           <col id="col-graph">
           <col id="col-desc">
           <col id="col-author" class="col-author">
+          <col id="col-adate" class="col-adate">
+          <col id="col-committer" class="col-committer">
           <col id="col-cdate" class="col-cdate">
           <col id="col-id" class="col-id">
         </colgroup>
@@ -893,7 +897,9 @@ export class GraphPanel {
             <th class="col-graph-head">Graph</th>
             <th>Description<span class="col-resizer" data-col="desc"></span></th>
             <th class="col-author">Author<span class="col-resizer" data-col="author"></span></th>
-            <th class="col-cdate">Date<span class="col-resizer" data-col="cdate"></span></th>
+            <th class="col-adate">Authored Date<span class="col-resizer" data-col="adate"></span></th>
+            <th class="col-committer">Committer<span class="col-resizer" data-col="committer"></span></th>
+            <th class="col-cdate">Committed Date<span class="col-resizer" data-col="cdate"></span></th>
             <th class="col-id">Commit<span class="col-resizer" data-col="id"></span></th>
           </tr>
         </thead>

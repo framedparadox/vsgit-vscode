@@ -26,6 +26,12 @@ export class GitWatcherService implements vscode.Disposable {
   }
 
   private scheduleRefresh(): void {
+    const autoRefresh = vscode.workspace
+      .getConfiguration("vsgit")
+      .get<boolean>("autoRefresh", true);
+    if (!autoRefresh) {
+      return;
+    }
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
     }

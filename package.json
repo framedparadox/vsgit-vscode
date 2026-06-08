@@ -2882,6 +2882,11 @@
           "minimum": 1,
           "description": "Interval (minutes) between automatic fetches."
         },
+        "vsgit.autoFetch.notify": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a notification when automatic fetch discovers new incoming commits."
+        },
         "vsgit.graph.pageSize": {
           "type": "number",
           "default": 200,
@@ -2973,10 +2978,20 @@
           "default": true,
           "description": "Show the Author column in the Git Graph."
         },
+        "vsgit.graph.showAuthoredDateColumn": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the Authored Date column in the Git Graph."
+        },
+        "vsgit.graph.showCommitterColumn": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the Committer column in the Git Graph."
+        },
         "vsgit.graph.showCommittedDateColumn": {
           "type": "boolean",
           "default": true,
-          "description": "Show the Date column in the Git Graph."
+          "description": "Show the Committed Date column in the Git Graph."
         },
         "vsgit.graph.dateFormat": {
           "type": "string",

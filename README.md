@@ -205,10 +205,12 @@ All settings live under the `vsgit.*` namespace.
 
 | Setting | Default | Description |
 |---|---|---|
+| `vsgit.showAdvancedViews` | `false` | Show advanced sidebar sections such as Staging, Reflog, Synchronize, Worktrees, Conflicts, and Compare. |
 | `vsgit.git.path` | `""` | Custom path to the `git` executable; empty uses `$PATH`. |
 | `vsgit.autoRefresh` | `true` | Refresh views automatically when the repo changes. |
 | `vsgit.autoFetch.enabled` | `false` | Periodically fetch from all remotes. |
 | `vsgit.autoFetch.intervalMinutes` | `3` | Minutes between automatic fetches. |
+| `vsgit.autoFetch.notify` | `true` | Notify when auto-fetch discovers new incoming commits. |
 | `vsgit.fetch.pruneOnFetch` | `true` | Prune deleted remote-tracking branches on fetch. |
 | `vsgit.defaultPullMode` | `merge` | Pull strategy: `merge` or `rebase`. |
 | `vsgit.confirmDestructiveActions` | `true` | Confirm hard reset, clean, force-push, etc. |
@@ -222,7 +224,7 @@ All settings live under the `vsgit.*` namespace.
 | `vsgit.graph.sortOrder` | `date` | Commit sort order for the History view. |
 | `vsgit.graph.style` | `rounded` | Branch line style: `rounded` curves or `angular` elbows. |
 | `vsgit.graph.colours` | 12-colour palette | Branch lane colours cycled through in the graph. |
-| `vsgit.graph.dateFormat` | `relative` | Date format in the graph (`relative` / `iso` / `standard`). |
+| `vsgit.graph.dateFormat` | `standard` | Date format in the graph (`relative` / `iso` / `standard`). |
 | `vsgit.graph.showRemoteBranches` | `true` | Show remote branches in the graph by default. |
 | `vsgit.graph.showSidebar` | `true` | Show the graph's left sidebar tree. |
 | `vsgit.graph.showStatusBarItem` | `true` | Show a *Git Graph* button in the status bar. |

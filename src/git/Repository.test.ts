@@ -542,6 +542,21 @@ test("log: rejects option-like revRange", async () => {
   assert.ok(git.calls[0].args.includes("main...feature"));
 });
 
+test("log: maps configured sort orders to git order flags", async () => {
+  const { repo, git } = makeRepo();
+  git.calls = [];
+  await repo.log();
+  assert.ok(git.calls[0].args.includes("--date-order"));
+
+  git.calls = [];
+  await repo.log({ order: "author-date" });
+  assert.ok(git.calls[0].args.includes("--author-date-order"));
+
+  git.calls = [];
+  await repo.log({ order: "topo" });
+  assert.ok(git.calls[0].args.includes("--topo-order"));
+});
+
 test("log: scopes file history after revision arguments", async () => {
   const { repo, git } = makeRepo();
   await repo.log({ all: true, limit: 25, skip: 5, file: "src/example.ts" });

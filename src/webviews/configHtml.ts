@@ -89,6 +89,11 @@ export function configHtml(nonce: string, cspSource: string): string {
 
   <!-- Extension Settings tab -->
   <div id="tab-extension" class="tab-content">
+    <div class="section-title">Refresh</div>
+    <div class="setting-row">
+      <div class="setting-label"><strong>Auto Refresh</strong><small>Refresh views when repository state changes outside VS Code</small></div>
+      <input type="checkbox" id="ext-autoRefresh" />
+    </div>
     <div class="section-title">Auto Fetch</div>
     <div class="setting-row">
       <div class="setting-label"><strong>Enable Auto Fetch</strong><small>Automatically fetch remotes in the background</small></div>
@@ -97,6 +102,10 @@ export function configHtml(nonce: string, cspSource: string): string {
     <div class="setting-row">
       <div class="setting-label"><strong>Fetch Interval (minutes)</strong><small>How often to auto-fetch</small></div>
       <input type="number" id="ext-autoFetch.intervalMinutes" min="1" max="60" />
+    </div>
+    <div class="setting-row">
+      <div class="setting-label"><strong>Incoming Commit Notifications</strong><small>Notify when auto-fetch finds new commits</small></div>
+      <input type="checkbox" id="ext-autoFetch.notify" />
     </div>
     <div class="section-title">Safety</div>
     <div class="setting-row">
@@ -178,11 +187,17 @@ function renderRemotes() {
 }
 
 function renderExtensionSettings(settings) {
+  if (settings['autoRefresh'] !== undefined) {
+    document.getElementById('ext-autoRefresh').checked = !!settings['autoRefresh'];
+  }
   if (settings['autoFetch.enabled'] !== undefined) {
     document.getElementById('ext-autoFetch.enabled').checked = !!settings['autoFetch.enabled'];
   }
   if (settings['autoFetch.intervalMinutes'] !== undefined) {
     document.getElementById('ext-autoFetch.intervalMinutes').value = String(settings['autoFetch.intervalMinutes']);
+  }
+  if (settings['autoFetch.notify'] !== undefined) {
+    document.getElementById('ext-autoFetch.notify').checked = !!settings['autoFetch.notify'];
   }
   if (settings['confirmDestructiveActions'] !== undefined) {
     document.getElementById('ext-confirmDestructiveActions').checked = !!settings['confirmDestructiveActions'];
@@ -230,7 +245,7 @@ document.getElementById('remoteAddBtn').addEventListener('click', () => {
 });
 
 // Extension settings change handlers
-['ext-autoFetch.enabled', 'ext-confirmDestructiveActions'].forEach(id => {
+['ext-autoRefresh', 'ext-autoFetch.enabled', 'ext-autoFetch.notify', 'ext-confirmDestructiveActions'].forEach(id => {
   document.getElementById(id).addEventListener('change', (e) => {
     const key = id.replace('ext-', '');
     vscode.postMessage({ type: 'setExtensionSetting', key, value: e.target.checked });

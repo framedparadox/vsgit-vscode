@@ -804,11 +804,18 @@ export class Repository {
     /**
      * Commit ordering. `topo` lists a child before all of its parents, which the
      * graph renderer needs to lay out lanes without backtracking edges; `date`
-     * (the default) is reverse-chronological for plain list views.
+     * (the default) is reverse-chronological for plain list views; `author-date`
+     * sorts by author timestamp when possible while preserving child-before-parent
+     * constraints.
      */
-    order?: "date" | "topo";
+    order?: "date" | "author-date" | "topo";
   } = {}): Promise<Commit[]> {
-    const orderFlag = options.order === "topo" ? "--topo-order" : "--date-order";
+    const orderFlag =
+      options.order === "topo"
+        ? "--topo-order"
+        : options.order === "author-date"
+          ? "--author-date-order"
+          : "--date-order";
     const args = ["log", `--format=${LOG_FORMAT}`, orderFlag];
     if (options.limit !== undefined) {
       args.push(`--max-count=${options.limit}`);

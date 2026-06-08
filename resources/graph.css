@@ -322,7 +322,7 @@ td.col-desc {
   white-space: nowrap;
   font-size: 12px;
 }
-td.col-id, td.col-author, td.col-cdate {
+td.col-id, td.col-author, td.col-adate, td.col-committer, td.col-cdate {
   padding: 0 6px;
   vertical-align: middle;
   white-space: nowrap;

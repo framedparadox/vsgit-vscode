@@ -30,9 +30,16 @@ let CONFIG = {
             '#00d9cc','#e138e8','#85d900','#dc5b23','#6f24d6','#ffcc00'],
   style: 'rounded',
   dateFormat: 'standard',
-  // git-graph-style columns: Graph | Description | Author | Date | Commit.
-  // Graph/Description are always shown; Author, Date and Commit (id) toggle.
-  columns: { id: true, author: true, committedDate: true },
+  // VsGit/EGit-style columns: Graph | Description | Author | Authored Date |
+  // Committer | Committed Date | Commit. Graph/Description are always shown;
+  // the metadata columns and Commit (id) are configurable.
+  columns: {
+    id: true,
+    author: true,
+    authoredDate: true,
+    committer: true,
+    committedDate: true,
+  },
   showRemoteBranches: true,
   showSidebar: true,
 };
@@ -609,8 +616,8 @@ function renderTable(rows) {
     tr.dataset.sha = commit.sha;
     if (commit.sha === selectedSha) tr.classList.add('selected');
 
-    // Column order mirrors vscode-git-graph: Graph | Description | Author |
-    // Date | Commit.
+    // Column order mirrors VsGit / EGit history: Graph | Description | Author |
+    // Authored Date | Committer | Committed Date | Commit.
 
     // Graph: a fixed-size spacer cell; all lines + dots are drawn by one overlay
     // SVG appended to the first row's graph cell (see below), so the whole DAG
@@ -635,6 +642,18 @@ function renderTable(rows) {
     tdAuthor.textContent = commit.author || '';
     tdAuthor.title = commit.author || '';
     tr.appendChild(tdAuthor);
+
+    const tdADate = document.createElement('td');
+    tdADate.className = 'col-adate';
+    tdADate.textContent = commit.kind === 'uncommitted' ? '' : formatDate(commit.date);
+    tdADate.title = commit.date || '';
+    tr.appendChild(tdADate);
+
+    const tdCommitter = document.createElement('td');
+    tdCommitter.className = 'col-committer';
+    tdCommitter.textContent = commit.kind === 'uncommitted' ? '' : (commit.committer || '');
+    tdCommitter.title = commit.committer || '';
+    tr.appendChild(tdCommitter);
 
     const tdCDate = document.createElement('td');
     tdCDate.className = 'col-cdate';
@@ -666,6 +685,8 @@ function applyColumnWidths() {
   const set = (id, w) => { const el = document.getElementById(id); if (w && el) el.style.width = w + 'px'; };
   set('col-id', colWidths.id || 80);
   set('col-author', colWidths.author || 130);
+  set('col-adate', colWidths.adate || 150);
+  set('col-committer', colWidths.committer || 130);
   set('col-cdate', colWidths.cdate || 150);
 }
 function applyColumnVisibility() {
@@ -676,6 +697,8 @@ function applyColumnVisibility() {
   };
   toggle('col-id', CONFIG.columns.id);
   toggle('col-author', CONFIG.columns.author);
+  toggle('col-adate', CONFIG.columns.authoredDate);
+  toggle('col-committer', CONFIG.columns.committer);
   toggle('col-cdate', CONFIG.columns.committedDate);
 }
 
@@ -1159,7 +1182,7 @@ function runFind(term) {
   if (!q || !graphData) return;
   graphData.commits.forEach((c) => {
     if (c.kind === 'uncommitted') return;
-    const hay = (c.message + ' ' + (c.author || '') + ' ' + c.sha + ' ' +
+    const hay = (c.message + ' ' + (c.author || '') + ' ' + (c.committer || '') + ' ' + c.sha + ' ' +
       (c.refs || []).map((r) => r.name).join(' ')).toLowerCase();
     if (hay.includes(q)) findMatches.push(c.sha);
   });

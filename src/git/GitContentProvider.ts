@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { GitExecutor } from "./GitExecutor";
-import { isOptionLike, safeRef } from "./argGuard";
+import { isOptionLike } from "./argGuard";
 
 export const VSGIT_SCHEME = "vsgit";
 

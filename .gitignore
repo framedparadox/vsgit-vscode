@@ -4,3 +4,10 @@ out/
 out-test/
 *.vsix
 .DS_Store
+.claude/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+graphify-out/
+docs/codex-plan.md
+.vscodeignore
+.gitignore

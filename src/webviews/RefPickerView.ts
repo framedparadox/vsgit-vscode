@@ -1,3 +1,8 @@
+/**
+ * Temporary webview-backed ref picker for commands that need richer commit/ref
+ * context than a QuickPick can comfortably show. It writes its small HTML/CSS/JS
+ * bundle to a temp folder and cleans that folder when the panel closes.
+ */
 import * as crypto from "node:crypto";
 import * as path from "node:path";
 import * as fs from "node:fs";

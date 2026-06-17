@@ -1,3 +1,8 @@
+/**
+ * Worktrees tree provider. It projects each repository's `git worktree list`
+ * state into a VS Code tree and keeps the node payloads rich enough for the
+ * worktree command module to open, lock, move, prune, or remove entries.
+ */
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";

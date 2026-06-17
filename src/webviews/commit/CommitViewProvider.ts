@@ -207,6 +207,9 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     const jsUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, "resources", "commit.js"),
     );
+    const iconsUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "resources", "fluentIcons.js"),
+    );
     const csp = [
       "default-src 'none'",
       `style-src ${webview.cspSource}`,
@@ -231,14 +234,10 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         </div>
         <div id="commit-actions">
           <button id="view-tree" class="header-btn" title="Tree View" aria-label="Tree View">
-            <svg class="header-icon" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M2 2h4v3H2V2zm7 0h4v3H9V2zM2 11h4v3H2v-3zm3-5h1v1.5h3V6h1v1.5h3V10h-1V8.5H6V10H5V8.5H3V10H2V7.5h3V6z"/>
-            </svg>
+            <span class="header-icon" data-fluent-icon="fileTree"></span>
           </button>
           <button id="view-list" class="header-btn" title="List View" aria-label="List View">
-            <svg class="header-icon" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M2 3h2v2H2V3zm3.5.25H14v1.5H5.5v-1.5zM2 7h2v2H2V7zm3.5.25H14v1.5H5.5v-1.5zM2 11h2v2H2v-2zm3.5.25H14v1.5H5.5v-1.5z"/>
-            </svg>
+            <span class="header-icon" data-fluent-icon="fileList"></span>
           </button>
           <button id="commit-btn" class="primary" title="Commit staged changes">Commit</button>
         </div>
@@ -252,6 +251,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     </div>
     <div id="groups"></div>
   </div>
+  <script nonce="${nonce}" src="${iconsUri}"></script>
   <script nonce="${nonce}" src="${jsUri}"></script>
 </body>
 </html>`;

@@ -839,6 +839,9 @@ export class GraphPanel {
     const layoutUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, "resources", "graphLayout.js"),
     );
+    const iconsUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "resources", "fluentIcons.js"),
+    );
     const csp = [
       "default-src 'none'",
       `style-src ${webview.cspSource}`,
@@ -937,9 +940,9 @@ export class GraphPanel {
   <div id="find-widget">
     <input type="text" id="find-input" placeholder="Find commit, author, hash, ref…">
     <span id="find-count"></span>
-    <button id="find-prev" title="Previous (Shift+Enter)">▲</button>
-    <button id="find-next" title="Next (Enter)">▼</button>
-    <button id="find-close" title="Close (Esc)">✕</button>
+    <button id="find-prev" title="Previous (Shift+Enter)" aria-label="Previous result"><span data-fluent-icon="chevronUp"></span></button>
+    <button id="find-next" title="Next (Enter)" aria-label="Next result"><span data-fluent-icon="chevronDown"></span></button>
+    <button id="find-close" title="Close (Esc)" aria-label="Close find"><span data-fluent-icon="close"></span></button>
   </div>
 
   <div id="context-menu" class="context-menu"></div>
@@ -948,7 +951,7 @@ export class GraphPanel {
     <form id="create-tag-form" class="modal" autocomplete="off">
       <div class="modal-header">
         <h2>Create Tag</h2>
-        <button type="button" class="modal-close" id="create-tag-close" title="Close" aria-label="Close">&times;</button>
+        <button type="button" class="modal-close" id="create-tag-close" title="Close" aria-label="Close"><span data-fluent-icon="close"></span></button>
       </div>
       <div class="modal-body">
         <label class="field">
@@ -988,6 +991,7 @@ export class GraphPanel {
   </div>
 
   <script nonce="${nonce}" src="${layoutUri}"></script>
+  <script nonce="${nonce}" src="${iconsUri}"></script>
   <script nonce="${nonce}" src="${jsUri}"></script>
 </body>
 </html>`;

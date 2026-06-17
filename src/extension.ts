@@ -1,3 +1,8 @@
+/**
+ * Extension activation root. This file wires the repository model, tree/webview
+ * providers, background services, and command modules into VS Code contribution
+ * points; feature behavior lives in the registered modules.
+ */
 import * as vscode from "vscode";
 import { RepositoryManager } from "./git/RepositoryManager";
 import { RepositoriesProvider } from "./views/RepositoriesProvider";

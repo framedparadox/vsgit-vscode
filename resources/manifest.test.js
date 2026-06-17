@@ -4,6 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 
 const root = path.resolve(__dirname, '..');
 
@@ -194,4 +195,53 @@ test('Git Graph trace keeps the graph overlay bright', () => {
     graphCss.includes('#graph-svg .graph-node:not(.dim)'),
     'active traced graph nodes are visually emphasized',
   );
+});
+
+test('custom webview chrome uses the shared Fluent icon helper', () => {
+  const fluentIcons = read('resources/fluentIcons.js');
+  const graphPanel = read('src/webviews/graph/GraphPanel.ts');
+  const graphJs = read('resources/graph.js');
+  const commitProvider = read('src/webviews/commit/CommitViewProvider.ts');
+  const commitJs = read('resources/commit.js');
+  const createTagDialog = read('src/webviews/CreateTagDialog.ts');
+  const historyView = read('src/webviews/HistoryView.ts');
+  const historyHtml = read('src/webviews/historyHtml.ts');
+  const docs = read('docs/ICONS.md');
+
+  const sandbox = {};
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(fluentIcons, sandbox);
+
+  assert.ok(sandbox.VSGIT_FLUENT_ICONS, 'Fluent icon API is exported');
+  assert.ok(sandbox.VSGIT_FLUENT_ICONS.icon('branch').includes('<svg'), 'branch icon renders');
+  assert.ok(sandbox.VSGIT_FLUENT_ICONS.icon('compare').includes('<svg'), 'compare icon renders');
+  assert.ok(sandbox.VSGIT_FLUENT_ICONS.icon('close').includes('<svg'), 'close icon renders');
+  assert.strictEqual(sandbox.VSGIT_FLUENT_ICONS.icon('__missing__'), '', 'missing icons are empty');
+
+  assert.ok(graphPanel.includes('resources", "fluentIcons.js"'), 'Graph webview loads Fluent helper');
+  assert.ok(commitProvider.includes('resources", "fluentIcons.js"'), 'Commit webview loads Fluent helper');
+  assert.ok(createTagDialog.includes('resources", "fluentIcons.js"'), 'Create Tag dialog loads Fluent helper');
+  assert.ok(createTagDialog.includes('data-fluent-icon="close"'), 'Create Tag dialog close button uses Fluent icon');
+  assert.ok(historyView.includes('resources", "fluentIcons.js"'), 'History webview loads Fluent helper');
+  assert.ok(historyHtml.includes('data-fluent-icon="compare"'), 'History compare action uses Fluent icon');
+  assert.ok(historyHtml.includes('data-fluent-icon="refresh"'), 'History refresh action uses Fluent icon');
+  assert.ok(
+    graphPanel.includes('src="${iconsUri}"></script>\n  <script nonce="${nonce}" src="${jsUri}"></script>'),
+    'Graph helper loads before graph.js',
+  );
+  assert.ok(
+    commitProvider.includes('src="${iconsUri}"></script>\n  <script nonce="${nonce}" src="${jsUri}"></script>'),
+    'Commit helper loads before commit.js',
+  );
+
+  for (const source of [graphJs, commitJs]) {
+    assert.ok(source.includes('VSGIT_FLUENT_ICONS'), 'webview client uses the Fluent API');
+    assert.ok(!source.includes('Octicons'), 'stale Octicons wording is not present');
+    assert.ok(!source.includes('LICENSE_OCTICONS'), 'stale Octicons license reference is not present');
+  }
+
+  assert.ok(!commitJs.includes("groupAction('Stage All Changes', '+'"), 'commit group actions do not use plus glyphs');
+  assert.ok(!commitJs.includes("fileAction('Discard Changes', '↶'"), 'commit file actions do not use revert glyphs');
+  assert.ok(docs.includes('resources/fluentIcons.js'), 'icon inventory documents Fluent helper');
+  assert.ok(docs.includes('Webview icons (Fluent-style SVGs)'), 'icon inventory has a webview section');
 });

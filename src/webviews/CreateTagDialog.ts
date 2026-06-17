@@ -1,3 +1,7 @@
+/**
+ * Reusable modal webview for tag creation. It keeps sidebar and graph tag flows
+ * on one validation contract instead of duplicating native input-box prompts.
+ */
 import * as vscode from "vscode";
 
 export interface CreateTagDialogResult {
@@ -22,7 +26,15 @@ export async function showCreateTagDialog(
       localResourceRoots: [extensionUri],
     },
   );
-  panel.webview.html = createTagHtml(getNonce(), panel.webview.cspSource, shaLabel);
+  const iconsUri = panel.webview.asWebviewUri(
+    vscode.Uri.joinPath(extensionUri, "resources", "fluentIcons.js"),
+  );
+  panel.webview.html = createTagHtml(
+    getNonce(),
+    panel.webview.cspSource,
+    shaLabel,
+    iconsUri.toString(),
+  );
 
   return new Promise((resolve) => {
     let settled = false;
@@ -44,7 +56,12 @@ export async function showCreateTagDialog(
   });
 }
 
-function createTagHtml(nonce: string, cspSource: string, shaLabel: string): string {
+function createTagHtml(
+  nonce: string,
+  cspSource: string,
+  shaLabel: string,
+  iconsUri: string,
+): string {
   const escapedSha = escapeHtml(shaLabel);
   return /* html */ `<!DOCTYPE html>
 <html lang="en">
@@ -110,6 +127,12 @@ function createTagHtml(nonce: string, cspSource: string, shaLabel: string): stri
     line-height: 1;
   }
   .close:hover { background: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
+  .fluent-icon {
+    display: block;
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+  }
   main {
     display: flex;
     flex-direction: column;
@@ -182,7 +205,7 @@ function createTagHtml(nonce: string, cspSource: string, shaLabel: string): stri
     <form id="form" autocomplete="off">
       <header>
         <h1>Create Tag</h1>
-        <button type="button" class="close" id="close" title="Close" aria-label="Close">&times;</button>
+        <button type="button" class="close" id="close" title="Close" aria-label="Close"><span data-fluent-icon="close"></span></button>
       </header>
       <main>
         <label class="field">
@@ -220,8 +243,10 @@ function createTagHtml(nonce: string, cspSource: string, shaLabel: string): stri
       </footer>
     </form>
   </div>
+<script nonce="${nonce}" src="${iconsUri}"></script>
 <script nonce="${nonce}">
 const vscode = acquireVsCodeApi();
+if (globalThis.VSGIT_FLUENT_ICONS) globalThis.VSGIT_FLUENT_ICONS.paint(document);
 const form = document.getElementById('form');
 const nameInput = document.getElementById('name');
 const annotateInput = document.getElementById('annotate');

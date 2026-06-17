@@ -15,6 +15,16 @@ let viewMode = (vscode.getState() || {}).commitViewMode || 'tree';
 const el = (id) => document.getElementById(id);
 const post = (type, data) => vscode.postMessage({ type, data });
 
+function fluentIcon(name) {
+  return (globalThis.VSGIT_FLUENT_ICONS && globalThis.VSGIT_FLUENT_ICONS.icon(name)) || '';
+}
+
+function paintStaticIcons() {
+  if (globalThis.VSGIT_FLUENT_ICONS) {
+    globalThis.VSGIT_FLUENT_ICONS.paint(document);
+  }
+}
+
 // ─── render ────────────────────────────────────────────────────────────────
 function render() {
   if (!state.active) {
@@ -52,9 +62,9 @@ function renderGroup(title, group, files) {
 
   // Group-level action: stage-all / unstage-all.
   if (group === 'unstaged' && files.length) {
-    header.appendChild(groupAction('Stage All Changes', '+', () => post('stageAll')));
+    header.appendChild(groupAction('Stage All Changes', 'add', () => post('stageAll')));
   } else if (group === 'staged' && files.length) {
-    header.appendChild(groupAction('Unstage All Changes', '−', () => post('unstageAll')));
+    header.appendChild(groupAction('Unstage All Changes', 'remove', () => post('unstageAll')));
   }
   header.appendChild(count);
   wrap.appendChild(header);
@@ -75,11 +85,11 @@ function renderGroup(title, group, files) {
   return wrap;
 }
 
-function groupAction(title, glyph, action) {
+function groupAction(title, iconName, action) {
   const b = document.createElement('button');
   b.className = 'group-action';
   b.title = title;
-  b.textContent = glyph;
+  b.innerHTML = fluentIcon(iconName);
   b.addEventListener('click', (e) => { e.stopPropagation(); action(); });
   return b;
 }
@@ -109,7 +119,7 @@ function renderTreeLevel(parent, node, group, depth) {
     folder.className = 'tree-folder';
     folder.style.paddingLeft = (12 + depth * 14) + 'px';
     folder.innerHTML =
-      '<span class="chev expanded">▶</span>' +
+      '<span class="chev expanded">' + fluentIcon('chevron') + '</span>' +
       '<span class="folder-name">' + escapeHtml(name) + '</span>';
 
     const children = document.createElement('div');
@@ -156,16 +166,16 @@ function renderFile(f, group, depth = 0, label = f.name) {
   const actions = document.createElement('span');
   actions.className = 'file-actions';
   if (group === 'unstaged' || group === 'conflicted') {
-    actions.appendChild(fileAction('Discard Changes', '↶', (e) => {
+    actions.appendChild(fileAction('Discard Changes', 'discard', (e) => {
       e.stopPropagation();
       post('discard', { path: f.path, group });
     }));
-    actions.appendChild(fileAction('Stage Changes', '+', (e) => {
+    actions.appendChild(fileAction('Stage Changes', 'add', (e) => {
       e.stopPropagation();
       post('stage', { path: f.path, group });
     }));
   } else {
-    actions.appendChild(fileAction('Unstage Changes', '−', (e) => {
+    actions.appendChild(fileAction('Unstage Changes', 'remove', (e) => {
       e.stopPropagation();
       post('unstage', { path: f.path, group });
     }));
@@ -197,11 +207,11 @@ function escapeHtml(value) {
   }[ch]));
 }
 
-function fileAction(title, glyph, handler) {
+function fileAction(title, iconName, handler) {
   const b = document.createElement('button');
   b.className = 'file-action';
   b.title = title;
-  b.textContent = glyph;
+  b.innerHTML = fluentIcon(iconName);
   b.addEventListener('click', handler);
   return b;
 }
@@ -250,5 +260,6 @@ window.addEventListener('message', (event) => {
   }
 });
 
+paintStaticIcons();
 wire();
 post('ready');

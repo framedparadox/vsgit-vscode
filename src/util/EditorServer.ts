@@ -1,3 +1,8 @@
+/**
+ * Short-lived IPC bridge for git editor hooks. The Node shim launched through
+ * GIT_EDITOR/sequence.editor sends commit or rebase-todo text here, this server
+ * opens the VS Code editing UI, then returns the edited content to git.
+ */
 import * as net from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";

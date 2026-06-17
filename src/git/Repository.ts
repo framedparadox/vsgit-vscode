@@ -1,3 +1,8 @@
+/**
+ * Repository is the extension host facade over git CLI operations. It owns the
+ * cached repository state used by views and exposes narrow, argument-guarded
+ * methods so commands and webviews do not assemble git argv themselves.
+ */
 import * as path from "node:path";
 import { GitExecutor } from "./GitExecutor";
 import { safeRef, safeRemoteUrl } from "./argGuard";

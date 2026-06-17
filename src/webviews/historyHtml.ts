@@ -8,7 +8,11 @@
  *
  * All styling uses VS Code theme variables so it matches the active color theme.
  */
-export function historyHtml(nonce: string, cspSource: string): string {
+export function historyHtml(
+  nonce: string,
+  cspSource: string,
+  iconsUri: string,
+): string {
   return /* html */ `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -26,9 +30,11 @@ export function historyHtml(nonce: string, cspSource: string): string {
     background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, transparent);
     padding: 3px 6px; border-radius: 2px; }
   #toolbar label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; color: var(--vscode-foreground); }
-  #toolbar button { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground);
+  #toolbar button { display: inline-flex; align-items: center; gap: 4px;
+    background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground);
     border: 1px solid var(--vscode-button-border, transparent); cursor: pointer; }
   #toolbar button:hover { background: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-secondaryBackground)); }
+  .fluent-icon { display: block; width: 16px; height: 16px; fill: currentColor; }
   #search { flex: 1; min-width: 80px; }
 
   #scopeBanner { display: none; align-items: center; gap: 8px; padding: 5px 10px; font-size: 0.9em;
@@ -110,17 +116,19 @@ export function historyHtml(nonce: string, cspSource: string): string {
     <input id="search" type="text" placeholder="Filter commits…" />
     <select id="searchBy"><option value="message">Message</option><option value="author">Author</option></select>
     <label><input id="allBranches" type="checkbox" checked /> All branches</label>
-    <button id="btnCompare" title="Compare Branches…">⇄ Compare</button>
-    <button id="btnFilter" title="Filter by Branch…">⎇ Branch</button>
-    <button id="refresh" title="Refresh">↺</button>
+    <button id="btnCompare" title="Compare Branches…"><span data-fluent-icon="compare"></span>Compare</button>
+    <button id="btnFilter" title="Filter by Branch…"><span data-fluent-icon="branch"></span>Branch</button>
+    <button id="refresh" title="Refresh" aria-label="Refresh"><span data-fluent-icon="refresh"></span></button>
   </div>
   <div id="scopeBanner"><span id="scopeText"></span><button id="clearCompare">Clear</button></div>
   <div id="layout">
     <div id="list"><div class="empty">Loading…</div></div>
     <div id="details"><div class="empty">Select a commit to see its details.</div></div>
   </div>
+<script nonce="${nonce}" src="${iconsUri}"></script>
 <script nonce="${nonce}">
 const vscode = acquireVsCodeApi();
+if (globalThis.VSGIT_FLUENT_ICONS) globalThis.VSGIT_FLUENT_ICONS.paint(document);
 let commits = [], selected = null, hasMore = false, compareMode = null, filePath = null;
 // Changed-file pane view: 'tree' (folder hierarchy) or 'list' (flat) — same
 // toggle the Git Graph commit-details pane offers. Persisted across reloads.

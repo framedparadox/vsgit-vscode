@@ -9,6 +9,13 @@ body {
   background-color: var(--vscode-sideBar-background);
 }
 
+.fluent-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
 .empty {
   padding: 16px 12px;
   color: var(--vscode-descriptionForeground);
@@ -151,6 +158,9 @@ body {
   font-weight: 600;
 }
 .group-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: none;
   color: var(--vscode-foreground);
@@ -158,8 +168,6 @@ body {
   border-radius: 3px;
   width: 18px;
   height: 18px;
-  line-height: 16px;
-  font-size: 14px;
 }
 .group-action:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
 
@@ -243,6 +251,9 @@ body {
 }
 .file-row:hover .file-actions { display: inline-flex; }
 .file-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: none;
   color: var(--vscode-foreground);
@@ -250,7 +261,5 @@ body {
   border-radius: 3px;
   width: 18px;
   height: 18px;
-  line-height: 16px;
-  font-size: 13px;
 }
 .file-action:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }

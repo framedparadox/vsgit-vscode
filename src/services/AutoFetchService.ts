@@ -1,3 +1,8 @@
+/**
+ * Background auto-fetch coordinator. It observes VsGit settings, periodically
+ * fetches every discovered repository through the credential-aware transport
+ * path, and surfaces lightweight status/behind information in VS Code.
+ */
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { Credentials } from "../util/credentials";

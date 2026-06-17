@@ -74,7 +74,14 @@ export class HistoryView {
       },
     );
     const nonce = makeNonce();
-    this.panel.webview.html = historyHtml(nonce, this.panel.webview.cspSource);
+    const iconsUri = this.panel.webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "resources", "fluentIcons.js"),
+    );
+    this.panel.webview.html = historyHtml(
+      nonce,
+      this.panel.webview.cspSource,
+      iconsUri.toString(),
+    );
     this.panel.onDidDispose(() => (this.panel = undefined));
     this.panel.webview.onDidReceiveMessage((m) => this.onMessage(m));
     await this.reload();

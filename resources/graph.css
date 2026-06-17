@@ -76,6 +76,13 @@ body {
 .tb-btn.icon-only[data-label]:focus-visible::after {
   display: block;
 }
+.fluent-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
 .tb-ico {
   display: inline-flex;
   align-items: center;
@@ -83,8 +90,7 @@ body {
   width: 16px;
   height: 16px;
 }
-/* The toolbar octicons ship without an explicit fill (so they'd render solid
-   black). Tint them with the button's themed colour so they track the active VS
+/* Tint Fluent SVGs with the button's themed colour so they track the active VS
    Code colour theme instead of staying black. */
 .tb-ico svg { display: block; fill: currentColor; width: 16px; height: 16px; }
 .tb-ico svg path { fill: currentColor; }

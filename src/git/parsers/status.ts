@@ -67,19 +67,26 @@ export function parseStatusV2(output: string): StatusResult {
       // "1 XY sub mH mI mW hH hI path" — path is the 9th field onward.
       const xy = entry.slice(2, 4);
       const fields = entry.split(" ");
+      if (fields.length < 9) continue;
       const filePath = fields.slice(8).join(" ");
       changes.push(makeChange(xy, filePath));
     } else if (type === "2") {
       // "2 XY sub mH mI mW hH hI Xscore path" then NUL then origPath
       const xy = entry.slice(2, 4);
       const fields = entry.split(" ");
+      if (fields.length < 10) {
+        i++; // still consume the paired origPath token
+        continue;
+      }
       const filePath = fields.slice(9).join(" ");
       const origPath = tokens[++i] ?? "";
       const change = makeChange(xy, filePath);
       change.origPath = origPath;
       changes.push(change);
     } else if (type === "u") {
-      const filePath = entry.split(" ").slice(10).join(" ");
+      const fields = entry.split(" ");
+      if (fields.length < 11) continue;
+      const filePath = fields.slice(10).join(" ");
       changes.push({
         path: filePath,
         conflicted: true,

@@ -157,8 +157,8 @@ export class GraphPanel {
         columns: {
           id: c.get<boolean>("graph.showIdColumn", true),
           author: c.get<boolean>("graph.showAuthorColumn", true),
-          authoredDate: c.get<boolean>("graph.showAuthoredDateColumn", true),
-          committer: c.get<boolean>("graph.showCommitterColumn", true),
+          authoredDate: c.get<boolean>("graph.showAuthoredDateColumn", false),
+          committer: c.get<boolean>("graph.showCommitterColumn", false),
           committedDate: c.get<boolean>("graph.showCommittedDateColumn", true),
         },
       },
@@ -288,6 +288,25 @@ export class GraphPanel {
           await this.sendConfig();
           await this.refresh();
           return;
+
+        case "setColumnVisibility": {
+          const { column, visible } = message.data as {
+            column?: string;
+            visible?: boolean;
+          };
+          const settingByColumn: Record<string, string> = {
+            id: "graph.showIdColumn",
+            author: "graph.showAuthorColumn",
+            authoredDate: "graph.showAuthoredDateColumn",
+            committer: "graph.showCommitterColumn",
+            committedDate: "graph.showCommittedDateColumn",
+          };
+          const setting = column ? settingByColumn[column] : undefined;
+          if (!setting) return;
+          await this.cfg.update(setting, visible === true, vscode.ConfigurationTarget.Global);
+          await this.sendConfig();
+          return;
+        }
 
         case "setBranchFilter":
           this.branchFilters = ((message.data as { branches?: string[] }).branches || []).filter(
@@ -481,6 +500,10 @@ export class GraphPanel {
         case "copyCommitSha":
           await vscode.env.clipboard.writeText(message.data as string);
           this.notify("Commit SHA copied to clipboard");
+          return;
+
+        default:
+          console.warn(`GraphPanel: unhandled message type "${message.type}"`);
           return;
       }
     } catch (error) {
@@ -845,22 +868,25 @@ export class GraphPanel {
       <span class="tb-spacer"></span>
       <span id="commit-count"></span>
       <span class="tb-sep"></span>
-      <button class="tb-btn icon-only" id="tb-pull" title="Pull">
+      <button class="tb-btn icon-only" id="tb-pull" title="Pull" data-label="Pull" aria-label="Pull">
         <span class="tb-ico" data-icon="pull"></span><span class="tb-badge" id="badge-pull"></span>
       </button>
-      <button class="tb-btn icon-only" id="tb-push" title="Push">
+      <button class="tb-btn icon-only" id="tb-push" title="Push" data-label="Push" aria-label="Push">
         <span class="tb-ico" data-icon="push"></span><span class="tb-badge" id="badge-push"></span>
       </button>
-      <button class="tb-btn icon-only" id="tb-fetch" title="Fetch"><span class="tb-ico" data-icon="fetch"></span></button>
+      <button class="tb-btn icon-only" id="tb-fetch" title="Fetch" data-label="Fetch" aria-label="Fetch"><span class="tb-ico" data-icon="fetch"></span></button>
       <span class="tb-sep"></span>
-      <button class="tb-btn icon-only" id="tb-commit" title="Commit"><span class="tb-ico" data-icon="commit"></span></button>
-      <button class="tb-btn icon-only" id="tb-branch" title="New Branch"><span class="tb-ico" data-icon="branch"></span></button>
-      <button class="tb-btn icon-only" id="tb-merge" title="Merge"><span class="tb-ico" data-icon="merge"></span></button>
-      <button class="tb-btn icon-only" id="tb-stash" title="Stash"><span class="tb-ico" data-icon="stash"></span></button>
+      <button class="tb-btn icon-only" id="tb-commit" title="Commit" data-label="Commit" aria-label="Commit"><span class="tb-ico" data-icon="commit"></span></button>
+      <button class="tb-btn icon-only" id="tb-branch" title="New Branch" data-label="New Branch" aria-label="New Branch"><span class="tb-ico" data-icon="branch"></span></button>
+      <button class="tb-btn icon-only" id="tb-merge" title="Merge" data-label="Merge" aria-label="Merge"><span class="tb-ico" data-icon="merge"></span></button>
+      <button class="tb-btn icon-only" id="tb-stash" title="Stash" data-label="Stash" aria-label="Stash"><span class="tb-ico" data-icon="stash"></span></button>
       <span class="tb-sep"></span>
-      <button class="tb-btn icon-only" id="tb-find" title="Find (Ctrl/Cmd+F)"><span class="tb-ico" data-icon="find"></span></button>
-      <button class="tb-btn icon-only" id="tb-trace" title="Trace flow: ancestors / descendants / off"><span class="tb-ico" data-icon="trace"></span></button>
-      <button class="tb-btn icon-only" id="tb-refresh" title="Refresh (Ctrl/Cmd+R)"><span class="tb-ico" data-icon="refresh"></span></button>
+      <button class="tb-btn icon-only" id="tb-find" title="Find (Ctrl/Cmd+F)" data-label="Find" aria-label="Find"><span class="tb-ico" data-icon="find"></span></button>
+      <button class="tb-btn icon-only" id="tb-columns" title="Columns" data-label="Columns" aria-label="Columns"><span class="tb-ico" data-icon="columns"></span></button>
+      <button class="tb-btn icon-only" id="tb-tracking" title="Tracking: off" data-label="Tracking" aria-label="Tracking"><span class="tb-ico" data-icon="tracking"></span></button>
+      <button class="tb-btn icon-only" id="tb-trace" title="Trace flow: ancestors / descendants / off" data-label="Trace" aria-label="Trace"><span class="tb-ico" data-icon="trace"></span></button>
+      <button class="tb-btn icon-only" id="tb-refresh" title="Refresh (Ctrl/Cmd+R)" data-label="Refresh" aria-label="Refresh"><span class="tb-ico" data-icon="refresh"></span></button>
+      <div id="columns-menu" class="columns-menu" hidden></div>
     </div>
 
     <!-- ── in-progress operation banner ────────────────────────────── -->

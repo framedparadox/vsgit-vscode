@@ -2980,12 +2980,12 @@
         },
         "vsgit.graph.showAuthoredDateColumn": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "description": "Show the Authored Date column in the Git Graph."
         },
         "vsgit.graph.showCommitterColumn": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "description": "Show the Committer column in the Git Graph."
         },
         "vsgit.graph.showCommittedDateColumn": {

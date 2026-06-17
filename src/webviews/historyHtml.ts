@@ -14,8 +14,8 @@ export function historyHtml(nonce: string, cspSource: string): string {
 <head>
 <meta charset="UTF-8" />
 <meta http-equiv="Content-Security-Policy"
-  content="default-src 'none'; img-src ${cspSource}; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';" />
-<style>
+  content="default-src 'none'; img-src ${cspSource}; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';" />
+<style nonce="${nonce}">
   * { box-sizing: border-box; }
   body { margin: 0; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size);
     color: var(--vscode-foreground); background: var(--vscode-editor-background); }

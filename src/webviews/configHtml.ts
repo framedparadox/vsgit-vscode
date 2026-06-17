@@ -10,8 +10,8 @@ export function configHtml(nonce: string, cspSource: string): string {
 <head>
 <meta charset="UTF-8" />
 <meta http-equiv="Content-Security-Policy"
-  content="default-src 'none'; img-src ${cspSource}; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';" />
-<style>
+  content="default-src 'none'; img-src ${cspSource}; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';" />
+<style nonce="${nonce}">
   body { margin: 0; padding: 12px; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size);
     color: var(--vscode-foreground); background: var(--vscode-editor-background); }
   h2 { margin: 0 0 8px; font-size: 1.1em; }
@@ -48,6 +48,7 @@ export function configHtml(nonce: string, cspSource: string): string {
   #remotes-add-form input { flex: 1; }
   .tab-content { display: none; }
   .tab-content.active { display: block; }
+  .dim-cell { color: var(--vscode-descriptionForeground); }
 </style>
 </head>
 <body>
@@ -169,7 +170,7 @@ function renderRemotes() {
   const tbody = document.getElementById('remotes-rows');
   tbody.innerHTML = '';
   if (remotes.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--vscode-descriptionForeground)">(no remotes configured)</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="dim-cell">(no remotes configured)</td></tr>';
     return;
   }
   remotes.forEach(r => {

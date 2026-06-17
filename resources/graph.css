@@ -52,11 +52,41 @@ body {
 }
 .tb-btn:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
 .tb-btn.active { background-color: var(--vscode-inputOption-activeBackground, rgba(14,99,156,0.4)); }
-.tb-ico { display: inline-flex; align-items: center; width: 16px; height: 16px; }
+.tb-btn.icon-only[data-label]::after {
+  content: attr(data-label);
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 80;
+  display: none;
+  padding: 3px 7px;
+  border-radius: 3px;
+  background-color: var(--vscode-editorHoverWidget-background, var(--vscode-menu-background, #252526));
+  color: var(--vscode-editorHoverWidget-foreground, var(--vscode-menu-foreground, #ccc));
+  border: 1px solid var(--vscode-editorHoverWidget-border, rgba(128, 128, 128, 0.5));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.24);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 16px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.tb-btn.icon-only[data-label]:hover::after,
+.tb-btn.icon-only[data-label]:focus-visible::after {
+  display: block;
+}
+.tb-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
 /* The toolbar octicons ship without an explicit fill (so they'd render solid
    black). Tint them with the button's themed colour so they track the active VS
    Code colour theme instead of staying black. */
-.tb-ico svg { display: block; fill: currentColor; }
+.tb-ico svg { display: block; fill: currentColor; width: 16px; height: 16px; }
 .tb-ico svg path { fill: currentColor; }
 .tb-badge {
   position: absolute;
@@ -76,6 +106,50 @@ body {
 .tb-badge.visible { display: inline-block; }
 .tb-sep { width: 1px; align-self: stretch; margin: 3px 4px; background-color: var(--vscode-panel-border); }
 .tb-spacer { flex: 1; }
+
+.columns-menu {
+  position: absolute;
+  top: calc(100% - 2px);
+  right: 8px;
+  z-index: 65;
+  min-width: 170px;
+  padding: 4px 0;
+  background-color: var(--vscode-menu-background, #252526);
+  color: var(--vscode-menu-foreground, #ccc);
+  border: 1px solid rgba(128, 128, 128, 0.5);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
+}
+.column-option {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 26px;
+  padding: 4px 10px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.column-option:hover {
+  background-color: var(--vscode-menu-selectionBackground, #094771);
+  color: var(--vscode-menu-selectionForeground, #fff);
+}
+.column-option input { display: none; }
+.column-option input:checked + .customCheckbox {
+  background-color: var(--vscode-button-background, #0e639c);
+  border-color: var(--vscode-button-background, #0e639c);
+}
+.column-option input:checked + .customCheckbox::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--vscode-button-foreground, #fff);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
 
 /* control-bar labels + repo/branch controls */
 #repoControl, #branchControl {
@@ -246,14 +320,17 @@ body {
   overflow: auto;
   position: relative;
   min-height: 0;
+  width: 100%;
 }
 #main.loading { opacity: 0.45; pointer-events: none; }
 
 #graph-table {
   width: 100%;
+  min-width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
 }
+#col-desc { width: 100%; }
 #graph-table th {
   position: sticky;
   top: 0;
@@ -340,9 +417,11 @@ tr.commit-row.uncommitted td.col-desc { font-style: italic; color: var(--vscode-
 /* flow tracing (dim everything except the traced flow) */
 .graph-line, .graph-node { transition: opacity 0.12s ease; }
 .graph-line.dim, .graph-node.dim { opacity: 0.13; }
-#graph-table tr.commit-row.dimmed { opacity: 0.4; }
+#graph-table tr.commit-row.dimmed td:not(.col-graph) { opacity: 0.4; }
 #graph-table tr.commit-row.dimmed .gitRef { opacity: 0.5; }
 #graph-table tr.commit-row.traced td.col-desc { font-weight: 600; }
+#graph-svg .graph-line:not(.dim) { stroke-width: 2.6; }
+#graph-svg .graph-node:not(.dim) { filter: drop-shadow(0 0 2px currentColor); }
 
 /* ─── inline ref labels (gitRef pills) — exact vscode-git-graph styling ─── */
 .gitRef {

@@ -533,8 +533,13 @@ export class Repository {
 
   /** Create archive from ref. Format: zip, tar, tar.gz, etc. */
   async archive(ref: string, format: string, output: string, prefix?: string): Promise<void> {
-    const args = ["archive", `--format=${format}`, `--output=${output}`, safeRef(ref)];
-    if (prefix) args.push(`--prefix=${prefix}`);
+    const args = [
+      "archive",
+      `--format=${safeRef(format, "archive format")}`,
+      `--output=${safeRef(output, "output path")}`,
+      safeRef(ref),
+    ];
+    if (prefix) args.push(`--prefix=${safeRef(prefix, "archive prefix")}`);
     await this.git.run(args, { cwd: this.root });
   }
 

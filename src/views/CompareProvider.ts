@@ -16,9 +16,10 @@ interface ComparisonState {
   ref2: string;
 }
 
-export class CompareProvider implements vscode.TreeDataProvider<CompareTreeNode> {
+export class CompareProvider implements vscode.TreeDataProvider<CompareTreeNode>, vscode.Disposable {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<CompareTreeNode | undefined>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+  private readonly subscription: vscode.Disposable;
 
   private currentComparison: ComparisonState | undefined;
   private cachedLeftCommits: Commit[] = [];
@@ -26,9 +27,14 @@ export class CompareProvider implements vscode.TreeDataProvider<CompareTreeNode>
   private cachedFiles: CommitFile[] = [];
 
   constructor(manager: RepositoryManager) {
-    manager.onDidChange(() => {
+    this.subscription = manager.onDidChange(() => {
       this.refresh();
     });
+  }
+
+  dispose(): void {
+    this.subscription.dispose();
+    this._onDidChangeTreeData.dispose();
   }
 
   refresh() {

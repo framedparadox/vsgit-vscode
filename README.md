@@ -67,14 +67,15 @@ config, hooks, credential helpers, and aliases apply.
 Colour-coded lanes, `HEAD → main` / remote / tag ref pills, a selected-row
 commit-details panel (metadata on the left, changed files on the right), and
 Eclipse Git-style columns: **Graph · Description · Author · Authored Date · Committer ·
-Committed Date** (each toggleable).
+Committed Date · Commit**. Metadata columns are toggleable from the graph toolbar;
+Authored Date and Committer are hidden by default.
 
 ### Activity bar & trees
 
 ![Sidebar views](docs/sidebar.png)
 
-The VsGit container uses its own commit-graph logo (distinct from the built-in
-Source Control icon) and hosts the Repositories and Staging trees, among others.
+The VsGit container uses a git-merge style logo and hosts the Repositories
+and Staging trees, among others.
 
 ---
 
@@ -231,8 +232,8 @@ All settings live under the `vsgit.*` namespace.
 | `vsgit.graph.bottomPanelMode` | `editor` | How the graph opens a changed file's diff. |
 | `vsgit.graph.showIdColumn` | `true` | Show the Id (hash) column. |
 | `vsgit.graph.showAuthorColumn` | `true` | Show the Author column. |
-| `vsgit.graph.showAuthoredDateColumn` | `true` | Show the Authored Date column. |
-| `vsgit.graph.showCommitterColumn` | `true` | Show the Committer column. |
+| `vsgit.graph.showAuthoredDateColumn` | `false` | Show the Authored Date column. |
+| `vsgit.graph.showCommitterColumn` | `false` | Show the Committer column. |
 | `vsgit.graph.showCommittedDateColumn` | `true` | Show the Committed Date column. |
 
 There's also a graphical **Git Config editor** (`⌘⇧G ,`) for editing local /

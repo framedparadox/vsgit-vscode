@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { GitExecutor } from "./GitExecutor";
-import { isOptionLike } from "./argGuard";
+import { isOptionLike, safeRef } from "./argGuard";
 
 export const VSGIT_SCHEME = "vsgit";
 
@@ -19,12 +19,12 @@ export class GitContentProvider implements vscode.TextDocumentContentProvider {
     const repo = params.get("repo") ?? "";
     const ref = params.get("ref") ?? "HEAD";
     const relPath = params.get("path") ?? "";
-    const spec = ref === "~index" ? `:${relPath}` : `${ref}:${relPath}`;
     // `git show <spec>` takes no `--` separator for an object spec, so guard
-    // against a ref/spec that git would otherwise parse as an option.
-    if (isOptionLike(spec)) {
+    // against a ref or path that git would otherwise parse as an option.
+    if (isOptionLike(relPath) || (ref !== "~index" && isOptionLike(ref))) {
       return "";
     }
+    const spec = ref === "~index" ? `:${relPath}` : `${ref}:${relPath}`;
     try {
       return await this.git.stdout(["show", spec], { cwd: repo });
     } catch {

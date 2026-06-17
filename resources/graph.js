@@ -36,8 +36,8 @@ let CONFIG = {
   columns: {
     id: true,
     author: true,
-    authoredDate: true,
-    committer: true,
+    authoredDate: false,
+    committer: false,
     committedDate: true,
   },
   showRemoteBranches: true,
@@ -65,6 +65,7 @@ const SHOW_ALL_BRANCHES = '';
 let repoDropdown = null;
 let branchDropdown = null;
 let currentBranches = null;  // null / [SHOW_ALL] => all branches
+let columnMenuOpen = false;
 
 let traceMode = persistedTraceMode();
 let traceRoot = null;
@@ -72,14 +73,23 @@ let parentMap = new Map();
 let childMap = new Map();
 function persistedTraceMode() {
   const p = vscode.getState() || {};
-  return p.traceMode || 'ancestors';
+  return p.traceMode || 'off';
 }
 
 const persisted = vscode.getState() || {};
 let colWidths = persisted.colWidths || {};
+let trackingEnabled = persisted.trackingEnabled === true;
+let trackedSha = persisted.trackedSha || null;
+let trackedRef = persisted.trackedRef || null;
 
 function savePersisted() {
-  vscode.setState({ ...vscode.getState(), colWidths });
+  vscode.setState({
+    ...vscode.getState(),
+    colWidths,
+    trackingEnabled,
+    trackedSha,
+    trackedRef,
+  });
 }
 
 // ─── SVG icons (the exact Octicons used by vscode-git-graph) ─────────────────
@@ -101,10 +111,12 @@ const SVG_ICONS = {
   fileList: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M 2,3 V 4.5 H 4 V 3 Z M 5.5,3 V 4.5 H 18 V 3 Z M 2,7 V 8.5 H 4 V 7 Z M 5.5,7 V 8.5 H 18 V 7 Z M 2,11 v 1.5 H 4 V 11 Z m 3.5,0 v 1.5 H 18 V 11 Z M 2,15 v 1.5 H 4 V 15 Z m 3.5,0 v 1.5 H 18 V 15 Z"/></svg>',
   fileTree: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2 3v1.5h4V3H2zm6 0v1.5h10V3H8zM2 7v1.5h4V7H2zm6 4v1.5h4V11H8zm0 4v1.5h4V15H8zm-3-7.75v8.5H6.5V15H12v-1.5H6.5v-2.75H12V9.25H6.5V7.25H5z"/></svg>',
   chevron: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M6 4l4 4-4 4V4z"/></svg>',
-  pull: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="16" viewBox="0 0 14 16"><path fill-rule="evenodd" d="M7 7V3H5l3-3 3 3H9v4H7zm5-1.41L13.41 7H13v6c0 .55-.45 1-1 1H2c-.55 0-1-.45-1-1V7H.59L2 5.59V13h10V5.59zM7 9v4H5l3 3 3-3H9V9H7z" transform="translate(0,-1)"/></svg>',
-  push: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="16" viewBox="0 0 14 16"><path fill-rule="evenodd" d="M7 9V5H5l3-3 3 3H9v4H7zm-5 4h10v1H2v-1z"/></svg>',
-  merge: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="16" viewBox="0 0 12 16"><path fill-rule="evenodd" d="M10 7c-.73 0-1.38.41-1.73 1.02V8C7.22 7.98 6 7.64 5.14 6.98c-.75-.58-1.5-1.61-1.89-2.44A1.993 1.993 0 0 0 2 .99C.89.99 0 1.89 0 3a2 2 0 0 0 1 1.72v6.56c-.59.35-1 .99-1 1.72 0 1.11.89 2 2 2 1.11 0 2-.89 2-2 0-.53-.2-1-.53-1.36.85.83 1.86 1.45 3.02 1.65.5.12 1.01.16 1.51.16v-.02c.36.61 1 1.02 1.73 1.02 1.11 0 2-.89 2-2 0-1.11-.89-2-2-2zM2 1.8c.66 0 1.2.55 1.2 1.2 0 .65-.55 1.2-1.2 1.2C1.35 4.2.8 3.65.8 3c0-.65.55-1.2 1.2-1.2zm0 12.41c-.66 0-1.2-.55-1.2-1.2 0-.65.55-1.2 1.2-1.2.65 0 1.2.55 1.2 1.2 0 .65-.55 1.2-1.2 1.2zm8-3c-.66 0-1.2-.55-1.2-1.2 0-.65.55-1.2 1.2-1.2.65 0 1.2.55 1.2 1.2 0 .65-.55 1.2-1.2 1.2z"/></svg>',
-  trace: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.4"/><path stroke="currentColor" stroke-width="1.4" fill="none" d="M8 1v3.6M8 11.4V15M1 8h3.6M11.4 8H15"/></svg>',
+  pull: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M7.25 1.75a.75.75 0 0 1 1.5 0v6.69l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1 1.06-1.06l2.22 2.22V1.75zM2.75 13a.75.75 0 0 0 0 1.5h10.5a.75.75 0 0 0 0-1.5H2.75z"/></svg>',
+  push: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M7.47 1.22a.75.75 0 0 1 1.06 0l3.5 3.5a.75.75 0 1 1-1.06 1.06L8.75 3.56v6.69a.75.75 0 0 1-1.5 0V3.56L5.03 5.78a.75.75 0 0 1-1.06-1.06l3.5-3.5zM2.75 13a.75.75 0 0 0 0 1.5h10.5a.75.75 0 0 0 0-1.5H2.75z"/></svg>',
+  merge: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5 3.25a2.25 2.25 0 1 0-3 2.122v5.256a2.251 2.251 0 1 0 1.5 0V5.372A2.25 2.25 0 0 0 5 3.25zm8.75 5.5a2.25 2.25 0 0 0-2.122 1.5h-.378c-2.9 0-5.25-2.35-5.25-5.25V3.75a.75.75 0 0 0-1.5 0V5a6.75 6.75 0 0 0 6.75 6.75h.378a2.251 2.251 0 1 0 2.122-3z"/></svg>',
+  columns: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 2A1.75 1.75 0 0 0 1 3.75v8.5c0 .966.784 1.75 1.75 1.75h10.5A1.75 1.75 0 0 0 15 12.25v-8.5A1.75 1.75 0 0 0 13.25 2H2.75zM2.5 3.75a.25.25 0 0 1 .25-.25h2.5v9h-2.5a.25.25 0 0 1-.25-.25v-8.5zm4.25 8.75v-9h2.5v9h-2.5zm4 0v-9h2.5a.25.25 0 0 1 .25.25v8.5a.25.25 0 0 1-.25.25h-2.5z"/></svg>',
+  tracking: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8 1.5a.75.75 0 0 1 .75.75v1.03a4.76 4.76 0 0 1 3.97 3.97h1.03a.75.75 0 0 1 0 1.5h-1.03a4.76 4.76 0 0 1-3.97 3.97v1.03a.75.75 0 0 1-1.5 0v-1.03a4.76 4.76 0 0 1-3.97-3.97H2.25a.75.75 0 0 1 0-1.5h1.03a4.76 4.76 0 0 1 3.97-3.97V2.25A.75.75 0 0 1 8 1.5zm0 3.25a3.25 3.25 0 1 0 0 6.5 3.25 3.25 0 0 0 0-6.5zm0 2a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5z"/></svg>',
+  trace: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M3.75 2a1.75 1.75 0 1 0 1.64 2.35l5.26 2.63a1.757 1.757 0 0 0 0 2.04l-5.26 2.63a1.75 1.75 0 1 0 .67 1.34l5.26-2.63a1.75 1.75 0 1 0 0-4.72L6.06 3.01A1.75 1.75 0 0 0 3.75 2z"/></svg>',
 };
 // Toolbar data-icon aliases.
 SVG_ICONS.fetch = SVG_ICONS.download;
@@ -330,7 +342,14 @@ function makeRefBadge(ref, colorIdx) {
   span.addEventListener('click', (e) => {
     e.stopPropagation();
     const host = span.closest('tr.commit-row');
-    if (host && host.dataset.sha) setTraceRoot(host.dataset.sha);
+    if (!host || !host.dataset.sha) return;
+    if (trackingEnabled) {
+      const row = layoutRows.find((r) => r.commit.sha === host.dataset.sha);
+      if (row) selectCommit(row.commit, host);
+      trackRef(ref.name);
+    } else if (traceMode !== 'off') {
+      setTraceRoot(host.dataset.sha);
+    }
   });
   return span;
 }
@@ -573,14 +592,25 @@ function applyTrace() {
     const sha = el.dataset.sha;
     el.classList.toggle('dim', dimAll && !lit.has(sha));
   });
+  updateTraceButton();
 }
+function clearTraceRoot() { traceRoot = null; applyTrace(); }
 function setTraceRoot(sha) { traceRoot = sha; applyTrace(); }
 function setTraceMode(mode) {
   traceMode = mode;
   vscode.setState({ ...vscode.getState(), traceMode: mode });
-  const btn = document.getElementById('tb-trace');
-  if (btn) btn.title = 'Trace flow: ' + traceModeLabel();
+  if (traceMode === 'off') traceRoot = null;
+  else if (!traceRoot && selectedSha) traceRoot = selectedSha;
   applyTrace();
+}
+function updateTraceButton() {
+  const btn = document.getElementById('tb-trace');
+  if (!btn) return;
+  const label = 'Trace flow: ' + traceModeLabel();
+  btn.title = label;
+  btn.setAttribute('aria-label', label);
+  btn.classList.toggle('active', traceMode !== 'off');
+  btn.dataset.traceMode = traceMode;
 }
 function traceModeLabel() {
   if (traceMode === 'off') return 'off';
@@ -588,8 +618,85 @@ function traceModeLabel() {
   return 'ancestors';
 }
 function cycleTraceMode() {
-  const order = ['ancestors', 'both', 'off'];
+  const order = ['off', 'ancestors', 'both'];
   setTraceMode(order[(order.indexOf(traceMode) + 1) % order.length]);
+}
+
+function updateTrackingButton() {
+  const btn = document.getElementById('tb-tracking');
+  if (!btn) return;
+  const target = trackedRef || (trackedSha ? trackedSha.slice(0, 8) : 'none');
+  const label = trackingEnabled ? 'Tracking: ' + target : 'Tracking: off';
+  btn.classList.toggle('active', trackingEnabled);
+  btn.title = label;
+  btn.setAttribute('aria-label', label);
+}
+
+function setTrackingEnabled(enabled) {
+  trackingEnabled = enabled;
+  if (!trackingEnabled) {
+    trackedSha = null;
+    trackedRef = null;
+  } else if (selectedSha) {
+    trackedSha = selectedSha;
+    trackedRef = null;
+  }
+  savePersisted();
+  updateTrackingButton();
+}
+
+function trackCommit(sha) {
+  if (!trackingEnabled || !sha || sha === '*uncommitted*') return;
+  trackedSha = sha;
+  trackedRef = null;
+  savePersisted();
+  updateTrackingButton();
+}
+
+function trackRef(refName) {
+  if (!trackingEnabled || !refName) return;
+  trackedRef = refName;
+  const row = layoutRows.find((r) => (r.commit.refs || []).some((ref) => ref.name === refName));
+  trackedSha = row ? row.commit.sha : null;
+  savePersisted();
+  updateTrackingButton();
+  if (row) applyTrackingSelection({ scroll: false });
+}
+
+function trackedRow() {
+  if (trackedRef) {
+    const byRef = layoutRows.find((r) => (r.commit.refs || []).some((ref) => ref.name === trackedRef));
+    if (byRef) {
+      trackedSha = byRef.commit.sha;
+      return byRef;
+    }
+  }
+  return trackedSha ? layoutRows.find((r) => r.commit.sha === trackedSha) : null;
+}
+
+function applyTrackingSelection({ scroll = false } = {}) {
+  if (!trackingEnabled) return false;
+  const row = trackedRow();
+  document.querySelectorAll('#graph-body tr.selected, #graph-body tr.compareSelected').forEach((r) =>
+    r.classList.remove('selected', 'compareSelected'));
+  compareSha = null;
+  if (!row) {
+    selectedSha = null;
+    updateTrackingButton();
+    savePersisted();
+    return false;
+  }
+  selectedSha = row.commit.sha;
+  const tr = document.querySelector('#graph-body tr[data-sha="' + cssEsc(selectedSha) + '"]');
+  if (tr) {
+    tr.classList.add('selected');
+    if (scroll) setTimeout(() => tr.scrollIntoView({ block: 'center' }), 0);
+  }
+  if (traceMode !== 'off') setTraceRoot(selectedSha);
+  else applyTrace();
+  updateTrackingButton();
+  savePersisted();
+  return true;
 }
 
 // ─── table rendering (ported, + keyboard nav) ────────────────────────────────
@@ -688,6 +795,25 @@ function applyColumnWidths() {
   set('col-adate', colWidths.adate || 150);
   set('col-committer', colWidths.committer || 130);
   set('col-cdate', colWidths.cdate || 150);
+  updateDescriptionColumnWidth();
+}
+function visibleColumnWidth(key, defaultWidth) {
+  return CONFIG.columns[key] === false ? 0 : (colWidths[key] || defaultWidth);
+}
+function updateDescriptionColumnWidth() {
+  const main = document.getElementById('main');
+  const desc = document.getElementById('col-desc');
+  const graph = document.getElementById('col-graph');
+  if (!main || !desc || !graph) return;
+  const graphWidth = parseFloat(graph.style.width) || 80;
+  const metadataWidth =
+    visibleColumnWidth('author', 130) +
+    visibleColumnWidth('authoredDate', 150) +
+    visibleColumnWidth('committer', 130) +
+    visibleColumnWidth('committedDate', 150) +
+    visibleColumnWidth('id', 80);
+  const available = Math.floor(main.clientWidth - graphWidth - metadataWidth);
+  desc.style.width = Math.max(360, available) + 'px';
 }
 function applyColumnVisibility() {
   const toggle = (cls, show) => {
@@ -700,6 +826,61 @@ function applyColumnVisibility() {
   toggle('col-adate', CONFIG.columns.authoredDate);
   toggle('col-committer', CONFIG.columns.committer);
   toggle('col-cdate', CONFIG.columns.committedDate);
+  updateDescriptionColumnWidth();
+  renderColumnsMenu();
+}
+
+const COLUMN_OPTIONS = [
+  { key: 'id', label: 'Commit' },
+  { key: 'author', label: 'Author' },
+  { key: 'authoredDate', label: 'Authored Date' },
+  { key: 'committer', label: 'Committer' },
+  { key: 'committedDate', label: 'Committed Date' },
+];
+
+function renderColumnsMenu() {
+  const menu = document.getElementById('columns-menu');
+  if (!menu) return;
+  menu.innerHTML = '';
+  COLUMN_OPTIONS.forEach((col) => {
+    const label = document.createElement('label');
+    label.className = 'column-option';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = CONFIG.columns[col.key] !== false;
+    input.dataset.columnKey = col.key;
+    const mark = document.createElement('span');
+    mark.className = 'customCheckbox';
+    const text = document.createElement('span');
+    text.textContent = col.label;
+    label.appendChild(input);
+    label.appendChild(mark);
+    label.appendChild(text);
+    menu.appendChild(label);
+  });
+}
+
+function closeColumnsMenu() {
+  columnMenuOpen = false;
+  const menu = document.getElementById('columns-menu');
+  const btn = document.getElementById('tb-columns');
+  if (menu) menu.hidden = true;
+  if (btn) btn.classList.remove('active');
+}
+
+function toggleColumnsMenu() {
+  columnMenuOpen = !columnMenuOpen;
+  const menu = document.getElementById('columns-menu');
+  const btn = document.getElementById('tb-columns');
+  if (menu) menu.hidden = !columnMenuOpen;
+  if (btn) btn.classList.toggle('active', columnMenuOpen);
+}
+
+function setColumnVisibility(key, visible) {
+  if (!Object.prototype.hasOwnProperty.call(CONFIG.columns, key)) return;
+  CONFIG.columns[key] = visible;
+  applyColumnVisibility();
+  vscode.postMessage({ type: 'setColumnVisibility', data: { column: key, visible } });
 }
 
 // keyboard navigation over rows
@@ -753,6 +934,8 @@ function selectCommit(commit, tr, ev) {
   if (selectedSha === commit.sha && !compareSha && document.getElementById('cdv-row')) {
     removeExpandedRow();
     selectedSha = null;
+    compareSha = null;
+    clearTraceRoot();
     document.querySelectorAll('#graph-body tr.selected').forEach((r) => r.classList.remove('selected'));
     return;
   }
@@ -762,7 +945,9 @@ function selectCommit(commit, tr, ev) {
   document.querySelectorAll('#graph-body tr.selected, #graph-body tr.compareSelected').forEach((r) =>
     r.classList.remove('selected', 'compareSelected'));
   if (tr) tr.classList.add('selected');
-  if (commit.kind !== 'uncommitted') setTraceRoot(commit.sha);
+  if (trackingEnabled) trackCommit(commit.sha);
+  if (traceMode !== 'off' && commit.kind !== 'uncommitted') setTraceRoot(commit.sha);
+  else applyTrace();
 
   openExpandedRow(commit, tr);
   vscode.postMessage({ type: 'requestFiles', data: commit.sha });
@@ -1290,14 +1475,17 @@ function wireResizers() {
 window.addEventListener('message', (event) => {
   const msg = event.data;
   switch (msg.type) {
-    case 'config':
+    case 'config': {
+      const previousColumns = CONFIG.columns;
       CONFIG = Object.assign(CONFIG, msg.data || {});
+      CONFIG.columns = Object.assign({}, previousColumns, (msg.data && msg.data.columns) || {});
       if (graphData) {
         layoutRows = buildLayout(graphData.commits);
         renderTable(layoutRows);
         applyTrace();
       }
       break;
+    }
     case 'empty':
       document.getElementById('loading').style.display = 'none';
       document.getElementById('empty-state').style.display = 'block';
@@ -1318,19 +1506,23 @@ window.addEventListener('message', (event) => {
       buildAdjacency(graphData.commits);
       layoutRows = buildLayout(graphData.commits);
       renderTable(layoutRows);
-      // Re-open the previously expanded commit if it still exists, else clear.
-      const stillThere = selectedSha && layoutRows.find((r) => r.commit.sha === selectedSha);
-      if (stillThere) {
-        const tr = document.querySelector('#graph-body tr[data-sha="' + cssEsc(selectedSha) + '"]');
-        if (tr) {
-          tr.classList.add('selected');
-          if (hadExpanded) {
-            openExpandedRow(stillThere.commit, tr);
-            vscode.postMessage({ type: 'requestFiles', data: selectedSha });
-          }
-        }
+      if (trackingEnabled) {
+        applyTrackingSelection({ scroll: true });
       } else {
-        selectedSha = null;
+        // Re-open the previously expanded commit if it still exists, else clear.
+        const stillThere = selectedSha && layoutRows.find((r) => r.commit.sha === selectedSha);
+        if (stillThere) {
+          const tr = document.querySelector('#graph-body tr[data-sha="' + cssEsc(selectedSha) + '"]');
+          if (tr) {
+            tr.classList.add('selected');
+            if (hadExpanded) {
+              openExpandedRow(stillThere.commit, tr);
+              vscode.postMessage({ type: 'requestFiles', data: selectedSha });
+            }
+          }
+        } else {
+          selectedSha = null;
+        }
       }
       applyTrace();
       document.getElementById('commit-count').textContent =
@@ -1408,8 +1600,21 @@ function wireControls() {
   document.getElementById('tb-stash').addEventListener('click', () => send('toolbarStash'));
 
   document.getElementById('tb-find').addEventListener('click', openFind);
+  document.getElementById('tb-columns').addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleColumnsMenu();
+  });
+  document.getElementById('columns-menu').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const input = e.target.closest('input[data-column-key]');
+    if (input) setColumnVisibility(input.dataset.columnKey, input.checked);
+  });
+  document.getElementById('tb-tracking').addEventListener('click', () => {
+    setTrackingEnabled(!trackingEnabled);
+  });
+  updateTrackingButton();
   document.getElementById('tb-trace').addEventListener('click', cycleTraceMode);
-  document.getElementById('tb-trace').title = 'Trace flow: ' + traceModeLabel();
+  updateTraceButton();
   document.getElementById('tb-refresh').addEventListener('click', () => {
     document.getElementById('main').classList.add('loading');
     send('refresh');
@@ -1484,7 +1689,9 @@ function wireControls() {
 
   document.addEventListener('click', () => {
     document.getElementById('context-menu').classList.remove('visible');
+    closeColumnsMenu();
   });
+  window.addEventListener('resize', updateDescriptionColumnWidth);
 
   wireResizers();
 }

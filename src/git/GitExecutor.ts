@@ -10,6 +10,8 @@ export interface GitRunOptions {
   env?: NodeJS.ProcessEnv;
   /** Treat these exit codes as success (in addition to 0). */
   okCodes?: number[];
+  /** Kill the process if it hasn't exited after this many milliseconds. */
+  timeoutMs?: number;
 }
 
 export interface GitResult {
@@ -32,7 +34,7 @@ export class GitExecutor {
     const ok = result.exitCode === 0 || (options.okCodes ?? []).includes(result.exitCode);
     if (!ok) {
       throw new GitError(
-        `git ${args.join(" ")} failed (exit ${result.exitCode}): ${result.stderr.trim()}`,
+        `git ${args[0] ?? ""} failed (exit ${result.exitCode}): ${result.stderr.trim()}`,
         result.exitCode,
         result.stderr,
         result.stdout,
@@ -59,8 +61,24 @@ export class GitExecutor {
       child.stdout.on("data", (d) => (stdout += d.toString()));
       child.stderr.on("data", (d) => (stderr += d.toString()));
 
-      child.on("error", reject);
+      let timedOut = false;
+      const timer = options.timeoutMs
+        ? setTimeout(() => {
+            timedOut = true;
+            child.kill();
+          }, options.timeoutMs)
+        : undefined;
+
+      child.on("error", (err) => {
+        if (timer) clearTimeout(timer);
+        reject(err);
+      });
       child.on("close", (code) => {
+        if (timer) clearTimeout(timer);
+        if (timedOut) {
+          reject(new GitError(`git ${args[0] ?? ""} timed out after ${options.timeoutMs}ms`, -1, stderr, stdout, args));
+          return;
+        }
         resolve({ stdout, stderr, exitCode: code ?? -1 });
       });
 

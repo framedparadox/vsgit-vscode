@@ -110,23 +110,31 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         await vscode.commands.executeCommand("vsgit.staging.unstageAll");
         return;
       case "openDiff": {
-        const group = (msg.data as { group: StagingGroup }).group;
+        const data = msg.data as { group?: unknown } | undefined;
+        const group = isStagingGroup(data?.group) ? data.group : "unstaged";
         await vscode.commands.executeCommand(
           "vsgit.staging.openDiff",
           this.fileNode(msg.data, group),
         );
         return;
       }
-      case "commit":
-        await this.commit(
-          repo,
-          msg.data as {
-            message: string;
-            amend: boolean;
-            signoff: boolean;
-            gpg: boolean;
-          },
-        );
+      case "commit": {
+        const data = msg.data as Partial<{
+          message: string;
+          amend: boolean;
+          signoff: boolean;
+          gpg: boolean;
+        }> | undefined;
+        await this.commit(repo, {
+          message: typeof data?.message === "string" ? data.message : "",
+          amend: data?.amend === true,
+          signoff: data?.signoff === true,
+          gpg: data?.gpg === true,
+        });
+        return;
+      }
+      default:
+        console.warn(`CommitViewProvider: unhandled message type "${msg.type}"`);
         return;
     }
   }
@@ -134,9 +142,9 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
   /** Re-hydrate a webview file reference into a StagingNode for the commands. */
   private fileNode(data: unknown, group: StagingGroup): StagingNode | undefined {
     const repo = this.repo;
-    const d = data as { path?: string; group?: StagingGroup };
-    if (!repo || !d?.path) return undefined;
-    const g = d.group ?? group;
+    const d = data as { path?: string; group?: unknown } | undefined;
+    if (!repo || typeof d?.path !== "string") return undefined;
+    const g = isStagingGroup(d.group) ? d.group : group;
     const pool =
       g === "staged"
         ? repo.stagedChanges
@@ -251,6 +259,10 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
 }
 
 type StagingGroup = "staged" | "unstaged" | "conflicted";
+
+function isStagingGroup(value: unknown): value is StagingGroup {
+  return value === "staged" || value === "unstaged" || value === "conflicted";
+}
 
 interface FileDto {
   path: string;

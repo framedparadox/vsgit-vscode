@@ -204,6 +204,9 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     const cssUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, "resources", "commit.css"),
     );
+    const helpersUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "resources", "commitView.js"),
+    );
     const jsUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, "resources", "commit.js"),
     );
@@ -244,7 +247,12 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         </div>
       </div>
       <textarea id="message" placeholder="Message (commit on this branch)"></textarea>
-      <div id="commit-bar">
+      <button id="advanced-toggle" class="advanced-toggle" type="button"
+              aria-expanded="false" aria-controls="commit-bar">
+        <span class="chev" aria-hidden="true">▶</span>
+        <span>Advanced</span>
+      </button>
+      <div id="commit-bar" hidden>
         <label class="opt"><input type="checkbox" id="opt-amend"> Amend</label>
         <label class="opt"><input type="checkbox" id="opt-signoff"> Sign off</label>
         <label class="opt"><input type="checkbox" id="opt-gpg"> GPG</label>
@@ -252,6 +260,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     </div>
     <div id="groups"></div>
   </div>
+  <script nonce="${nonce}" src="${helpersUri}"></script>
   <script nonce="${nonce}" src="${jsUri}"></script>
 </body>
 </html>`;

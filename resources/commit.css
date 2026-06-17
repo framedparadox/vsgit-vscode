@@ -69,6 +69,27 @@ body {
 }
 #message:focus { border-color: var(--vscode-focusBorder); }
 
+/* Disclosure toggle revealing the advanced commit options below. */
+.advanced-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 2px 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+.advanced-toggle:hover { color: var(--vscode-foreground); }
+.advanced-toggle .chev {
+  display: inline-block;
+  font-size: 9px;
+  transition: transform 0.1s ease;
+}
+.advanced-toggle.open .chev { transform: rotate(90deg); }
+
 #commit-bar {
   display: flex;
   align-items: center;
@@ -76,6 +97,8 @@ body {
   margin-top: 6px;
   flex-wrap: wrap;
 }
+/* `hidden` collapses the bar by default until the disclosure is opened. */
+#commit-bar[hidden] { display: none; }
 
 #commit-btn {
   border: none;

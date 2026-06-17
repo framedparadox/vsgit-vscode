@@ -9,8 +9,16 @@
 
 const vscode = acquireVsCodeApi();
 
+// Pure, DOM-free helpers shared with Node tests (resources/commitView.js,
+// loaded as a global by the webview before this script).
+const { statusLabel, statusCode, fileExt, escapeHtml, buildFileTree } =
+  self.CommitView;
+
 let state = { active: false };
 let viewMode = (vscode.getState() || {}).commitViewMode || 'tree';
+// Advanced commit options (Amend / Sign off / GPG) are hidden behind a
+// disclosure by default; remember whether the user expanded them.
+let advancedOpen = (vscode.getState() || {}).commitAdvancedOpen === true;
 
 const el = (id) => document.getElementById(id);
 const post = (type, data) => vscode.postMessage({ type, data });
@@ -26,6 +34,7 @@ function render() {
   el('root').style.display = 'block';
   el('branch-name').textContent = state.branch || '';
   syncViewButtons();
+  syncAdvanced();
 
   const groups = el('groups');
   groups.innerHTML = '';
@@ -85,18 +94,7 @@ function groupAction(title, glyph, action) {
 }
 
 function renderTree(group, files) {
-  const root = { dirs: new Map(), files: [] };
-  files.forEach((f) => {
-    const parts = String(f.path || '').split('/').filter(Boolean);
-    let node = root;
-    for (let i = 0; i < parts.length - 1; i++) {
-      const segment = parts[i];
-      if (!node.dirs.has(segment)) node.dirs.set(segment, { dirs: new Map(), files: [] });
-      node = node.dirs.get(segment);
-    }
-    node.files.push({ file: f, name: parts[parts.length - 1] || f.name || f.path });
-  });
-
+  const root = buildFileTree(files);
   const wrap = document.createElement('div');
   renderTreeLevel(wrap, root, group, 0);
   return wrap;
@@ -129,33 +127,13 @@ function renderTreeLevel(parent, node, group, depth) {
   });
 }
 
-// Full change label shown on the right of each row, keyed by status code.
-const STATUS_LABELS = {
-  A: 'Added',
-  M: 'Modified',
-  D: 'Deleted',
-  R: 'Renamed',
-  C: 'Conflicted',
-  U: 'Conflicted',
-  '?': 'Untracked',
-};
-
-// File extension (lowercase, no dot) shown on the left of each row, or '•' when
-// the file has no extension.
-function fileExt(name) {
-  const base = String(name || '');
-  const dot = base.lastIndexOf('.');
-  if (dot <= 0 || dot === base.length - 1) return '•';
-  return base.slice(dot + 1).toLowerCase();
-}
-
 function renderFile(f, group, depth = 0, label = f.name) {
   const row = document.createElement('div');
   row.className = 'file-row';
   row.title = f.path;
   if (viewMode === 'tree') row.style.paddingLeft = (26 + depth * 14) + 'px';
 
-  const code = f.conflicted ? 'C' : (f.state || 'modified').charAt(0).toUpperCase();
+  const code = statusCode(f);
 
   // LEFT: file extension chip.
   const ext = document.createElement('span');
@@ -178,7 +156,7 @@ function renderFile(f, group, depth = 0, label = f.name) {
   // RIGHT: full change label (Modified, Added, …).
   const change = document.createElement('span');
   change.className = 'file-change s-' + code;
-  change.textContent = STATUS_LABELS[code] || 'Modified';
+  change.textContent = statusLabel(code);
   row.appendChild(change);
 
   const actions = document.createElement('span');
@@ -216,13 +194,21 @@ function syncViewButtons() {
   el('view-list').classList.toggle('active', viewMode === 'list');
 }
 
-function escapeHtml(value) {
-  return String(value == null ? '' : value).replace(/[&<>"]/g, (ch) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-  }[ch]));
+function setAdvancedOpen(open) {
+  advancedOpen = open;
+  vscode.setState({ ...(vscode.getState() || {}), commitAdvancedOpen: open });
+  syncAdvanced();
+}
+
+// Reflect the advanced-options disclosure state into the DOM: toggle button
+// (chevron + aria-expanded) and the hidden state of the options bar.
+function syncAdvanced() {
+  const toggle = el('advanced-toggle');
+  const bar = el('commit-bar');
+  if (!toggle || !bar) return;
+  toggle.classList.toggle('open', advancedOpen);
+  toggle.setAttribute('aria-expanded', String(advancedOpen));
+  bar.hidden = !advancedOpen;
 }
 
 function fileAction(title, glyph, handler) {
@@ -257,6 +243,7 @@ function wire() {
   el('commit-btn').addEventListener('click', doCommit);
   el('view-tree').addEventListener('click', () => setViewMode('tree'));
   el('view-list').addEventListener('click', () => setViewMode('list'));
+  el('advanced-toggle').addEventListener('click', () => setAdvancedOpen(!advancedOpen));
 }
 
 // ─── messages ────────────────────────────────────────────────────────────────
@@ -279,4 +266,5 @@ window.addEventListener('message', (event) => {
 });
 
 wire();
+syncAdvanced();
 post('ready');

@@ -14,6 +14,11 @@
 ### Changed
 - New, distinctive activity-bar icon (a commit-graph DAG) so the container no
   longer reuses the built-in Source Control glyph.
+- **Commit view**: the advanced commit options (Amend / Sign off / GPG) are now
+  hidden by default behind an "Advanced" disclosure, keeping the panel focused on
+  the message and changes. The disclosure state is remembered per webview. The
+  view's pure helpers (status labels, file-tree grouping, escaping) were extracted
+  into a unit-tested module (`resources/commitView.js`).
 
 ### Security
 - The askpass and editor IPC servers now require a per-session token (passed to

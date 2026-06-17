@@ -70,3 +70,62 @@ test('commit.css hides the bar by default and styles the disclosure', () => {
   assert.ok(css.includes('.advanced-toggle'), 'disclosure toggle is styled');
   assert.ok(css.includes('.advanced-toggle.open .chev'), 'open state rotates the chevron');
 });
+
+test('the collapsed toggle still surfaces an indicator when an option is active', () => {
+  const html = read('src/webviews/commit/CommitViewProvider.ts');
+  const js = read('resources/commit.js');
+  const css = read('resources/commit.css');
+
+  const badge = html.match(/<span id="advanced-badge"[^>]*>/);
+  assert.ok(badge, 'advanced-badge element exists inside the toggle');
+  assert.ok(badge[0].includes('hidden'), 'badge starts hidden');
+
+  assert.ok(js.includes('function syncAdvancedBadge'), 'badge visibility is computed');
+  assert.ok(
+    js.includes("el('opt-amend').checked || el('opt-signoff').checked || el('opt-gpg').checked"),
+    'badge reflects whether any advanced option is checked',
+  );
+  for (const id of ['opt-amend', 'opt-signoff', 'opt-gpg']) {
+    assert.ok(
+      js.includes(`el('${id}').addEventListener('change'`),
+      `${id} changes refresh the badge`,
+    );
+  }
+  assert.ok(
+    js.includes('syncAdvancedBadge();') && js.includes('preAmendMessage = \'\';\n    lastAmendMessage = null;'),
+    'committing resets and re-syncs the badge',
+  );
+  assert.ok(css.includes('.advanced-badge'), 'badge dot is styled');
+});
+
+test('checking Amend prefills the previous commit message without clobbering a draft', () => {
+  const provider = read('src/webviews/commit/CommitViewProvider.ts');
+  const js = read('resources/commit.js');
+
+  assert.ok(
+    provider.includes('case "amendToggled"'),
+    'host handles the amendToggled message',
+  );
+  assert.ok(
+    provider.includes('repo.headCommitMessage()'),
+    'host fetches the previous commit message to prefill amend',
+  );
+  assert.ok(
+    provider.includes('type: "amendMessage"'),
+    'host posts the previous message back to the webview',
+  );
+
+  assert.ok(js.includes("post('amendToggled'"), 'client requests the amend prefill');
+  assert.ok(
+    js.includes("} else if (m.type === 'amendMessage') {"),
+    'client listens for the amend prefill response',
+  );
+  assert.ok(
+    js.includes('if (!cur.value.trim()) {'),
+    'an in-progress draft is never overwritten by the amend prefill',
+  );
+  assert.ok(
+    js.includes('msg.value = preAmendMessage;'),
+    'unchecking amend restores the pre-amend draft when untouched',
+  );
+});

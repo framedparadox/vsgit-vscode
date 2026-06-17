@@ -118,6 +118,14 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         );
         return;
       }
+      case "amendToggled": {
+        const data = msg.data as Partial<{ amend: boolean }> | undefined;
+        if (data?.amend === true && repo) {
+          const message = await repo.headCommitMessage();
+          this.view?.webview.postMessage({ type: "amendMessage", data: { message } });
+        }
+        return;
+      }
       case "commit": {
         const data = msg.data as Partial<{
           message: string;
@@ -251,6 +259,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
               aria-expanded="false" aria-controls="commit-bar">
         <span class="chev" aria-hidden="true">▶</span>
         <span>Advanced</span>
+        <span id="advanced-badge" class="advanced-badge" hidden title="Advanced options are active"></span>
       </button>
       <div id="commit-bar" hidden>
         <label class="opt"><input type="checkbox" id="opt-amend"> Amend</label>

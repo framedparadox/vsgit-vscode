@@ -209,6 +209,19 @@ function syncAdvanced() {
   toggle.classList.toggle('open', advancedOpen);
   toggle.setAttribute('aria-expanded', String(advancedOpen));
   bar.hidden = !advancedOpen;
+  syncAdvancedBadge();
+}
+
+// Show a badge on the (possibly collapsed) "Advanced" toggle whenever amend,
+// sign-off, or GPG is active, so a checked option is never silently hidden.
+function syncAdvancedBadge() {
+  const badge = el('advanced-badge');
+  const toggle = el('advanced-toggle');
+  if (!badge || !toggle) return;
+  const active =
+    el('opt-amend').checked || el('opt-signoff').checked || el('opt-gpg').checked;
+  badge.hidden = !active;
+  toggle.classList.toggle('has-active', active);
 }
 
 function fileAction(title, glyph, handler) {
@@ -230,6 +243,25 @@ function doCommit() {
   });
 }
 
+// Message that was in the box right before Amend was checked, restored if the
+// user unchecks Amend without editing the auto-filled text.
+let preAmendMessage = '';
+// The previous-commit message we auto-filled in, or null if none/edited away.
+let lastAmendMessage = null;
+
+function onAmendToggled() {
+  syncAdvancedBadge();
+  const msg = el('message');
+  if (el('opt-amend').checked) {
+    preAmendMessage = msg.value;
+    post('amendToggled', { amend: true });
+  } else if (lastAmendMessage !== null && msg.value === lastAmendMessage) {
+    msg.value = preAmendMessage;
+    post('messageChanged', msg.value);
+    lastAmendMessage = null;
+  }
+}
+
 function wire() {
   const msg = el('message');
   msg.addEventListener('input', () => post('messageChanged', msg.value));
@@ -244,6 +276,9 @@ function wire() {
   el('view-tree').addEventListener('click', () => setViewMode('tree'));
   el('view-list').addEventListener('click', () => setViewMode('list'));
   el('advanced-toggle').addEventListener('click', () => setAdvancedOpen(!advancedOpen));
+  el('opt-amend').addEventListener('change', onAmendToggled);
+  el('opt-signoff').addEventListener('change', syncAdvancedBadge);
+  el('opt-gpg').addEventListener('change', syncAdvancedBadge);
 }
 
 // ─── messages ────────────────────────────────────────────────────────────────
@@ -257,11 +292,23 @@ window.addEventListener('message', (event) => {
       cur.value = state.message;
     }
     render();
+  } else if (m.type === 'amendMessage') {
+    // Only fill in the previous commit's message if the user hasn't already
+    // started typing one, so we never clobber an in-progress draft.
+    const cur = el('message');
+    if (!cur.value.trim()) {
+      lastAmendMessage = (m.data && m.data.message) || '';
+      cur.value = lastAmendMessage;
+      post('messageChanged', cur.value);
+    }
   } else if (m.type === 'committed') {
     el('message').value = '';
     el('opt-amend').checked = false;
     el('opt-signoff').checked = false;
     el('opt-gpg').checked = false;
+    preAmendMessage = '';
+    lastAmendMessage = null;
+    syncAdvancedBadge();
   }
 });
 

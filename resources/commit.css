@@ -90,6 +90,17 @@ body {
 }
 .advanced-toggle.open .chev { transform: rotate(90deg); }
 
+/* Dot shown on the (possibly collapsed) toggle when amend/sign-off/GPG is
+   active, so a checked option is never silently hidden away. */
+.advanced-badge {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--vscode-notificationsWarningIcon-foreground, #cca700);
+}
+.advanced-toggle.has-active { color: var(--vscode-foreground); }
+
 #commit-bar {
   display: flex;
   align-items: center;

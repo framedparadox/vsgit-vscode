@@ -16,9 +16,14 @@
   longer reuses the built-in Source Control glyph.
 - **Commit view**: the advanced commit options (Amend / Sign off / GPG) are now
   hidden by default behind an "Advanced" disclosure, keeping the panel focused on
-  the message and changes. The disclosure state is remembered per webview. The
-  view's pure helpers (status labels, file-tree grouping, escaping) were extracted
-  into a unit-tested module (`resources/commitView.js`).
+  the message and changes. The disclosure state is remembered per webview. A
+  small indicator dot stays on the collapsed toggle whenever amend/sign-off/GPG
+  is checked, so an active option is never silently hidden. Checking Amend now
+  prefills the previous commit's message (via the existing
+  `Repository.headCommitMessage()`) when the message box is empty, restoring the
+  prior draft if Amend is unchecked again untouched. The view's pure helpers
+  (status labels, file-tree grouping, escaping) were extracted into a
+  unit-tested module (`resources/commitView.js`).
 
 ### Security
 - The askpass and editor IPC servers now require a per-session token (passed to

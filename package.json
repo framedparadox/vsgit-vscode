@@ -840,6 +840,31 @@
         "category": "VsGit"
       },
       {
+        "command": "vsgit.repo.reset.soft",
+        "title": "Soft (keep index & working tree)...",
+        "category": "VsGit"
+      },
+      {
+        "command": "vsgit.repo.reset.mixed",
+        "title": "Mixed (reset index, keep working tree)...",
+        "category": "VsGit"
+      },
+      {
+        "command": "vsgit.repo.reset.hard",
+        "title": "Hard (reset index & working tree)...",
+        "category": "VsGit"
+      },
+      {
+        "command": "vsgit.repo.reset.keep",
+        "title": "Keep (reset index, keep local changes)...",
+        "category": "VsGit"
+      },
+      {
+        "command": "vsgit.repo.reset.merge",
+        "title": "Merge (reset index, keep merge changes)...",
+        "category": "VsGit"
+      },
+      {
         "command": "vsgit.branch.compareTo",
         "title": "Compare Branch with...",
         "category": "VsGit"
@@ -1078,6 +1103,10 @@
       {
         "id": "vsgit.repo.commit",
         "label": "Commit"
+      },
+      {
+        "id": "vsgit.repo.reset",
+        "label": "Reset"
       },
       {
         "id": "vsgit.repo.remote",
@@ -1346,6 +1375,28 @@
         {
           "command": "vsgit.tag.create",
           "group": "3@2"
+        }
+      ],
+      "vsgit.repo.reset": [
+        {
+          "command": "vsgit.repo.reset.soft",
+          "group": "1@1"
+        },
+        {
+          "command": "vsgit.repo.reset.mixed",
+          "group": "1@2"
+        },
+        {
+          "command": "vsgit.repo.reset.hard",
+          "group": "1@3"
+        },
+        {
+          "command": "vsgit.repo.reset.keep",
+          "group": "2@1"
+        },
+        {
+          "command": "vsgit.repo.reset.merge",
+          "group": "2@2"
         }
       ],
       "vsgit.repo.remote": [
@@ -2090,7 +2141,7 @@
           "group": "1b@2"
         },
         {
-          "command": "vsgit.branch.reset",
+          "submenu": "vsgit.repo.reset",
           "when": "(view == vsgit.repositoriesList || view == vsgit.repositories) && viewItem == vsgit.repo",
           "group": "1b@3"
         },

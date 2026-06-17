@@ -210,30 +210,62 @@ body {
 }
 .tree-children.collapsed { display: none; }
 
-.file-status {
-  width: 14px;
+/* LEFT extension chip. */
+.file-ext {
+  min-width: 30px;
+  max-width: 48px;
+  padding: 0 4px;
+  height: 15px;
+  line-height: 15px;
   text-align: center;
   font-family: var(--vscode-editor-font-family, monospace);
-  font-weight: 700;
-  font-size: 11px;
+  font-weight: 600;
+  font-size: 10px;
+  border-radius: 3px;
   flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background-color: rgba(128, 128, 128, 0.16);
 }
-.file-status.s-A { color: #4ec94e; }
-.file-status.s-M { color: #e2c08d; }
-.file-status.s-D { color: #f14c4c; }
-.file-status.s-R { color: #4daafc; }
-.file-status.s-U { color: #e2c08d; }
-.file-status.s-C { color: #f14c4c; }
+.file-ext.s-A { color: #4ec94e; }
+.file-ext.s-M { color: #e2c08d; }
+.file-ext.s-D { color: #f14c4c; }
+.file-ext.s-R { color: #4daafc; }
+.file-ext.s-U { color: #e2c08d; }
+.file-ext.s-C { color: #f14c4c; }
 
-.file-name { flex-shrink: 0; }
-.file-dir {
+.file-name {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-dir {
   color: var(--vscode-descriptionForeground);
   font-size: 11px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex-shrink: 0;
+  max-width: 45%;
 }
+
+/* RIGHT change label (Modified, Added, …). */
+.file-change {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+.file-change.s-A { color: #4ec94e; }
+.file-change.s-M { color: #e2c08d; }
+.file-change.s-D { color: #f14c4c; }
+.file-change.s-R { color: #4daafc; }
+.file-change.s-U { color: #e2c08d; }
+.file-change.s-C { color: #f14c4c; }
+/* The hover actions overlay the change label, so hide it on hover. */
+.file-row:hover .file-change { display: none; }
 
 .file-actions {
   margin-left: auto;

@@ -129,6 +129,26 @@ function renderTreeLevel(parent, node, group, depth) {
   });
 }
 
+// Full change label shown on the right of each row, keyed by status code.
+const STATUS_LABELS = {
+  A: 'Added',
+  M: 'Modified',
+  D: 'Deleted',
+  R: 'Renamed',
+  C: 'Conflicted',
+  U: 'Conflicted',
+  '?': 'Untracked',
+};
+
+// File extension (lowercase, no dot) shown on the left of each row, or '•' when
+// the file has no extension.
+function fileExt(name) {
+  const base = String(name || '');
+  const dot = base.lastIndexOf('.');
+  if (dot <= 0 || dot === base.length - 1) return '•';
+  return base.slice(dot + 1).toLowerCase();
+}
+
 function renderFile(f, group, depth = 0, label = f.name) {
   const row = document.createElement('div');
   row.className = 'file-row';
@@ -136,10 +156,12 @@ function renderFile(f, group, depth = 0, label = f.name) {
   if (viewMode === 'tree') row.style.paddingLeft = (26 + depth * 14) + 'px';
 
   const code = f.conflicted ? 'C' : (f.state || 'modified').charAt(0).toUpperCase();
-  const badge = document.createElement('span');
-  badge.className = 'file-status s-' + code;
-  badge.textContent = code;
-  row.appendChild(badge);
+
+  // LEFT: file extension chip.
+  const ext = document.createElement('span');
+  ext.className = 'file-ext s-' + code;
+  ext.textContent = fileExt(f.name);
+  row.appendChild(ext);
 
   const name = document.createElement('span');
   name.className = 'file-name';
@@ -153,10 +175,16 @@ function renderFile(f, group, depth = 0, label = f.name) {
     row.appendChild(dir);
   }
 
+  // RIGHT: full change label (Modified, Added, …).
+  const change = document.createElement('span');
+  change.className = 'file-change s-' + code;
+  change.textContent = STATUS_LABELS[code] || 'Modified';
+  row.appendChild(change);
+
   const actions = document.createElement('span');
   actions.className = 'file-actions';
   if (group === 'unstaged' || group === 'conflicted') {
-    actions.appendChild(fileAction('Discard Changes', '↶', (e) => {
+    actions.appendChild(fileAction('Reset Changes', '↺', (e) => {
       e.stopPropagation();
       post('discard', { path: f.path, group });
     }));

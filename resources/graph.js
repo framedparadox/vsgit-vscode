@@ -1129,19 +1129,49 @@ function renderFilePane(host, files, onOpen, emptyText) {
   host.appendChild(cdvFileViewMode === 'tree' ? buildFileTree(files, onOpen) : buildFileList(files, onOpen));
 }
 
+// Full change label shown on the right of each row, keyed by status code.
+const CDV_STATUS_LABELS = {
+  A: 'Added',
+  M: 'Modified',
+  D: 'Deleted',
+  R: 'Renamed',
+  C: 'Copied',
+  T: 'Type Changed',
+  U: 'Conflicted',
+};
+
+// File extension (lowercase, no dot) shown on the left of each row, or '•' when
+// the file has no extension.
+function cdvFileExt(p) {
+  const base = String(p || '').split('/').pop() || '';
+  const dot = base.lastIndexOf('.');
+  if (dot <= 0 || dot === base.length - 1) return '•';
+  return base.slice(dot + 1).toLowerCase();
+}
+
 function makeFileRow(f, onOpen, label) {
   const fileRow = document.createElement('div');
   fileRow.className = 'file-row';
-  const st = document.createElement('span');
   const code = (f.status || 'M').charAt(0).toUpperCase();
-  st.className = 'file-status ' + code;
-  st.textContent = code;
+
+  // LEFT: file extension chip.
+  const ext = document.createElement('span');
+  ext.className = 'file-ext ' + code;
+  ext.textContent = cdvFileExt(f.path);
+
   const p = document.createElement('span');
   p.className = 'file-path';
   p.textContent = label;
   p.title = f.path;
-  fileRow.appendChild(st);
+
+  // RIGHT: full change label (Modified, Added, …).
+  const change = document.createElement('span');
+  change.className = 'file-change ' + code;
+  change.textContent = CDV_STATUS_LABELS[code] || 'Modified';
+
+  fileRow.appendChild(ext);
   fileRow.appendChild(p);
+  fileRow.appendChild(change);
   if (onOpen) fileRow.addEventListener('click', () => onOpen(f));
   return fileRow;
 }

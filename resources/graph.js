@@ -797,8 +797,10 @@ function applyColumnWidths() {
   set('col-cdate', colWidths.cdate || 150);
   updateDescriptionColumnWidth();
 }
-function visibleColumnWidth(key, defaultWidth) {
-  return CONFIG.columns[key] === false ? 0 : (colWidths[key] || defaultWidth);
+// `configKey` is the CONFIG.columns visibility key; `widthKey` is the (possibly
+// different) key the resized width is persisted under in colWidths.
+function visibleColumnWidth(configKey, widthKey, defaultWidth) {
+  return CONFIG.columns[configKey] === false ? 0 : (colWidths[widthKey] || defaultWidth);
 }
 function updateDescriptionColumnWidth() {
   const main = document.getElementById('main');
@@ -807,13 +809,18 @@ function updateDescriptionColumnWidth() {
   if (!main || !desc || !graph) return;
   const graphWidth = parseFloat(graph.style.width) || 80;
   const metadataWidth =
-    visibleColumnWidth('author', 130) +
-    visibleColumnWidth('authoredDate', 150) +
-    visibleColumnWidth('committer', 130) +
-    visibleColumnWidth('committedDate', 150) +
-    visibleColumnWidth('id', 80);
+    visibleColumnWidth('author', 'author', 130) +
+    visibleColumnWidth('authoredDate', 'adate', 150) +
+    visibleColumnWidth('committer', 'committer', 130) +
+    visibleColumnWidth('committedDate', 'cdate', 150) +
+    visibleColumnWidth('id', 'id', 80);
+  // Fit the table to the window: the Description column takes exactly the space
+  // left over so the row never extends past #main and forces a horizontal
+  // scrollbar. When the metadata columns alone overflow a narrow window we
+  // still floor at 0 (those columns keep their own px widths and scroll), but
+  // we never *add* an artificial minimum that would push the table wider.
   const available = Math.floor(main.clientWidth - graphWidth - metadataWidth);
-  desc.style.width = Math.max(360, available) + 'px';
+  desc.style.width = Math.max(0, available) + 'px';
 }
 function applyColumnVisibility() {
   const toggle = (cls, show) => {
@@ -1012,6 +1019,7 @@ function openExpandedRow(commit, tr) {
   td.appendChild(cdv);
 
   tr.insertAdjacentElement('afterend', row);
+  sizeExpandedPanel();
 
   syncFileViewButtons();
   cdv.querySelector('#cdvViewTree').addEventListener('click', (e) => { e.stopPropagation(); setFileViewMode('tree'); });
@@ -1033,6 +1041,49 @@ function openExpandedRow(commit, tr) {
   // dots stay centred and the edges run continuously through the new gap (the
   // graph lines keep flowing past the open commit, exactly like git-graph).
   rebuildGraphOverlay();
+
+  // Bring the whole panel onto the screen: when the clicked commit sits near the
+  // bottom of the viewport the 248px details row would be clipped, so scroll the
+  // container just enough to reveal it — but never so far that the clicked
+  // commit's own row scrolls out of view above.
+  scrollExpandedRowIntoView(tr, row);
+}
+
+// Pin the commit-details panel to the visible viewport width so its right pane
+// (changed files) never runs off-screen. The panel lives in a td that spans the
+// metadata columns, whose summed width can exceed the window; anchoring #cdv to
+// (visible width − graph column) keeps both halves inside the screen with no
+// horizontal overflow, regardless of column widths.
+function sizeExpandedPanel() {
+  const cdv = document.getElementById('cdv');
+  const main = document.getElementById('main');
+  const graphCol = document.getElementById('col-graph');
+  if (!cdv || !main) return;
+  const graphColW = graphCol ? (parseFloat(graphCol.style.width) || 0) : 0;
+  const width = Math.max(0, main.clientWidth - graphColW);
+  cdv.style.width = width + 'px';
+}
+
+// Scroll #main so the expanded details row (`cdvRow`) is fully visible while
+// keeping its parent commit row (`commitRow`) on screen. Runs after layout so
+// offset measurements are final.
+function scrollExpandedRowIntoView(commitRow, cdvRow) {
+  const main = document.getElementById('main');
+  if (!main || !commitRow || !cdvRow) return;
+  requestAnimationFrame(() => {
+    const viewTop = main.scrollTop;
+    const viewBottom = viewTop + main.clientHeight;
+    const commitTop = commitRow.offsetTop;
+    const panelBottom = cdvRow.offsetTop + cdvRow.offsetHeight;
+    if (panelBottom > viewBottom) {
+      // Scroll down to reveal the panel's bottom, but stop if that would push
+      // the commit row off the top — pin to the commit row in that case.
+      const target = Math.min(panelBottom - main.clientHeight, commitTop);
+      main.scrollTop = Math.max(0, target);
+    } else if (commitTop < viewTop) {
+      main.scrollTop = commitTop;
+    }
+  });
 }
 
 // Tree/list view-type toggle for the changed-file pane.
@@ -1488,6 +1539,9 @@ function wireResizers() {
         if (key !== 'desc') {
           colWidths[key] = w;
           document.querySelectorAll('td.col-' + key).forEach((td) => { td.style.width = w + 'px'; });
+          // Re-fit Description so widening a metadata column shrinks it instead
+          // of pushing the table past the window.
+          updateDescriptionColumnWidth();
         }
       };
       const onUp = () => {
@@ -1721,7 +1775,11 @@ function wireControls() {
     document.getElementById('context-menu').classList.remove('visible');
     closeColumnsMenu();
   });
-  window.addEventListener('resize', updateDescriptionColumnWidth);
+  window.addEventListener('resize', () => {
+    updateDescriptionColumnWidth();
+    // Keep an open commit-details panel pinned to the viewport width.
+    if (document.getElementById('cdv-row')) sizeExpandedPanel();
+  });
 
   wireResizers();
 }

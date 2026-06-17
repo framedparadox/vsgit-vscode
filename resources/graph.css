@@ -317,7 +317,10 @@ body {
 /* ─── graph (scrollable) ───────────────────────────────────────────────── */
 #main {
   flex: 1;
-  overflow: auto;
+  /* Scroll vertically only — the table is sized to the window width (see
+     updateDescriptionColumnWidth), so it must never scroll horizontally. */
+  overflow-x: hidden;
+  overflow-y: auto;
   position: relative;
   min-height: 0;
   width: 100%;

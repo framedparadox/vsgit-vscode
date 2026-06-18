@@ -1,3 +1,10 @@
+/**
+ * Repository wraps a single git working copy: it builds argv for every git
+ * subcommand we support (status, log, diff, branch, remote, stash, worktree,
+ * submodule, blame, reflog, config, etc.), runs it through GitExecutor, and
+ * parses the output into typed results. All ref/SHA/URL parameters are routed
+ * through argGuard so hostile input can't be smuggled into git's argv.
+ */
 import * as path from "node:path";
 import { GitExecutor } from "./GitExecutor";
 import { safeRef, safeRemoteUrl } from "./argGuard";
@@ -1029,7 +1036,10 @@ export class Repository {
     }
   }
 
-  async reset(sha: string, mode: "soft" | "mixed" | "hard"): Promise<void> {
+  async reset(
+    sha: string,
+    mode: "soft" | "mixed" | "hard" | "keep" | "merge",
+  ): Promise<void> {
     await this.git.run(["reset", `--${mode}`, safeRef(sha, "commit")], { cwd: this.root });
   }
 

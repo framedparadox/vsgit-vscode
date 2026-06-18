@@ -1,3 +1,8 @@
+/**
+ * Extension entry point: constructs the RepositoryManager, wires up every
+ * tree/webview view provider and command group, and registers them with
+ * VS Code's extension context for disposal on deactivation.
+ */
 import * as vscode from "vscode";
 import { RepositoryManager } from "./git/RepositoryManager";
 import { RepositoriesProvider } from "./views/RepositoriesProvider";

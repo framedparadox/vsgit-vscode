@@ -1,3 +1,7 @@
+/**
+ * Tree view listing each repository's git worktrees, with commands to
+ * create, open, and remove them.
+ */
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";

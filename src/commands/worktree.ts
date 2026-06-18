@@ -4,7 +4,7 @@ import { RepositoryManager } from "../git/RepositoryManager";
 import { WorktreeInfo } from "../git/Repository";
 import { errMsg, withProgress } from "./shared";
 
-export type WorktreeNode =
+type WorktreeNode =
   | { type: "worktreeRoot"; repo_root: string; manager: RepositoryManager }
   | { type: "worktree"; info: WorktreeInfo; repo_root: string; manager: RepositoryManager };
 

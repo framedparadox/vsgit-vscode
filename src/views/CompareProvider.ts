@@ -1,3 +1,7 @@
+/**
+ * Tree view that compares two refs in a repository, showing the commits
+ * unique to each side plus the combined file diff between them.
+ */
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";

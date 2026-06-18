@@ -1,4 +1,10 @@
+/**
+ * Webview-backed dialog for creating a tag: collects name, message, and
+ * annotate/sign/force/push options, then resolves with the user's choices
+ * (or undefined if cancelled).
+ */
 import * as vscode from "vscode";
+import { escapeHtml } from "../util/html";
 
 export interface CreateTagDialogResult {
   name: string;
@@ -270,14 +276,6 @@ nameInput.focus();
 </script>
 </body>
 </html>`;
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 function getNonce(): string {

@@ -1,3 +1,8 @@
+/**
+ * Manages the commit graph webview panel: renders the repository's commit
+ * graph and handles graph-originated requests (checkout, tag, diff, etc.)
+ * by routing them back through Repository.
+ */
 import * as vscode from "vscode";
 import * as path from "node:path";
 import { Repository } from "../../git/Repository";
@@ -865,6 +870,7 @@ export class GraphPanel {
       <span id="repoControl"><span class="ctrl-label">Repo: </span><div id="repoDropdown" class="dropdown"></div></span>
       <span id="branchControl"><span class="ctrl-label">Branches: </span><div id="branchDropdown" class="dropdown"></div></span>
       <label id="showRemoteBranchesControl"><input type="checkbox" id="showRemoteBranchesCheckbox" tabindex="-1"><span class="customCheckbox"></span>Show Remote Branches</label>
+      <button class="tb-btn icon-only" id="tb-trace" title="Trace flow: ancestors / descendants / off" data-label="Trace" aria-label="Trace"><span class="tb-ico" data-icon="trace"></span></button>
       <span class="tb-spacer"></span>
       <span id="commit-count"></span>
       <span class="tb-sep"></span>
@@ -884,7 +890,6 @@ export class GraphPanel {
       <button class="tb-btn icon-only" id="tb-find" title="Find (Ctrl/Cmd+F)" data-label="Find" aria-label="Find"><span class="tb-ico" data-icon="find"></span></button>
       <button class="tb-btn icon-only" id="tb-columns" title="Columns" data-label="Columns" aria-label="Columns"><span class="tb-ico" data-icon="columns"></span></button>
       <button class="tb-btn icon-only" id="tb-tracking" title="Tracking: off" data-label="Tracking" aria-label="Tracking"><span class="tb-ico" data-icon="tracking"></span></button>
-      <button class="tb-btn icon-only" id="tb-trace" title="Trace flow: ancestors / descendants / off" data-label="Trace" aria-label="Trace"><span class="tb-ico" data-icon="trace"></span></button>
       <button class="tb-btn icon-only" id="tb-refresh" title="Refresh (Ctrl/Cmd+R)" data-label="Refresh" aria-label="Refresh"><span class="tb-ico" data-icon="refresh"></span></button>
       <div id="columns-menu" class="columns-menu" hidden></div>
     </div>

@@ -9,3 +9,9 @@ tsconfig.test.json
 **/*.map
 **/*.ts
 .gitignore
+
+# Local tooling / dev files — not part of the published extension
+.github/**
+.claude/**
+CLAUDE.md
+graphify-out/**

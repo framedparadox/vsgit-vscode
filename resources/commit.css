@@ -18,6 +18,41 @@ body {
 /* ─── message editor ─────────────────────────────────────────────────────── */
 #message-box { padding: 8px; }
 
+#commit-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+#commit-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+#commit-title .title {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+#branch-name {
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#commit-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
 #message {
   width: 100%;
   min-height: 56px;
@@ -52,6 +87,32 @@ body {
   color: var(--vscode-button-foreground);
 }
 #commit-btn:hover { background-color: var(--vscode-button-hoverBackground); }
+
+.header-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+.header-btn:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
+.header-btn.active {
+  background-color: var(--vscode-inputOption-activeBackground, rgba(14,99,156,0.35));
+  border-color: var(--vscode-inputOption-activeBorder, transparent);
+}
+.header-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
 
 .opt {
   display: inline-flex;
@@ -120,30 +181,91 @@ body {
 }
 .file-row:hover { background-color: var(--vscode-list-hoverBackground); }
 
-.file-status {
+.tree-folder {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px 2px 12px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+}
+.tree-folder:hover { background-color: var(--vscode-list-hoverBackground); }
+.tree-folder .chev {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
+  font-size: 10px;
+  transition: transform 0.1s ease;
+}
+.tree-folder .chev.expanded { transform: rotate(90deg); }
+.tree-folder .folder-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tree-children.collapsed { display: none; }
+
+/* LEFT extension chip. */
+.file-ext {
+  min-width: 30px;
+  max-width: 48px;
+  padding: 0 4px;
+  height: 15px;
+  line-height: 15px;
   text-align: center;
   font-family: var(--vscode-editor-font-family, monospace);
-  font-weight: 700;
-  font-size: 11px;
+  font-weight: 600;
+  font-size: 10px;
+  border-radius: 3px;
   flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background-color: rgba(128, 128, 128, 0.16);
 }
-.file-status.s-A { color: #4ec94e; }
-.file-status.s-M { color: #e2c08d; }
-.file-status.s-D { color: #f14c4c; }
-.file-status.s-R { color: #4daafc; }
-.file-status.s-U { color: #e2c08d; }
-.file-status.s-C { color: #f14c4c; }
+.file-ext.s-A { color: #4ec94e; }
+.file-ext.s-M { color: #e2c08d; }
+.file-ext.s-D { color: #f14c4c; }
+.file-ext.s-R { color: #4daafc; }
+.file-ext.s-U { color: #e2c08d; }
+.file-ext.s-C { color: #f14c4c; }
 
-.file-name { flex-shrink: 0; }
-.file-dir {
+.file-name {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-dir {
   color: var(--vscode-descriptionForeground);
   font-size: 11px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex-shrink: 0;
+  max-width: 45%;
 }
+
+/* RIGHT change label (Modified, Added, …). */
+.file-change {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+.file-change.s-A { color: #4ec94e; }
+.file-change.s-M { color: #e2c08d; }
+.file-change.s-D { color: #f14c4c; }
+.file-change.s-R { color: #4daafc; }
+.file-change.s-U { color: #e2c08d; }
+.file-change.s-C { color: #f14c4c; }
+/* The hover actions overlay the change label, so hide it on hover. */
+.file-row:hover .file-change { display: none; }
 
 .file-actions {
   margin-left: auto;

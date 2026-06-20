@@ -110,23 +110,31 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         await vscode.commands.executeCommand("vsgit.staging.unstageAll");
         return;
       case "openDiff": {
-        const group = (msg.data as { group: StagingGroup }).group;
+        const data = msg.data as { group?: unknown } | undefined;
+        const group = isStagingGroup(data?.group) ? data.group : "unstaged";
         await vscode.commands.executeCommand(
           "vsgit.staging.openDiff",
           this.fileNode(msg.data, group),
         );
         return;
       }
-      case "commit":
-        await this.commit(
-          repo,
-          msg.data as {
-            message: string;
-            amend: boolean;
-            signoff: boolean;
-            gpg: boolean;
-          },
-        );
+      case "commit": {
+        const data = msg.data as Partial<{
+          message: string;
+          amend: boolean;
+          signoff: boolean;
+          gpg: boolean;
+        }> | undefined;
+        await this.commit(repo, {
+          message: typeof data?.message === "string" ? data.message : "",
+          amend: data?.amend === true,
+          signoff: data?.signoff === true,
+          gpg: data?.gpg === true,
+        });
+        return;
+      }
+      default:
+        console.warn(`CommitViewProvider: unhandled message type "${msg.type}"`);
         return;
     }
   }
@@ -134,9 +142,9 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
   /** Re-hydrate a webview file reference into a StagingNode for the commands. */
   private fileNode(data: unknown, group: StagingGroup): StagingNode | undefined {
     const repo = this.repo;
-    const d = data as { path?: string; group?: StagingGroup };
-    if (!repo || !d?.path) return undefined;
-    const g = d.group ?? group;
+    const d = data as { path?: string; group?: unknown } | undefined;
+    if (!repo || typeof d?.path !== "string") return undefined;
+    const g = isStagingGroup(d.group) ? d.group : group;
     const pool =
       g === "staged"
         ? repo.stagedChanges
@@ -216,9 +224,27 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
   <div id="empty" class="empty">No Git repository is active.</div>
   <div id="root" style="display:none">
     <div id="message-box">
+      <div id="commit-header">
+        <div id="commit-title">
+          <span class="title">Commit</span>
+          <span id="branch-name"></span>
+        </div>
+        <div id="commit-actions">
+          <button id="view-tree" class="header-btn" title="Tree View" aria-label="Tree View">
+            <svg class="header-icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M2 2h4v3H2V2zm7 0h4v3H9V2zM2 11h4v3H2v-3zm3-5h1v1.5h3V6h1v1.5h3V10h-1V8.5H6V10H5V8.5H3V10H2V7.5h3V6z"/>
+            </svg>
+          </button>
+          <button id="view-list" class="header-btn" title="List View" aria-label="List View">
+            <svg class="header-icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M2 3h2v2H2V3zm3.5.25H14v1.5H5.5v-1.5zM2 7h2v2H2V7zm3.5.25H14v1.5H5.5v-1.5zM2 11h2v2H2v-2zm3.5.25H14v1.5H5.5v-1.5z"/>
+            </svg>
+          </button>
+          <button id="commit-btn" class="primary" title="Commit staged changes">Commit</button>
+        </div>
+      </div>
       <textarea id="message" placeholder="Message (commit on this branch)"></textarea>
       <div id="commit-bar">
-        <button id="commit-btn" class="primary" title="Commit staged changes">Commit</button>
         <label class="opt"><input type="checkbox" id="opt-amend"> Amend</label>
         <label class="opt"><input type="checkbox" id="opt-signoff"> Sign off</label>
         <label class="opt"><input type="checkbox" id="opt-gpg"> GPG</label>
@@ -233,6 +259,10 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
 }
 
 type StagingGroup = "staged" | "unstaged" | "conflicted";
+
+function isStagingGroup(value: unknown): value is StagingGroup {
+  return value === "staged" || value === "unstaged" || value === "conflicted";
+}
 
 interface FileDto {
   path: string;

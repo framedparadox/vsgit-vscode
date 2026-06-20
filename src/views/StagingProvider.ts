@@ -15,14 +15,20 @@ export type StagingNode =
  * "active" repository is the first discovered repo (multi-repo selection comes
  * in a later phase).
  */
-export class StagingProvider implements vscode.TreeDataProvider<StagingNode> {
+export class StagingProvider implements vscode.TreeDataProvider<StagingNode>, vscode.Disposable {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<
     StagingNode | undefined
   >();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+  private readonly subscription: vscode.Disposable;
 
   constructor(private readonly manager: RepositoryManager) {
-    manager.onDidChange(() => this._onDidChangeTreeData.fire(undefined));
+    this.subscription = manager.onDidChange(() => this._onDidChangeTreeData.fire(undefined));
+  }
+
+  dispose(): void {
+    this.subscription.dispose();
+    this._onDidChangeTreeData.dispose();
   }
 
   get activeRepo(): Repository | undefined {
@@ -64,19 +70,21 @@ export class StagingProvider implements vscode.TreeDataProvider<StagingNode> {
     const item = new vscode.TreeItem(path.basename(change.path));
     item.description = path.dirname(change.path) === "." ? "" : path.dirname(change.path);
     item.resourceUri = vscode.Uri.file(path.join(node.repo.root, change.path));
-    
-    // Context value and icon based on group and conflict status
+    // Use the language-specific file icon from the active icon theme (e.g. a
+    // TypeScript glyph for *.ts). The git status is conveyed separately via the
+    // colored letter badge from VsgitFileDecorationProvider, matching VS Code's
+    // built-in SCM view.
+    item.iconPath = vscode.ThemeIcon.File;
+
+    // Context value based on group and conflict status.
     if (node.group === "conflicted" || change.conflicted) {
       item.contextValue = "vsgit.conflictedFile";
-      item.iconPath = new vscode.ThemeIcon("warning", new vscode.ThemeColor("list.errorForeground"));
       item.tooltip = `${change.path} — CONFLICTED`;
     } else if (node.group === "staged") {
       item.contextValue = "vsgit.stagedFile";
-      item.iconPath = new vscode.ThemeIcon(statusIcon(change, node.group));
       item.tooltip = `${change.path} — ${describeState(change, node.group)}`;
     } else {
       item.contextValue = "vsgit.unstagedFile";
-      item.iconPath = new vscode.ThemeIcon(statusIcon(change, node.group));
       item.tooltip = `${change.path} — ${describeState(change, node.group)}`;
     }
     
@@ -127,26 +135,6 @@ export class StagingProvider implements vscode.TreeDataProvider<StagingNode> {
       (change) =>
         ({ type: "file", group: node.group, repo, change }) as StagingNode,
     );
-  }
-}
-
-function statusIcon(change: FileChange, group: "staged" | "unstaged"): string {
-  if (change.conflicted) {
-    return "warning";
-  }
-  const state = group === "staged" ? change.indexState : change.worktreeState;
-  switch (state) {
-    case "added":
-    case "untracked":
-      return "diff-added";
-    case "deleted":
-      return "diff-removed";
-    case "renamed":
-      return "diff-renamed";
-    case "ignored":
-      return "circle-slash";
-    default:
-      return "diff-modified";
   }
 }
 

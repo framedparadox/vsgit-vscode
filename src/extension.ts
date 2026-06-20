@@ -1,3 +1,8 @@
+/**
+ * Extension entry point: constructs the RepositoryManager, wires up every
+ * tree/webview view provider and command group, and registers them with
+ * VS Code's extension context for disposal on deactivation.
+ */
 import * as vscode from "vscode";
 import { RepositoryManager } from "./git/RepositoryManager";
 import { RepositoriesProvider } from "./views/RepositoriesProvider";
@@ -86,6 +91,7 @@ export async function activate(
   // view's title bar.
   const reposListProvider = new RepositoriesProvider(manager, true);
   context.subscriptions.push(
+    reposListProvider,
     vscode.window.createTreeView("vsgit.repositoriesList", {
       treeDataProvider: reposListProvider,
     }),
@@ -95,6 +101,7 @@ export async function activate(
   // Remote Branches, Tags, Remotes, Stashes, and Submodules.
   const repositoriesProvider = new RepositoriesProvider(manager);
   context.subscriptions.push(
+    repositoriesProvider,
     vscode.window.createTreeView("vsgit.repositories", {
       treeDataProvider: repositoriesProvider,
       showCollapseAll: true,
@@ -103,6 +110,7 @@ export async function activate(
 
   const stagingProvider = new StagingProvider(manager);
   context.subscriptions.push(
+    stagingProvider,
     vscode.window.createTreeView("vsgit.staging", {
       treeDataProvider: stagingProvider,
       showCollapseAll: true,
@@ -124,6 +132,7 @@ export async function activate(
 
   const reflogProvider = new ReflogProvider(manager);
   context.subscriptions.push(
+    reflogProvider,
     vscode.window.createTreeView("vsgit.reflog", {
       treeDataProvider: reflogProvider,
     }),
@@ -131,6 +140,7 @@ export async function activate(
 
   const syncProvider = new SynchronizeProvider(manager);
   context.subscriptions.push(
+    syncProvider,
     vscode.window.createTreeView("vsgit.synchronize", {
       treeDataProvider: syncProvider,
     }),
@@ -167,7 +177,7 @@ export async function activate(
   const compareView = vscode.window.createTreeView("vsgit.compare", {
     treeDataProvider: compareProvider,
   });
-  context.subscriptions.push(compareView);
+  context.subscriptions.push(compareProvider, compareView);
 
   // Reveal the Compare view (called internally after starting a comparison)
   context.subscriptions.push(
@@ -225,6 +235,7 @@ export async function activate(
 
   const worktreesProvider = new WorktreesProvider(manager);
   context.subscriptions.push(
+    worktreesProvider,
     vscode.window.createTreeView("vsgit.worktrees", {
       treeDataProvider: worktreesProvider,
     }),
@@ -232,6 +243,7 @@ export async function activate(
 
   const conflictsProvider = new ConflictsProvider(manager);
   context.subscriptions.push(
+    conflictsProvider,
     vscode.window.createTreeView("vsgit.conflicts", {
       treeDataProvider: conflictsProvider,
     }),

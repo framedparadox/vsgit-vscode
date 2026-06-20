@@ -1,3 +1,10 @@
+/**
+ * Repository wraps a single git working copy: it builds argv for every git
+ * subcommand we support (status, log, diff, branch, remote, stash, worktree,
+ * submodule, blame, reflog, config, etc.), runs it through GitExecutor, and
+ * parses the output into typed results. All ref/SHA/URL parameters are routed
+ * through argGuard so hostile input can't be smuggled into git's argv.
+ */
 import * as path from "node:path";
 import { GitExecutor } from "./GitExecutor";
 import { safeRef, safeRemoteUrl } from "./argGuard";
@@ -533,8 +540,13 @@ export class Repository {
 
   /** Create archive from ref. Format: zip, tar, tar.gz, etc. */
   async archive(ref: string, format: string, output: string, prefix?: string): Promise<void> {
-    const args = ["archive", `--format=${format}`, `--output=${output}`, safeRef(ref)];
-    if (prefix) args.push(`--prefix=${prefix}`);
+    const args = [
+      "archive",
+      `--format=${safeRef(format, "archive format")}`,
+      `--output=${safeRef(output, "output path")}`,
+      safeRef(ref),
+    ];
+    if (prefix) args.push(`--prefix=${safeRef(prefix, "archive prefix")}`);
     await this.git.run(args, { cwd: this.root });
   }
 
@@ -804,11 +816,18 @@ export class Repository {
     /**
      * Commit ordering. `topo` lists a child before all of its parents, which the
      * graph renderer needs to lay out lanes without backtracking edges; `date`
-     * (the default) is reverse-chronological for plain list views.
+     * (the default) is reverse-chronological for plain list views; `author-date`
+     * sorts by author timestamp when possible while preserving child-before-parent
+     * constraints.
      */
-    order?: "date" | "topo";
+    order?: "date" | "author-date" | "topo";
   } = {}): Promise<Commit[]> {
-    const orderFlag = options.order === "topo" ? "--topo-order" : "--date-order";
+    const orderFlag =
+      options.order === "topo"
+        ? "--topo-order"
+        : options.order === "author-date"
+          ? "--author-date-order"
+          : "--date-order";
     const args = ["log", `--format=${LOG_FORMAT}`, orderFlag];
     if (options.limit !== undefined) {
       args.push(`--max-count=${options.limit}`);
@@ -1017,7 +1036,10 @@ export class Repository {
     }
   }
 
-  async reset(sha: string, mode: "soft" | "mixed" | "hard"): Promise<void> {
+  async reset(
+    sha: string,
+    mode: "soft" | "mixed" | "hard" | "keep" | "merge",
+  ): Promise<void> {
     await this.git.run(["reset", `--${mode}`, safeRef(sha, "commit")], { cwd: this.root });
   }
 

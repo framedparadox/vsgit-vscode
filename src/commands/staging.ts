@@ -60,13 +60,23 @@ export function registerStagingCommands(
 
   reg("vsgit.staging.stageAll", () =>
     guard(async () => {
-      await staging.activeRepo?.stageAll();
+      const repo = staging.activeRepo;
+      if (!repo) {
+        vscode.window.showWarningMessage("No active repository");
+        return;
+      }
+      await repo.stageAll();
     }, "Stage all"),
   );
 
   reg("vsgit.staging.unstageAll", () =>
     guard(async () => {
-      await staging.activeRepo?.unstageAll();
+      const repo = staging.activeRepo;
+      if (!repo) {
+        vscode.window.showWarningMessage("No active repository");
+        return;
+      }
+      await repo.unstageAll();
     }, "Unstage all"),
   );
 

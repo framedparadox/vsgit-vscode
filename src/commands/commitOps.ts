@@ -340,7 +340,7 @@ export function registerCommitOpsCommands(
       const doc = await vscode.workspace.openTextDocument(uri);
       await vscode.window.showTextDocument(doc);
       vscode.window.showInformationMessage(
-        `Resolve conflicts in ${picks.path}, then run "Mark Resolved" (vsgit.conflicts.markResolved).`,
+        `Resolve conflicts in ${picks.path}, then run "Mark Resolved" (vsgit.conflict.markResolved).`,
       );
     }
   });

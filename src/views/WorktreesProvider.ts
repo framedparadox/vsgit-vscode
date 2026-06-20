@@ -1,3 +1,7 @@
+/**
+ * Tree view listing each repository's git worktrees, with commands to
+ * create, open, and remove them.
+ */
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
@@ -7,19 +11,25 @@ export type WorktreeTreeNode =
   | { type: "repoWorktrees"; repo: Repository }
   | { type: "worktree"; info: WorktreeInfo; repo: Repository; manager: RepositoryManager };
 
-export class WorktreesProvider implements vscode.TreeDataProvider<WorktreeTreeNode> {
+export class WorktreesProvider implements vscode.TreeDataProvider<WorktreeTreeNode>, vscode.Disposable {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<
     WorktreeTreeNode | undefined
   >();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+  private readonly subscription: vscode.Disposable;
 
   private worktreeCache = new Map<string, WorktreeInfo[]>();
 
   constructor(private readonly manager: RepositoryManager) {
-    manager.onDidChange(() => {
+    this.subscription = manager.onDidChange(() => {
       this.worktreeCache.clear();
       this._onDidChangeTreeData.fire(undefined);
     });
+  }
+
+  dispose(): void {
+    this.subscription.dispose();
+    this._onDidChangeTreeData.dispose();
   }
 
   getTreeItem(node: WorktreeTreeNode): vscode.TreeItem {

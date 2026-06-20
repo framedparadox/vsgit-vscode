@@ -10,6 +10,7 @@
 const vscode = acquireVsCodeApi();
 
 let state = { active: false };
+let viewMode = (vscode.getState() || {}).commitViewMode || 'tree';
 
 const el = (id) => document.getElementById(id);
 const post = (type, data) => vscode.postMessage({ type, data });
@@ -23,6 +24,8 @@ function render() {
   }
   el('empty').style.display = 'none';
   el('root').style.display = 'block';
+  el('branch-name').textContent = state.branch || '';
+  syncViewButtons();
 
   const groups = el('groups');
   groups.innerHTML = '';
@@ -64,7 +67,11 @@ function renderGroup(title, group, files) {
     return wrap;
   }
 
-  files.forEach((f) => wrap.appendChild(renderFile(f, group)));
+  if (viewMode === 'tree') {
+    wrap.appendChild(renderTree(group, files));
+  } else {
+    files.forEach((f) => wrap.appendChild(renderFile(f, group)));
+  }
   return wrap;
 }
 
@@ -77,33 +84,107 @@ function groupAction(title, glyph, action) {
   return b;
 }
 
-function renderFile(f, group) {
+function renderTree(group, files) {
+  const root = { dirs: new Map(), files: [] };
+  files.forEach((f) => {
+    const parts = String(f.path || '').split('/').filter(Boolean);
+    let node = root;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const segment = parts[i];
+      if (!node.dirs.has(segment)) node.dirs.set(segment, { dirs: new Map(), files: [] });
+      node = node.dirs.get(segment);
+    }
+    node.files.push({ file: f, name: parts[parts.length - 1] || f.name || f.path });
+  });
+
+  const wrap = document.createElement('div');
+  renderTreeLevel(wrap, root, group, 0);
+  return wrap;
+}
+
+function renderTreeLevel(parent, node, group, depth) {
+  Array.from(node.dirs.keys()).sort((a, b) => a.localeCompare(b)).forEach((name) => {
+    const dir = node.dirs.get(name);
+    const folder = document.createElement('div');
+    folder.className = 'tree-folder';
+    folder.style.paddingLeft = (12 + depth * 14) + 'px';
+    folder.innerHTML =
+      '<span class="chev expanded">▶</span>' +
+      '<span class="folder-name">' + escapeHtml(name) + '</span>';
+
+    const children = document.createElement('div');
+    children.className = 'tree-children';
+    renderTreeLevel(children, dir, group, depth + 1);
+
+    folder.addEventListener('click', () => {
+      const collapsed = children.classList.toggle('collapsed');
+      folder.querySelector('.chev').classList.toggle('expanded', !collapsed);
+    });
+    parent.appendChild(folder);
+    parent.appendChild(children);
+  });
+
+  node.files.sort((a, b) => a.name.localeCompare(b.name)).forEach(({ file, name }) => {
+    parent.appendChild(renderFile(file, group, depth, name));
+  });
+}
+
+// Full change label shown on the right of each row, keyed by status code.
+const STATUS_LABELS = {
+  A: 'Added',
+  M: 'Modified',
+  D: 'Deleted',
+  R: 'Renamed',
+  C: 'Conflicted',
+  U: 'Conflicted',
+  '?': 'Untracked',
+};
+
+// File extension (lowercase, no dot) shown on the left of each row, or '•' when
+// the file has no extension.
+function fileExt(name) {
+  const base = String(name || '');
+  const dot = base.lastIndexOf('.');
+  if (dot <= 0 || dot === base.length - 1) return '•';
+  return base.slice(dot + 1).toLowerCase();
+}
+
+function renderFile(f, group, depth = 0, label = f.name) {
   const row = document.createElement('div');
   row.className = 'file-row';
   row.title = f.path;
+  if (viewMode === 'tree') row.style.paddingLeft = (26 + depth * 14) + 'px';
 
   const code = f.conflicted ? 'C' : (f.state || 'modified').charAt(0).toUpperCase();
-  const badge = document.createElement('span');
-  badge.className = 'file-status s-' + code;
-  badge.textContent = code;
-  row.appendChild(badge);
+
+  // LEFT: file extension chip.
+  const ext = document.createElement('span');
+  ext.className = 'file-ext s-' + code;
+  ext.textContent = fileExt(f.name);
+  row.appendChild(ext);
 
   const name = document.createElement('span');
   name.className = 'file-name';
-  name.textContent = f.name;
+  name.textContent = label;
   row.appendChild(name);
 
-  if (f.dir) {
+  if (viewMode !== 'tree' && f.dir) {
     const dir = document.createElement('span');
     dir.className = 'file-dir';
     dir.textContent = f.dir;
     row.appendChild(dir);
   }
 
+  // RIGHT: full change label (Modified, Added, …).
+  const change = document.createElement('span');
+  change.className = 'file-change s-' + code;
+  change.textContent = STATUS_LABELS[code] || 'Modified';
+  row.appendChild(change);
+
   const actions = document.createElement('span');
   actions.className = 'file-actions';
   if (group === 'unstaged' || group === 'conflicted') {
-    actions.appendChild(fileAction('Discard Changes', '↶', (e) => {
+    actions.appendChild(fileAction('Reset Changes', '↺', (e) => {
       e.stopPropagation();
       post('discard', { path: f.path, group });
     }));
@@ -121,6 +202,27 @@ function renderFile(f, group) {
 
   row.addEventListener('click', () => post('openDiff', { path: f.path, group }));
   return row;
+}
+
+function setViewMode(mode) {
+  if (viewMode === mode) return;
+  viewMode = mode;
+  vscode.setState({ ...(vscode.getState() || {}), commitViewMode: mode });
+  render();
+}
+
+function syncViewButtons() {
+  el('view-tree').classList.toggle('active', viewMode === 'tree');
+  el('view-list').classList.toggle('active', viewMode === 'list');
+}
+
+function escapeHtml(value) {
+  return String(value == null ? '' : value).replace(/[&<>"]/g, (ch) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+  }[ch]));
 }
 
 function fileAction(title, glyph, handler) {
@@ -153,6 +255,8 @@ function wire() {
     }
   });
   el('commit-btn').addEventListener('click', doCommit);
+  el('view-tree').addEventListener('click', () => setViewMode('tree'));
+  el('view-list').addEventListener('click', () => setViewMode('list'));
 }
 
 // ─── messages ────────────────────────────────────────────────────────────────

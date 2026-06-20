@@ -35,12 +35,13 @@ const GROUP_LABELS: Record<GroupKind, string> = {
 };
 
 export class RepositoriesProvider
-  implements vscode.TreeDataProvider<VsgitNode>
+  implements vscode.TreeDataProvider<VsgitNode>, vscode.Disposable
 {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<
     VsgitNode | undefined
   >();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+  private readonly subscription: vscode.Disposable;
 
   private abCache = new Map<string, { ahead: number; behind: number }>();
 
@@ -54,7 +55,12 @@ export class RepositoriesProvider
     private readonly manager: RepositoryManager,
     private readonly flat = false,
   ) {
-    manager.onDidChange(() => this.refresh());
+    this.subscription = manager.onDidChange(() => this.refresh());
+  }
+
+  dispose(): void {
+    this.subscription.dispose();
+    this._onDidChangeTreeData.dispose();
   }
 
   private refresh(): void {

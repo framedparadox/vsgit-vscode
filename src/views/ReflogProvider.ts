@@ -11,17 +11,23 @@ export type ReflogNode =
  * Reflog view for the active repository's HEAD. Each entry exposes
  * checkout/reset actions so lost commits can be recovered.
  */
-export class ReflogProvider implements vscode.TreeDataProvider<ReflogNode> {
+export class ReflogProvider implements vscode.TreeDataProvider<ReflogNode>, vscode.Disposable {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<
     ReflogNode | undefined
   >();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+  private readonly subscription: vscode.Disposable;
 
   private entries: ReflogEntry[] = [];
   private repo: Repository | undefined;
 
   constructor(private readonly manager: RepositoryManager) {
-    manager.onDidChange(() => void this.refresh());
+    this.subscription = manager.onDidChange(() => void this.refresh());
+  }
+
+  dispose(): void {
+    this.subscription.dispose();
+    this._onDidChangeTreeData.dispose();
   }
 
   get activeRepo(): Repository | undefined {

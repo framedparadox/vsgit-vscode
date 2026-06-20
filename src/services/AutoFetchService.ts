@@ -75,7 +75,7 @@ export class AutoFetchService implements vscode.Disposable {
           const ab = await repo.aheadBehind();
           if (ab) {
             const prev = this.behindCache.get(repo.root) ?? 0;
-            if (ab.behind > prev && ab.behind > 0) {
+            if (ab.behind > prev && ab.behind > 0 && this.shouldNotifyIncomingCommits()) {
               const action = await vscode.window.showInformationMessage(
                 `${repo.name}: ${ab.behind} new commit(s) available from remote`,
                 "Pull Now",
@@ -111,6 +111,12 @@ export class AutoFetchService implements vscode.Disposable {
     const minutesAgo = Math.floor((Date.now() - this.lastFetchTime.getTime()) / 60000);
     const label = minutesAgo === 0 ? "just now" : `${minutesAgo}m ago`;
     this.statusBarItem.text = `$(sync) Fetched: ${label}`;
+  }
+
+  private shouldNotifyIncomingCommits(): boolean {
+    return vscode.workspace
+      .getConfiguration("vsgit")
+      .get<boolean>("autoFetch.notify", true);
   }
 
   dispose(): void {

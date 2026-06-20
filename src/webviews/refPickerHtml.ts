@@ -13,8 +13,8 @@ export function refPickerHtml(nonce: string, _cspSource: string): string {
 <head>
 <meta charset="UTF-8"/>
 <meta http-equiv="Content-Security-Policy"
-  content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';" />
-<style>
+  content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';" />
+<style nonce="${nonce}">
   *, *::before, *::after { box-sizing: border-box; }
 
   body {
@@ -164,6 +164,7 @@ export function refPickerHtml(nonce: string, _cspSource: string): string {
   #btnCancel:hover { background: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-secondaryBackground)); }
 
   .empty { padding: 20px; color: var(--vscode-descriptionForeground); text-align: center; }
+  .hidden { display: none; }
 </style>
 </head>
 <body>
@@ -181,7 +182,7 @@ export function refPickerHtml(nonce: string, _cspSource: string): string {
 
   <div id="treeWrap">
     <div id="tree"></div>
-    <div id="empty" class="empty" style="display:none">No refs match your filter.</div>
+    <div id="empty" class="empty hidden">No refs match your filter.</div>
   </div>
 
   <div id="footer">

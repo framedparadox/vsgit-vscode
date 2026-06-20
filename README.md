@@ -2,7 +2,7 @@
 
 A full-featured, Git client for VS Code. VsGit spawns the `git`
 binary directly — no libgit2, no reimplementation of git in JavaScript — and
-surfaces **160+ commands** across every Git workflow through dedicated views,
+surfaces **170+ commands** across every Git workflow through dedicated views,
 webviews, and an interactive commit graph.
 
 ![VsGit Git Graph](docs/git-graph.png)
@@ -67,14 +67,15 @@ config, hooks, credential helpers, and aliases apply.
 Colour-coded lanes, `HEAD → main` / remote / tag ref pills, a selected-row
 commit-details panel (metadata on the left, changed files on the right), and
 Eclipse Git-style columns: **Graph · Description · Author · Authored Date · Committer ·
-Committed Date** (each toggleable).
+Committed Date · Commit**. Metadata columns are toggleable from the graph toolbar;
+Authored Date and Committer are hidden by default.
 
 ### Activity bar & trees
 
 ![Sidebar views](docs/sidebar.png)
 
-The VsGit container uses its own commit-graph logo (distinct from the built-in
-Source Control icon) and hosts the Repositories and Staging trees, among others.
+The VsGit container uses a git-merge style logo and hosts the Repositories
+and Staging trees, among others.
 
 ---
 
@@ -84,13 +85,18 @@ Source Control icon) and hosts the Repositories and Staging trees, among others.
 - Multi-root workspace support with per-repo ahead/behind indicators.
 - Full tree of branches, remotes, tags, stashes, submodules, and worktrees.
 - Inline checkout, push, pull, fetch, merge, and rebase from tree nodes.
+- **Reset HEAD** submenu with all five git modes — soft, mixed, hard, keep, and
+  merge — each picking the target ref and confirming before a hard reset.
 - **Switch To** quick picker (`⌘⇧G B` / `Ctrl+Shift+G B`) across all branches and tags.
 - Sequencer controls (Continue / Skip / Abort) appear automatically during an
   in-progress rebase, merge, cherry-pick, or revert.
 
 ### Staging view & Commit webview
 - Staged / Changes / Conflicts groups.
+- Changed files render as a collapsible **tree or flat list** (toggle persisted
+  across sessions), with a descriptive status label per file.
 - Hunk-level stage and unstage (forward/reverse patch apply to the index).
+- **Reset Changes** on any unstaged file to revert it.
 - Commit with **GPG sign** (`-S`) and **DCO sign-off** options, or **amend** the
   last commit (message prefilled).
 
@@ -99,8 +105,8 @@ Source Control icon) and hosts the Repositories and Staging trees, among others.
   unit-tested graph layout — branch lanes stay connected across rows.
 - Filter by branch, author, or message; restrict by date range.
 - Per-commit context menu: checkout (detached), create branch/tag, cherry-pick,
-  revert, reset (soft / mixed / hard), compare with HEAD or another commit,
-  copy SHA, and show full details.
+  revert, reset (soft / mixed / hard / keep / merge), compare with HEAD or
+  another commit, copy SHA, and show full details.
 - **Compare Branches** mode for a symmetric `A...B` diff.
 - Commits are loaded in `--topo-order` so a child always precedes its parents,
   which is what the lane layout needs to draw a correct graph.
@@ -151,6 +157,7 @@ Source Control icon) and hosts the Repositories and Staging trees, among others.
 | **Submodules** | Add, update, sync, deinit |
 | **Maintenance** | `git gc`, prune, fsck, and repo maintenance helpers |
 | **Blame** | Toggleable inline blame annotations (`⌘⇧G A`) |
+| **Tags** | Webview **Create Tag** dialog — name, message, and annotate / sign / force / push options in one form |
 | **GitHub** | Fetch Pull Requests — pulls `refs/pull/*/head` as local refs |
 
 Interactive rebase and commit-message editing are routed back into VS Code via a
@@ -173,7 +180,7 @@ rebase -i` opens a native editor instead of a terminal vi session.
 | `⌘⇧G K` | `Ctrl+Shift+G K` | Cherry-Pick Commit |
 | `⌘⇧G ,` | `Ctrl+Shift+G ,` | Open Git Config Panel |
 
-All 160+ commands are also available from the Command Palette under the
+All 170+ commands are also available from the Command Palette under the
 **Git (VsGit)** category.
 
 ---
@@ -205,10 +212,12 @@ All settings live under the `vsgit.*` namespace.
 
 | Setting | Default | Description |
 |---|---|---|
+| `vsgit.showAdvancedViews` | `false` | Show advanced sidebar sections such as Staging, Reflog, Synchronize, Worktrees, Conflicts, and Compare. |
 | `vsgit.git.path` | `""` | Custom path to the `git` executable; empty uses `$PATH`. |
 | `vsgit.autoRefresh` | `true` | Refresh views automatically when the repo changes. |
 | `vsgit.autoFetch.enabled` | `false` | Periodically fetch from all remotes. |
 | `vsgit.autoFetch.intervalMinutes` | `3` | Minutes between automatic fetches. |
+| `vsgit.autoFetch.notify` | `true` | Notify when auto-fetch discovers new incoming commits. |
 | `vsgit.fetch.pruneOnFetch` | `true` | Prune deleted remote-tracking branches on fetch. |
 | `vsgit.defaultPullMode` | `merge` | Pull strategy: `merge` or `rebase`. |
 | `vsgit.confirmDestructiveActions` | `true` | Confirm hard reset, clean, force-push, etc. |
@@ -222,15 +231,15 @@ All settings live under the `vsgit.*` namespace.
 | `vsgit.graph.sortOrder` | `date` | Commit sort order for the History view. |
 | `vsgit.graph.style` | `rounded` | Branch line style: `rounded` curves or `angular` elbows. |
 | `vsgit.graph.colours` | 12-colour palette | Branch lane colours cycled through in the graph. |
-| `vsgit.graph.dateFormat` | `relative` | Date format in the graph (`relative` / `iso` / `standard`). |
+| `vsgit.graph.dateFormat` | `standard` | Date format in the graph (`relative` / `iso` / `standard`). |
 | `vsgit.graph.showRemoteBranches` | `true` | Show remote branches in the graph by default. |
 | `vsgit.graph.showSidebar` | `true` | Show the graph's left sidebar tree. |
 | `vsgit.graph.showStatusBarItem` | `true` | Show a *Git Graph* button in the status bar. |
 | `vsgit.graph.bottomPanelMode` | `editor` | How the graph opens a changed file's diff. |
 | `vsgit.graph.showIdColumn` | `true` | Show the Id (hash) column. |
 | `vsgit.graph.showAuthorColumn` | `true` | Show the Author column. |
-| `vsgit.graph.showAuthoredDateColumn` | `true` | Show the Authored Date column. |
-| `vsgit.graph.showCommitterColumn` | `true` | Show the Committer column. |
+| `vsgit.graph.showAuthoredDateColumn` | `false` | Show the Authored Date column. |
+| `vsgit.graph.showCommitterColumn` | `false` | Show the Committer column. |
 | `vsgit.graph.showCommittedDateColumn` | `true` | Show the Committed Date column. |
 
 There's also a graphical **Git Config editor** (`⌘⇧G ,`) for editing local /
@@ -253,9 +262,10 @@ src/
                           (log, graphLog, status, refs, diff, blame, config,
                            reflog, rebaseTodo, worktree)
   views/                  tree data providers (Repositories, Staging, …)
-  webviews/               webview panels (Graph, History, Commit, pickers)
+  webviews/               webview panels (Graph, History, Commit, Create Tag,
+                          pickers)
   services/               auto-fetch, file-system watcher, status bar
-  util/                   IPC servers (askpass / editor) + helpers
+  util/                   IPC servers (askpass / editor) + helpers (html escape)
 resources/
   graphLayout.js          shared, unit-tested commit-graph layout (UMD)
   graph.js / graph.css    Git Graph panel client
@@ -309,11 +319,13 @@ required. They cover the pure logic that's most worth pinning down:
 
 - every output parser under `src/git/parsers/` (log, graph-log, status, refs,
   diff, blame, config, reflog, rebase-todo, worktree),
-- the shared commit-graph layout (`resources/graphLayout.test.js`),
-- the argument guards and the IPC token comparison.
+- the shared commit-graph layout (`resources/graphLayout.test.js`) and the
+  Git Graph webview client (`resources/manifest.test.js`),
+- the `GitExecutor` argv assembly and the `Repository` command builders,
+- the argument guards, the HTML-escape helper, and the IPC token comparison.
 
 ```bash
-npm test     # 60 tests
+npm test     # 142 tests
 ```
 
 CI (GitHub Actions) runs type-check, build, the test suite, and packages the

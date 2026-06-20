@@ -66,8 +66,10 @@ function openConfigEditor(repo: Repository, manager: RepositoryManager): void {
         panel.webview.postMessage({
           type: "extensionSettings",
           settings: {
+            "autoRefresh": cfg.get<boolean>("autoRefresh", true),
             "autoFetch.enabled": cfg.get<boolean>("autoFetch.enabled", false),
             "autoFetch.intervalMinutes": cfg.get<number>("autoFetch.intervalMinutes", 3),
+            "autoFetch.notify": cfg.get<boolean>("autoFetch.notify", true),
             "confirmDestructiveActions": cfg.get<boolean>("confirmDestructiveActions", true),
             "defaultPullMode": cfg.get<string>("defaultPullMode", "merge"),
           },

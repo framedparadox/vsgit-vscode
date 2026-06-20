@@ -1,6 +1,7 @@
 import * as net from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
+import * as fs from "node:fs";
 import * as crypto from "node:crypto";
 import * as vscode from "vscode";
 import { safeEqual } from "./token";
@@ -77,6 +78,7 @@ export class EditorServer implements vscode.Disposable {
       };
       if (typeof req.token !== "string" || !safeEqual(req.token, this.token)) {
         socket.write(JSON.stringify({ ok: false }) + "\n");
+        socket.destroy();
         return;
       }
       authed = true;
@@ -107,7 +109,7 @@ export class EditorServer implements vscode.Disposable {
     this.server.close();
     if (process.platform !== "win32") {
       try {
-        require("node:fs").unlinkSync(this.sockPath);
+        fs.unlinkSync(this.sockPath);
       } catch {
         // already gone
       }

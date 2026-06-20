@@ -317,99 +317,83 @@ Implement an interactive, visual git graph similar to git-graph extension and So
 
 ---
 
-## Phase 8: Auto-Fetch & Background Operations ⏰ TODO
+## Phase 8: Auto-Fetch & Background Operations ✅ COMPLETE
 
 ### Objectives
 Implement automatic background fetching and repository monitoring.
 
-### Tasks
-- [ ] **Auto-Fetch Service**
-  - Create `src/services/AutoFetchService.ts`
-  - Read `vsgit.autoFetch.enabled` and `vsgit.autoFetch.intervalMinutes`
-  - Start timer on extension activation
-  - Fetch all remotes for all repositories
-  - Show subtle notification on new commits
-  - Pause during active operations (merge, rebase, etc.)
+### Completed Tasks
+- ✅ **Auto-Fetch Service**
+  - Created `src/services/AutoFetchService.ts`
+  - Reads `vsgit.autoFetch.enabled`, `vsgit.autoFetch.intervalMinutes`, and `vsgit.autoFetch.notify`
+  - Starts/stops the interval from extension activation and config changes
+  - Fetches all remotes for all repositories
+  - Skips repositories with merge/rebase/cherry-pick/revert operations in progress
+  - Shows optional notifications with a "Pull Now" action when new incoming commits are found
 
-- [ ] **File System Watcher**
-  - Watch `.git/` folder for external changes
-  - Detect:
-    - External commits (from command line)
-    - Branch switches
-    - Merge/rebase progress
-  - Auto-refresh views on change
+- ✅ **File System Watcher**
+  - Created `src/services/GitWatcherService.ts`
+  - Watches `.git` sentinel files for branch switches, merge/rebase/cherry-pick/revert state, and external commits
+  - Debounces refreshes and respects `vsgit.autoRefresh`
 
-- [ ] **Ahead/Behind Indicators**
-  - Show ahead/behind count in Repositories view
-  - Update after fetch
-  - Show in status bar (optional setting)
+- ✅ **Ahead/Behind Indicators**
+  - Refreshes ahead/behind state after fetch
+  - Shows pull/push badges in the Git Graph toolbar
+  - Shows last-fetch time in the auto-fetch status bar item
 
-- [ ] **Pull Notifications**
-  - Show notification when remote has new commits
-  - Quick action: "Pull Now" button
-  - Respect `vsgit.autoFetch.notify` setting
+- ✅ **Pull Notifications**
+  - Shows notifications when remote commits arrive
+  - Supports the "Pull Now" action
+  - Respects `vsgit.autoFetch.notify`
 
 ### Implementation Notes
 - Use `vscode.workspace.createFileSystemWatcher()` for `.git/**` changes
 - Debounce rapid file changes (500ms)
 - Use `setInterval()` for auto-fetch timer
 - Clear timer on extension deactivation
-- Add status bar item showing last fetch time
+- Status bar item shows last fetch time and can trigger `vsgit.autoFetch.fetchNow`
 
 ---
 
-## Phase 9: Configuration & Settings UI 🎨 TODO
+## Phase 9: Configuration & Settings UI ✅ COMPLETE
 
 ### Objectives
 Provide in-app configuration UI for common git settings.
 
-### Tasks
-- [ ] **Git Config Editor**
-  - Webview panel showing user.name, user.email, etc.
-  - Three levels: Local (repo), Global (user), System
-  - Edit common settings:
-    - User identity (name, email)
-    - Default branch name
-    - Pull strategy (merge/rebase)
-    - Push default (simple/matching/current)
-    - GPG signing
-  - Show all settings in advanced mode (key-value list)
+### Completed Tasks
+- ✅ **Git Config Editor**
+  - `src/commands/config.ts` opens a webview panel for local, global, and system scopes
+  - Local/global scopes support add, edit, and unset
+  - System scope is displayed as read-only
+  - Advanced key/value entries are loaded from `git config --list --show-origin --show-scope`
 
-- [ ] **Repository Settings Panel**
-  - Per-repository configuration
-  - Quick actions:
-    - Set upstream branch
-    - Configure remote URLs
-    - Set pull strategy
-    - Enable/disable GPG signing
-    - Set commit template path
+- ✅ **Repository Settings Panel**
+  - Remotes tab lists fetch/push URLs
+  - Supports adding and removing remotes
+  - Per-repository config can be edited through local scope
 
-- [ ] **Extension Settings Integration**
-  - Show current `vsgit.*` settings
-  - Quick toggle buttons for boolean settings
-  - Link to VS Code settings editor
+- ✅ **Extension Settings Integration**
+  - Extension tab shows common `vsgit.*` settings
+  - Supports toggles for auto refresh, auto fetch, auto-fetch notifications, and destructive-action confirmations
+  - Supports auto-fetch interval and default pull-mode edits
 
 ### Implementation Notes
-- Create `src/webviews/config/` folder
+- Uses `src/webviews/configHtml.ts`
 - Use `git config --list --show-origin --show-scope` to read
 - Use `git config --local/--global --add/--unset` to write
-- Add command `vsgit.config.openPanel`
+- Command `vsgit.config.openPanel` is registered as the keybinding/palette alias
 
 ---
 
-## Phase 10: Integration & Polish 🎯 TODO
+## Phase 10: Integration & Polish 🔄 IN PROGRESS
 
 ### Objectives
 Final integration, performance optimization, accessibility, and testing.
 
 ### Tasks
-- [ ] **Keyboard Shortcuts**
-  - Define default keybindings for common operations
-  - Examples:
-    - `Cmd+Shift+G C` — Commit
-    - `Cmd+Shift+G P` — Push
-    - `Cmd+Shift+G L` — Show History
-    - `Cmd+Shift+G F` — Fetch
+- [x] **Keyboard Shortcuts**
+  - Default keybindings are contributed in `package.json`
+  - Covered commands include Commit, Push, History, Fetch, Switch To, Inline Blame, Git Graph, Cherry-Pick, and Git Config
 
 - [ ] **Accessibility (a11y)**
   - Ensure all tree views have proper ARIA labels
@@ -423,35 +407,33 @@ Final integration, performance optimization, accessibility, and testing.
   - Lazy-load views
   - Cache git output where possible
 
-- [ ] **Error Handling**
-  - Graceful degradation when git not found
-  - Clear error messages for common git failures
-  - Suggest fixes for common issues (e.g., merge conflicts)
+- [x] **Error Handling**
+  - `src/commands/shared.ts` humanizes common git failures
+  - Command flows use shared progress/error wrappers where practical
+  - Conflict and destructive-operation paths surface explicit confirmations or follow-up actions
 
 - [ ] **Testing**
-  - Unit tests for parsers (status, log, blame, etc.)
-  - Integration tests for commands
-  - Mock git execution for tests
-  - Test coverage > 70%
+  - ✅ Unit tests for parsers (status, log, blame, refs, reflog, config, diff, worktree, etc.)
+  - ✅ Mock-git Repository security/argv tests
+  - ✅ Static manifest/docs regression tests
+  - [ ] Integration tests for command flows inside VS Code
+  - [ ] Coverage threshold / report
 
 - [ ] **Documentation**
-  - README with feature overview
-  - GIFs/screenshots for key features
-  - CHANGELOG tracking all releases
-  - CONTRIBUTING guide
-  - Keyboard shortcuts reference
+  - ✅ README with feature overview, screenshots, settings, architecture, and keyboard shortcuts
+  - ✅ CHANGELOG and LICENSE
+  - [ ] CONTRIBUTING guide
+  - [ ] GIFs or updated live screenshots for key workflows
 
 - [ ] **Marketplace Preparation**
-  - Extension icon and banner
-  - Detailed description
-  - Categories and keywords
-  - Pricing (free/paid features)
-  - License file (MIT)
+  - ✅ Extension icon, banner, categories, keywords, and license metadata
+  - ✅ Detailed README description
+  - [ ] Final VSIX inspection and marketplace publish checklist
 
 ### Implementation Notes
-- Add `contributes.keybindings` to `package.json`
+- `contributes.keybindings` is present in `package.json`
 - Use `@axe-core/playwright` for a11y testing
-- Add `test/` folder with `mocha` or `vitest`
+- Current tests use Node's built-in test runner
 - Create `.github/workflows/ci.yml` for CI/CD
 - Use `vsce package` to create `.vsix` for manual testing
 
@@ -471,6 +453,7 @@ Final integration, performance optimization, accessibility, and testing.
 - `vsgit.autoRefresh` — Auto-refresh views on change
 - `vsgit.autoFetch.enabled` — Enable auto-fetch
 - `vsgit.autoFetch.intervalMinutes` — Fetch interval
+- `vsgit.autoFetch.notify` — Notify when auto-fetch discovers incoming commits
 - `vsgit.graph.pageSize` — History page size (Phase 3)
 - `vsgit.graph.sortOrder` — Commit sort order
 - `vsgit.confirmDestructiveActions` — Confirm destructive ops
@@ -481,7 +464,7 @@ Final integration, performance optimization, accessibility, and testing.
 
 ## Current Status
 
-### ✅ Completed (70%)
+### ✅ Completed (~90%)
 - Phase 1: Explorer context menu (Team menu) — 100%
 - Phase 2: Branch & tag enhancements — 100%
 - Phase 3: History view enhancements — 100%
@@ -489,22 +472,22 @@ Final integration, performance optimization, accessibility, and testing.
 - Phase 5: SCM view menus & safety layer — 100%
 - Phase 6: Advanced operations (LFS, Notes, Archive, Subtree) — 100%
 - Phase 7: Git graph interactive visualization — 100%
+- Phase 8: Auto-fetch & background operations — 100%
+- Phase 9: Configuration & settings UI — 100%
 
 ### 🔄 In Progress
-- None
+- Phase 10: Integration & polish
 
-### 📋 Remaining (30%)
-- Phase 8: Auto-fetch & background operations — 0%
-- Phase 9: Configuration & settings UI — 0%
-- Phase 10: Integration & polish — 0%
+### 📋 Remaining
+- Phase 10: Accessibility audit, deeper command integration tests, CI workflow, CONTRIBUTING guide, and marketplace packaging polish
 
 ---
 
-## Extension Statistics (After Phase 7)
+## Extension Statistics (Current)
 
-- **Total Commands**: 125+ commands
-- **Total Views**: 7 tree views + 1 webview panel (Git Graph)
-- **Command Files**: 27+ modules
+- **Total Commands**: 167 contributed commands
+- **Total Views**: 8 sidebar views + 1 Commit webview + 1 Git Graph panel
+- **Command Files**: 29+ modules
 - **Repository Methods**: 92+ git operations
 - **Lines of Code**: ~11,500+ lines
 
@@ -512,6 +495,6 @@ Final integration, performance optimization, accessibility, and testing.
 
 ## Next Steps
 
-1. **Immediate**: Phase 8 — Auto-fetch & background operations
-2. **High Priority**: Phase 9 — Configuration & settings UI
-3. **Final**: Phase 10 — Integration, polish, and release preparation
+1. **Immediate**: Phase 10 — add CI and higher-level command integration tests
+2. **High Priority**: Accessibility and keyboard-navigation audit for webviews
+3. **Final**: Marketplace packaging polish and release preparation

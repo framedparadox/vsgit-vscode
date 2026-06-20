@@ -11,14 +11,20 @@ export type ConflictNode =
  * Conflicts view — shows all files in a conflicted state (merge, rebase,
  * cherry-pick). Automatically updates whenever the repository state changes.
  */
-export class ConflictsProvider implements vscode.TreeDataProvider<ConflictNode> {
+export class ConflictsProvider implements vscode.TreeDataProvider<ConflictNode>, vscode.Disposable {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<
     ConflictNode | undefined
   >();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+  private readonly subscription: vscode.Disposable;
 
   constructor(private readonly manager: RepositoryManager) {
-    manager.onDidChange(() => this._onDidChangeTreeData.fire(undefined));
+    this.subscription = manager.onDidChange(() => this._onDidChangeTreeData.fire(undefined));
+  }
+
+  dispose(): void {
+    this.subscription.dispose();
+    this._onDidChangeTreeData.dispose();
   }
 
   getTreeItem(node: ConflictNode): vscode.TreeItem {

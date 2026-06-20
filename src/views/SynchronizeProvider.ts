@@ -12,11 +12,12 @@ export type SyncNode =
  * Synchronize view: incoming (behind upstream) and outgoing (ahead of upstream)
  * changesets for the active repository's current branch.
  */
-export class SynchronizeProvider implements vscode.TreeDataProvider<SyncNode> {
+export class SynchronizeProvider implements vscode.TreeDataProvider<SyncNode>, vscode.Disposable {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<
     SyncNode | undefined
   >();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+  private readonly subscription: vscode.Disposable;
 
   private repo: Repository | undefined;
   private incoming: Commit[] = [];
@@ -24,7 +25,12 @@ export class SynchronizeProvider implements vscode.TreeDataProvider<SyncNode> {
   private hasUpstream = false;
 
   constructor(private readonly manager: RepositoryManager) {
-    manager.onDidChange(() => void this.refresh());
+    this.subscription = manager.onDidChange(() => void this.refresh());
+  }
+
+  dispose(): void {
+    this.subscription.dispose();
+    this._onDidChangeTreeData.dispose();
   }
 
   async refresh(): Promise<void> {

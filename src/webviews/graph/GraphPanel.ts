@@ -24,6 +24,17 @@ interface WebviewCommit {
   kind?: "commit" | "uncommitted";
 }
 
+interface CreateTagRequest {
+  sha: string;
+  name: string;
+  message?: string;
+  annotate?: boolean;
+  sign?: boolean;
+  force?: boolean;
+  push?: boolean;
+  remote?: string;
+}
+
 /**
  * Git Graph webview panel (vscode-git-graph style) on top of the existing git
  * plumbing: an icon-only action toolbar (Pull / Push / Fetch / Commit / Branch /
@@ -146,6 +157,8 @@ export class GraphPanel {
         columns: {
           id: c.get<boolean>("graph.showIdColumn", true),
           author: c.get<boolean>("graph.showAuthorColumn", true),
+          authoredDate: c.get<boolean>("graph.showAuthoredDateColumn", false),
+          committer: c.get<boolean>("graph.showCommitterColumn", false),
           committedDate: c.get<boolean>("graph.showCommittedDateColumn", true),
         },
       },
@@ -276,6 +289,25 @@ export class GraphPanel {
           await this.refresh();
           return;
 
+        case "setColumnVisibility": {
+          const { column, visible } = message.data as {
+            column?: string;
+            visible?: boolean;
+          };
+          const settingByColumn: Record<string, string> = {
+            id: "graph.showIdColumn",
+            author: "graph.showAuthorColumn",
+            authoredDate: "graph.showAuthoredDateColumn",
+            committer: "graph.showCommitterColumn",
+            committedDate: "graph.showCommittedDateColumn",
+          };
+          const setting = column ? settingByColumn[column] : undefined;
+          if (!setting) return;
+          await this.cfg.update(setting, visible === true, vscode.ConfigurationTarget.Global);
+          await this.sendConfig();
+          return;
+        }
+
         case "setBranchFilter":
           this.branchFilters = ((message.data as { branches?: string[] }).branches || []).filter(
             (b) => b && b.length > 0,
@@ -377,7 +409,7 @@ export class GraphPanel {
           return;
 
         case "createTag":
-          await this.createTag((message.data as { sha: string }).sha);
+          await this.createTag(message.data as CreateTagRequest);
           return;
 
         case "merge":
@@ -469,6 +501,10 @@ export class GraphPanel {
           await vscode.env.clipboard.writeText(message.data as string);
           this.notify("Commit SHA copied to clipboard");
           return;
+
+        default:
+          console.warn(`GraphPanel: unhandled message type "${message.type}"`);
+          return;
       }
     } catch (error) {
       vscode.window.showErrorMessage(`${message.type} failed: ${error}`);
@@ -493,18 +529,26 @@ export class GraphPanel {
     await this.refresh();
   }
 
-  private async createTag(sha: string): Promise<void> {
-    const name = await vscode.window.showInputBox({
-      prompt: "Enter tag name",
-      placeHolder: "v1.0.0",
-    });
+  private async createTag(request: CreateTagRequest): Promise<void> {
+    const name = request.name.trim();
     if (!name) return;
-    const msg = await vscode.window.showInputBox({
-      prompt: "Enter tag message (optional)",
-      placeHolder: "Release version 1.0.0",
-    });
-    await this.repo.createTagAt(name, sha, msg, false);
-    this.notify(`Tag '${name}' created`);
+    let remote: string | undefined;
+    if (request.push) {
+      remote = request.remote?.trim() || (await this.pickRemote());
+      if (!remote) return;
+    }
+    const message = request.message?.trim() || undefined;
+    await this.repo.createTagAt(
+      name,
+      request.sha,
+      request.sign === true || request.annotate === true ? message ?? name : undefined,
+      request.sign === true,
+      request.force === true,
+    );
+    if (remote) {
+      await this.repo.pushTag(remote, name, request.force === true);
+    }
+    this.notify(request.push ? `Tag '${name}' created and pushed` : `Tag '${name}' created`);
     await this.refresh();
   }
 
@@ -824,22 +868,25 @@ export class GraphPanel {
       <span class="tb-spacer"></span>
       <span id="commit-count"></span>
       <span class="tb-sep"></span>
-      <button class="tb-btn icon-only" id="tb-pull" title="Pull">
+      <button class="tb-btn icon-only" id="tb-pull" title="Pull" data-label="Pull" aria-label="Pull">
         <span class="tb-ico" data-icon="pull"></span><span class="tb-badge" id="badge-pull"></span>
       </button>
-      <button class="tb-btn icon-only" id="tb-push" title="Push">
+      <button class="tb-btn icon-only" id="tb-push" title="Push" data-label="Push" aria-label="Push">
         <span class="tb-ico" data-icon="push"></span><span class="tb-badge" id="badge-push"></span>
       </button>
-      <button class="tb-btn icon-only" id="tb-fetch" title="Fetch"><span class="tb-ico" data-icon="fetch"></span></button>
+      <button class="tb-btn icon-only" id="tb-fetch" title="Fetch" data-label="Fetch" aria-label="Fetch"><span class="tb-ico" data-icon="fetch"></span></button>
       <span class="tb-sep"></span>
-      <button class="tb-btn icon-only" id="tb-commit" title="Commit"><span class="tb-ico" data-icon="commit"></span></button>
-      <button class="tb-btn icon-only" id="tb-branch" title="New Branch"><span class="tb-ico" data-icon="branch"></span></button>
-      <button class="tb-btn icon-only" id="tb-merge" title="Merge"><span class="tb-ico" data-icon="merge"></span></button>
-      <button class="tb-btn icon-only" id="tb-stash" title="Stash"><span class="tb-ico" data-icon="stash"></span></button>
+      <button class="tb-btn icon-only" id="tb-commit" title="Commit" data-label="Commit" aria-label="Commit"><span class="tb-ico" data-icon="commit"></span></button>
+      <button class="tb-btn icon-only" id="tb-branch" title="New Branch" data-label="New Branch" aria-label="New Branch"><span class="tb-ico" data-icon="branch"></span></button>
+      <button class="tb-btn icon-only" id="tb-merge" title="Merge" data-label="Merge" aria-label="Merge"><span class="tb-ico" data-icon="merge"></span></button>
+      <button class="tb-btn icon-only" id="tb-stash" title="Stash" data-label="Stash" aria-label="Stash"><span class="tb-ico" data-icon="stash"></span></button>
       <span class="tb-sep"></span>
-      <button class="tb-btn icon-only" id="tb-find" title="Find (Ctrl/Cmd+F)"><span class="tb-ico" data-icon="find"></span></button>
-      <button class="tb-btn icon-only" id="tb-trace" title="Trace flow: ancestors / descendants / off"><span class="tb-ico" data-icon="trace"></span></button>
-      <button class="tb-btn icon-only" id="tb-refresh" title="Refresh (Ctrl/Cmd+R)"><span class="tb-ico" data-icon="refresh"></span></button>
+      <button class="tb-btn icon-only" id="tb-find" title="Find (Ctrl/Cmd+F)" data-label="Find" aria-label="Find"><span class="tb-ico" data-icon="find"></span></button>
+      <button class="tb-btn icon-only" id="tb-columns" title="Columns" data-label="Columns" aria-label="Columns"><span class="tb-ico" data-icon="columns"></span></button>
+      <button class="tb-btn icon-only" id="tb-tracking" title="Tracking: off" data-label="Tracking" aria-label="Tracking"><span class="tb-ico" data-icon="tracking"></span></button>
+      <button class="tb-btn icon-only" id="tb-trace" title="Trace flow: ancestors / descendants / off" data-label="Trace" aria-label="Trace"><span class="tb-ico" data-icon="trace"></span></button>
+      <button class="tb-btn icon-only" id="tb-refresh" title="Refresh (Ctrl/Cmd+R)" data-label="Refresh" aria-label="Refresh"><span class="tb-ico" data-icon="refresh"></span></button>
+      <div id="columns-menu" class="columns-menu" hidden></div>
     </div>
 
     <!-- ── in-progress operation banner ────────────────────────────── -->
@@ -855,8 +902,8 @@ export class GraphPanel {
     <div id="main">
       <div id="loading">Loading graph…</div>
       <div id="empty-state" style="display:none">No Git repository is active.</div>
-      <!-- Column layout mirrors vscode-git-graph:
-           Graph | Description | Author | Date | Commit.
+      <!-- Column layout mirrors VsGit / EGit-style history:
+           Graph | Description | Author | Authored Date | Committer | Committed Date | Commit.
            The graph rail is the FIRST column so the overlay SVG keeps a clean,
            uniform coordinate space anchored to the table's left edge; ref pills +
            message text live in the Description column, and the abbreviated commit
@@ -866,6 +913,8 @@ export class GraphPanel {
           <col id="col-graph">
           <col id="col-desc">
           <col id="col-author" class="col-author">
+          <col id="col-adate" class="col-adate">
+          <col id="col-committer" class="col-committer">
           <col id="col-cdate" class="col-cdate">
           <col id="col-id" class="col-id">
         </colgroup>
@@ -874,7 +923,9 @@ export class GraphPanel {
             <th class="col-graph-head">Graph</th>
             <th>Description<span class="col-resizer" data-col="desc"></span></th>
             <th class="col-author">Author<span class="col-resizer" data-col="author"></span></th>
-            <th class="col-cdate">Date<span class="col-resizer" data-col="cdate"></span></th>
+            <th class="col-adate">Authored Date<span class="col-resizer" data-col="adate"></span></th>
+            <th class="col-committer">Committer<span class="col-resizer" data-col="committer"></span></th>
+            <th class="col-cdate">Committed Date<span class="col-resizer" data-col="cdate"></span></th>
             <th class="col-id">Commit<span class="col-resizer" data-col="id"></span></th>
           </tr>
         </thead>
@@ -892,6 +943,49 @@ export class GraphPanel {
   </div>
 
   <div id="context-menu" class="context-menu"></div>
+
+  <div id="create-tag-modal" class="modal-backdrop" hidden>
+    <form id="create-tag-form" class="modal" autocomplete="off">
+      <div class="modal-header">
+        <h2>Create Tag</h2>
+        <button type="button" class="modal-close" id="create-tag-close" title="Close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <label class="field">
+          <span>Tag Name</span>
+          <input id="create-tag-name" type="text" placeholder="v1.0.0" required>
+        </label>
+        <label class="field">
+          <span>Commit</span>
+          <input id="create-tag-sha" type="text" readonly>
+        </label>
+        <label class="check-row">
+          <input id="create-tag-annotated" type="checkbox">
+          <span>Annotated Tag</span>
+        </label>
+        <label class="check-row">
+          <input id="create-tag-signed" type="checkbox">
+          <span>Sign Tag with GPG</span>
+        </label>
+        <label class="field">
+          <span>Message</span>
+          <textarea id="create-tag-message" rows="4" placeholder="Release version 1.0.0"></textarea>
+        </label>
+        <label class="check-row">
+          <input id="create-tag-force" type="checkbox">
+          <span>Force replace existing tag</span>
+        </label>
+        <label class="check-row">
+          <input id="create-tag-push" type="checkbox">
+          <span>Push tag after creation</span>
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="tb-btn" id="create-tag-cancel">Cancel</button>
+        <button type="submit" class="tb-btn primary">Create Tag</button>
+      </div>
+    </form>
+  </div>
 
   <script nonce="${nonce}" src="${layoutUri}"></script>
   <script nonce="${nonce}" src="${jsUri}"></script>

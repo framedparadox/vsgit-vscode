@@ -424,6 +424,7 @@ tr.commit-row.uncommitted td.col-desc { font-style: italic; color: var(--vscode-
 #graph-table tr.commit-row.dimmed .gitRef { opacity: 0.5; }
 #graph-table tr.commit-row.traced td.col-desc { font-weight: 600; }
 #graph-svg .graph-line:not(.dim) { stroke-width: 2.6; }
+#graph-svg .graph-node:not(.dim) { stroke-width: 2; }
 
 /* ─── inline ref labels (gitRef pills) — exact vscode-git-graph styling ─── */
 .gitRef {

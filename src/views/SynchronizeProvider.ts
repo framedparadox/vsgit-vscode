@@ -34,7 +34,7 @@ export class SynchronizeProvider implements vscode.TreeDataProvider<SyncNode>, v
   }
 
   async refresh(): Promise<void> {
-    this.repo = this.manager.getAll()[0];
+    this.repo = this.manager.getActive();
     if (this.repo) {
       const ab = await this.repo.aheadBehind();
       this.hasUpstream = ab !== undefined;

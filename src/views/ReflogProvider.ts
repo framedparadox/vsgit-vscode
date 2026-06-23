@@ -35,7 +35,7 @@ export class ReflogProvider implements vscode.TreeDataProvider<ReflogNode>, vsco
   }
 
   async refresh(): Promise<void> {
-    this.repo = this.manager.getAll()[0];
+    this.repo = this.manager.getActive();
     if (this.repo) {
       try {
         this.entries = await this.repo.reflog("HEAD");

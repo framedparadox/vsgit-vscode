@@ -5,6 +5,7 @@ import { Repository } from "../git/Repository";
 import { historyHtml } from "./historyHtml";
 import { GitContentProvider } from "../git/GitContentProvider";
 import { Commit } from "../git/parsers/log";
+import { confirmDestructiveAction, DestructiveOperations } from "../util/confirmation";
 
 /**
  * Manages the History webview panel: a commit graph for the active repository
@@ -48,7 +49,7 @@ export class HistoryView {
   }
 
   async show(repo?: Repository, file?: string): Promise<void> {
-    this.repo = repo ?? this.manager.getAll()[0];
+    this.repo = repo ?? this.manager.getActive();
     if (!this.repo) {
       vscode.window.showWarningMessage("No Git repository to show history for.");
       return;
@@ -384,12 +385,11 @@ export class HistoryView {
         await wrap(() => repo.reset(sha, "mixed"), "Reset (mixed)");
         break;
       case "Reset → hard": {
-        const confirm = await vscode.window.showWarningMessage(
-          `Hard reset to ${sha.slice(0, 8)}? Working tree changes will be lost.`,
-          { modal: true },
-          "Reset Hard",
-        );
-        if (confirm === "Reset Hard") {
+        const confirmed = await confirmDestructiveAction({
+          operation: DestructiveOperations.HARD_RESET,
+          message: `Hard reset to ${sha.slice(0, 8)}? Working tree changes will be lost.`,
+        });
+        if (confirmed) {
           await wrap(() => repo.reset(sha, "hard"), "Reset (hard)");
         }
         break;

@@ -105,6 +105,110 @@ test('Git Graph column settings are contributed, sent, and rendered', () => {
   assert.ok(graphJs.includes('tb-columns'), 'graph.js wires the Columns toolbar button');
 });
 
+test('native SCM provider is registered and menu actions target resource groups', () => {
+  const pkg = JSON.parse(read('package.json'));
+  const extension = read('src/extension.ts');
+  const scmProvider = read('src/views/ScmProvider.ts');
+  const scmCommands = read('src/commands/scm.ts');
+  const resourceStateMenus = pkg.contributes?.menus?.['scm/resourceState/context'] ?? [];
+  const resourceGroupMenus = pkg.contributes?.menus?.['scm/resourceGroup/context'] ?? [];
+
+  assert.ok(extension.includes('new VsgitScmProvider(manager)'), 'SCM provider is activated');
+  assert.ok(scmProvider.includes('vscode.scm.createSourceControl('), 'SCM provider creates source controls');
+  assert.ok(scmProvider.includes('"index", "Staged Changes"'), 'SCM provider exposes staged group');
+  assert.ok(scmProvider.includes('"workingTree", "Changes"'), 'SCM provider exposes working tree group');
+  assert.ok(scmProvider.includes('"merge", "Merge Changes"'), 'SCM provider exposes merge group');
+  assert.ok(scmProvider.includes('vsgitChange: change'), 'SCM resources carry parsed status metadata');
+  assert.ok(scmProvider.includes('quickDiffProvider'), 'native SCM uses VsGit quick diff');
+  assert.ok(scmProvider.includes('new VsgitQuickDiffProvider(this.manager, repo.root)'), 'SCM provider reuses quick diff provider');
+  assert.ok(scmProvider.includes('acceptInputCommand'), 'native SCM input box can commit');
+  assert.ok(!extension.includes('vscode.scm.createSourceControl("vsgit", "VsGit")'), 'old empty SCM provider was removed');
+  assert.ok(scmCommands.includes('resourceGroup('), 'SCM commands inspect resource group metadata');
+  assert.ok(scmCommands.includes('resourceChange('), 'SCM commands inspect status metadata');
+  assert.ok(scmCommands.includes('discardPathSets('), 'SCM discard separates tracked and untracked paths');
+  assert.ok(scmCommands.includes('repo.discard(discard.tracked, discard.untracked)'), 'SCM discard cleans untracked paths');
+  assert.ok(scmCommands.includes('VSGIT_EMPTY_REF'), 'SCM diff can render deleted working-tree files');
+  assert.ok(scmCommands.includes('Index ↔ Working Tree'), 'SCM working-tree diffs compare index to working tree');
+  assert.ok(scmCommands.includes('manager.findByUri'), 'SCM commands resolve repos by URI containment');
+
+  assert.strictEqual(
+    resourceStateMenus.find((item) => item.command === 'vsgit.scm.stage')?.when,
+    'scmProvider == vsgit && scmResourceGroup != index',
+  );
+  assert.strictEqual(
+    resourceStateMenus.find((item) => item.command === 'vsgit.scm.unstage')?.when,
+    'scmProvider == vsgit && scmResourceGroup == index',
+  );
+  assert.strictEqual(
+    resourceStateMenus.find((item) => item.command === 'vsgit.scm.discard')?.when,
+    'scmProvider == vsgit && scmResourceGroup != index',
+  );
+  assert.strictEqual(
+    resourceGroupMenus.find((item) => item.command === 'vsgit.scm.stageAll')?.when,
+    'scmProvider == vsgit && scmResourceGroup != index',
+  );
+  assert.strictEqual(
+    resourceGroupMenus.find((item) => item.command === 'vsgit.scm.unstageAll')?.when,
+    'scmProvider == vsgit && scmResourceGroup == index',
+  );
+  assert.strictEqual(
+    resourceGroupMenus.find((item) => item.command === 'vsgit.scm.discardAll')?.when,
+    'scmProvider == vsgit && scmResourceGroup != index',
+  );
+});
+
+test('configured git path and command preview are wired through the shared executor', () => {
+  const executor = read('src/git/GitExecutor.ts');
+  const manager = read('src/git/RepositoryManager.ts');
+  const extension = read('src/extension.ts');
+  const contentProvider = read('src/git/GitContentProvider.ts');
+  const commandPreview = read('src/util/commandPreview.ts');
+
+  assert.ok(executor.includes('private gitPath: string = "git"'), 'GitExecutor stores the configured path');
+  assert.ok(executor.includes('spawn(this.gitPath, args'), 'GitExecutor spawns the configured path');
+  assert.ok(executor.includes('this.preview(args, options.cwd, this.gitPath)'), 'preview sees the executable path');
+  assert.ok(manager.includes('new GitExecutor(configuredGitPath(), shouldRunGitCommand)'), 'manager creates shared configured executor');
+  assert.ok(manager.includes('updateGitPathFromConfiguration()'), 'manager can update git path after configuration changes');
+  assert.ok(extension.includes('e.affectsConfiguration("vsgit.git.path")'), 'extension listens for git path changes');
+  assert.ok(extension.includes('manager.updateGitPathFromConfiguration()'), 'extension applies git path changes');
+  assert.ok(extension.includes('new GitContentProvider(manager.getGitExecutor())'), 'diff content provider uses shared executor');
+  assert.ok(contentProvider.includes('constructor(private readonly git: GitExecutor)'), 'content provider receives executor');
+  assert.ok(contentProvider.includes('export const VSGIT_EMPTY_REF'), 'content provider has explicit empty-side ref');
+  assert.ok(contentProvider.includes('vscode.Uri.from({'), 'content provider encodes virtual URI paths structurally');
+  assert.ok(commandPreview.includes('get<boolean>("showCommandPreview", false)'), 'preview setting is read');
+  assert.ok(commandPreview.includes('[gitPath || "git", ...args]'), 'preview renders configured executable');
+  assert.ok(commandPreview.includes('isReadOnlyGitCommand(args)'), 'background read-only commands are not previewed');
+});
+
+test('repository routing uses active repo and containment-aware URI lookup', () => {
+  const manager = read('src/git/RepositoryManager.ts');
+  const staging = read('src/views/StagingProvider.ts');
+  const sync = read('src/views/SynchronizeProvider.ts');
+  const reflog = read('src/views/ReflogProvider.ts');
+  const history = read('src/webviews/HistoryView.ts');
+  const graph = read('src/webviews/graph/GraphPanel.ts');
+  const quickDiff = read('src/git/QuickDiffProvider.ts');
+  const blame = read('src/decorations/BlameController.ts');
+  const compare = read('src/commands/compare.ts');
+
+  assert.ok(manager.includes('getActive(): Repository | undefined'), 'manager exposes active repo');
+  assert.ok(manager.includes('setActive(root: string): void'), 'manager can set active repo');
+  assert.ok(manager.includes('findByUri(uri: vscode.Uri): Repository | undefined'), 'manager resolves repo by URI');
+  assert.ok(manager.includes('sort((a, b) => b.root.length - a.root.length)'), 'nested repos prefer deepest root');
+  assert.ok(manager.includes('relativePath(repo: Repository, uri: vscode.Uri): string'), 'manager owns git-relative path conversion');
+  assert.ok(manager.includes('"--absolute-git-dir"'), 'manager resolves linked-worktree git dirs');
+  assert.ok(manager.includes('"--git-common-dir"'), 'manager resolves common git dirs for refs');
+  assert.ok(manager.includes('watchGitPath(root, watchPath)'), 'manager watches resolved git paths');
+  assert.ok(staging.includes('return this.manager.getActive();'), 'staging view uses active repo');
+  assert.ok(sync.includes('this.repo = this.manager.getActive();'), 'synchronize view uses active repo');
+  assert.ok(reflog.includes('this.repo = this.manager.getActive();'), 'reflog view uses active repo');
+  assert.ok(history.includes('repo ?? this.manager.getActive()'), 'history fallback uses active repo');
+  assert.ok(graph.includes('initialRepo ?? manager.getActive()'), 'graph fallback uses active repo');
+  assert.ok(quickDiff.includes('this.manager.findByUri(uri)'), 'quick diff uses containment lookup');
+  assert.ok(blame.includes('this.manager.findByUri(editor.document.uri)'), 'blame uses containment lookup');
+  assert.ok(compare.includes('manager.findByUri(uri)'), 'compare uses containment lookup');
+});
+
 test('Git Graph trace defaults to explicit toolbar control', () => {
   const graphJs = read('resources/graph.js');
 

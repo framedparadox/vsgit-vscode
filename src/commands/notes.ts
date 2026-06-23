@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { VsgitNode } from "../views/RepositoriesProvider";
 import { resolveRepo, errMsg, withProgress } from "./shared";
+import { confirmDestructiveAction, DestructiveOperations } from "../util/confirmation";
 
 /** Git notes operations: add, edit, remove, show notes on commits. */
 export function registerNotesCommands(
@@ -82,12 +83,11 @@ export function registerNotesCommands(
     });
     if (!ref) return;
 
-    const confirm = await vscode.window.showWarningMessage(
-      `Remove note from ${ref}?`,
-      { modal: true },
-      "Remove"
-    );
-    if (confirm !== "Remove") return;
+    const confirmed = await confirmDestructiveAction({
+      operation: DestructiveOperations.DISCARD_CHANGES,
+      message: `Remove note from ${ref}?`,
+    });
+    if (!confirmed) return;
 
     try {
       await withProgress(manager, `Removing note from ${ref}`, () =>

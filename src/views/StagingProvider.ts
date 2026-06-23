@@ -12,8 +12,8 @@ export type StagingNode =
 /**
  * Staging view: two top-level groups (Staged / Unstaged Changes) listing the
  * files in the active repository. Mirrors VsGit's Staging view layout. The
- * "active" repository is the first discovered repo (multi-repo selection comes
- * in a later phase).
+ * active repository is selected from the Repositories view and falls back to
+ * the first available repo when nothing has been selected yet.
  */
 export class StagingProvider implements vscode.TreeDataProvider<StagingNode>, vscode.Disposable {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<
@@ -32,7 +32,7 @@ export class StagingProvider implements vscode.TreeDataProvider<StagingNode>, vs
   }
 
   get activeRepo(): Repository | undefined {
-    return this.manager.getAll()[0];
+    return this.manager.getActive();
   }
 
   getTreeItem(node: StagingNode): vscode.TreeItem {

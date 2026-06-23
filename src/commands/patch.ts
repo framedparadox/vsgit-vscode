@@ -2,7 +2,6 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import * as fs from "node:fs/promises";
 import { RepositoryManager } from "../git/RepositoryManager";
-import { GitExecutor } from "../git/GitExecutor";
 import { errMsg, resolveRepo, withProgress } from "./shared";
 import { VsgitNode } from "../views/RepositoriesProvider";
 
@@ -21,7 +20,7 @@ export function registerPatchCommands(
   reg("vsgit.patch.createFromStaged", async (node) => {
     const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
-    const git = new GitExecutor();
+    const git = manager.getGitExecutor();
     let diff: string;
     try {
       diff = await git.stdout(["diff", "--cached"], { cwd: repo.root });
@@ -59,7 +58,7 @@ export function registerPatchCommands(
     });
     if (!nStr) return;
     const n = Number(nStr.trim());
-    const git = new GitExecutor();
+    const git = manager.getGitExecutor();
     const folder = await vscode.window.showOpenDialog({
       canSelectFiles: false,
       canSelectFolders: true,
@@ -105,7 +104,7 @@ export function registerPatchCommands(
       vscode.window.showWarningMessage("No Git repositories found.");
       return;
     }
-    let repo = repos.find((r) => patchUri!.fsPath.startsWith(r.root));
+    let repo = manager.findByUri(patchUri);
     if (!repo) {
       if (repos.length === 1) {
         repo = repos[0];
@@ -125,7 +124,7 @@ export function registerPatchCommands(
     );
     if (!mode) return;
 
-    const git = new GitExecutor();
+    const git = manager.getGitExecutor();
     const args = ["apply"];
     if (mode.startsWith("Apply (stage")) {
       args.push("--index");

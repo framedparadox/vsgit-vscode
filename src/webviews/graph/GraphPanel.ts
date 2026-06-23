@@ -3,6 +3,7 @@ import * as path from "node:path";
 import { Repository } from "../../git/Repository";
 import { RepositoryManager } from "../../git/RepositoryManager";
 import { GitContentProvider } from "../../git/GitContentProvider";
+import { confirmDestructiveAction } from "../../util/confirmation";
 
 type RefType = "head" | "localBranch" | "remoteBranch" | "tag" | "stash";
 
@@ -65,7 +66,7 @@ export class GraphPanel {
     this.panel = panel;
     this.manager = manager;
     this.extensionUri = extensionUri;
-    this.activeRepo = initialRepo ?? manager.getAll()[0];
+    this.activeRepo = initialRepo ?? manager.getActive();
     this.panel.webview.html = this.getHtmlForWebview();
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
     this.panel.webview.onDidReceiveMessage(
@@ -140,7 +141,7 @@ export class GraphPanel {
         return live;
       }
     }
-    this.activeRepo = this.manager.getAll()[0];
+    this.activeRepo = this.manager.getActive();
     return this.activeRepo;
   }
 
@@ -206,7 +207,9 @@ export class GraphPanel {
 
       // Attach stash badges to their base commit (first cut of stash topology).
       for (const stash of repo.stashes) {
-        const target = commits.find((c) => c.sha === stash.ref) ?? commits[0];
+        const target =
+          commits.find((c) => c.sha === stash.baseObjectId) ??
+          commits.find((c) => c.sha === stash.objectId);
         if (target) target.refs.push({ name: stash.ref, type: "stash" });
       }
 
@@ -818,8 +821,10 @@ export class GraphPanel {
   }
 
   private async confirm(message: string, action: string): Promise<boolean> {
-    const choice = await vscode.window.showWarningMessage(message, { modal: true }, action);
-    return choice === action;
+    return confirmDestructiveAction({
+      operation: action,
+      message,
+    });
   }
 
   private notify(message: string): void {

@@ -1,6 +1,7 @@
 import * as crypto from "node:crypto";
 import * as vscode from "vscode";
 import { Repository } from "../git/Repository";
+import type { Commit } from "../git/parsers/log";
 import { commitPickerHtml } from "./commitPickerHtml";
 
 /**
@@ -62,8 +63,7 @@ async function loadCommits(
 ): Promise<void> {
   try {
     const commits = await repo.log({ limit: 500 });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data = commits.map((c: any) => ({
+    const data = commits.map((c: Commit) => ({
       sha:           c.sha,
       shortSha:      c.shortSha,
       parents:       c.parents,

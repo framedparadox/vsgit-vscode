@@ -15,7 +15,6 @@ import { ReflogProvider } from "./views/ReflogProvider";
 import { registerReflogCommands } from "./commands/reflog";
 import { VsgitFileDecorationProvider } from "./decorations/FileDecorations";
 import { BlameController } from "./decorations/BlameController";
-import { VsgitQuickDiffProvider } from "./git/QuickDiffProvider";
 import { registerCompareCommands } from "./commands/compare";
 import { registerBlameCommands } from "./commands/blame";
 import { SynchronizeProvider } from "./views/SynchronizeProvider";
@@ -47,6 +46,7 @@ import { GitWatcherService } from "./services/GitWatcherService";
 import { GraphStatusBarService } from "./services/GraphStatusBarService";
 import { registerAutoFetchCommands } from "./commands/autoFetch";
 import { registerCommitOpsCommands } from "./commands/commitOps";
+import { VsgitScmProvider } from "./views/ScmProvider";
 
 export async function activate(
   context: vscode.ExtensionContext,
@@ -70,6 +70,10 @@ export async function activate(
       if (e.affectsConfiguration("vsgit.showAdvancedViews")) {
         syncAdvancedViewsContext();
       }
+      if (e.affectsConfiguration("vsgit.git.path")) {
+        manager.updateGitPathFromConfiguration();
+        void manager.scan();
+      }
     }),
   );
 
@@ -77,7 +81,7 @@ export async function activate(
   context.subscriptions.push(
     vscode.workspace.registerTextDocumentContentProvider(
       VSGIT_SCHEME,
-      new GitContentProvider(),
+      new GitContentProvider(manager.getGitExecutor()),
     ),
   );
 
@@ -89,6 +93,14 @@ export async function activate(
     reposListProvider,
     vscode.window.createTreeView("vsgit.repositoriesList", {
       treeDataProvider: reposListProvider,
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("vsgit.repositories.setActive", (node) => {
+      if (node && typeof node === "object" && "repo" in node) {
+        manager.setActive((node as { repo: { root: string } }).repo.root);
+      }
     }),
   );
 
@@ -183,10 +195,7 @@ export async function activate(
 
   registerCompareCommands(context, manager, compareProvider);
 
-  const quickDiff = new VsgitQuickDiffProvider(manager);
-  const scm = vscode.scm.createSourceControl("vsgit", "VsGit");
-  scm.quickDiffProvider = quickDiff;
-  context.subscriptions.push(scm);
+  context.subscriptions.push(new VsgitScmProvider(manager));
 
   registerSyncCommands(context, syncProvider);
   registerConfigCommands(context, manager);

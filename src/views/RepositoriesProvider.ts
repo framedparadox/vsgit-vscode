@@ -95,14 +95,24 @@ export class RepositoriesProvider
             : vscode.TreeItemCollapsibleState.Expanded,
         );
         const ab = this.abCache.get(node.repo.root);
+        const active = this.manager.getActive()?.root === node.repo.root;
         const abParts: string[] = [];
         if (ab?.ahead) abParts.push(`↑${ab.ahead}`);
         if (ab?.behind) abParts.push(`↓${ab.behind}`);
         const abStr = abParts.join(" ");
-        item.description = [node.repo.headName, abStr].filter(Boolean).join("  ");
-        item.iconPath = new vscode.ThemeIcon("repo");
+        item.description = [
+          active ? "active" : undefined,
+          node.repo.headName,
+          abStr,
+        ].filter(Boolean).join("  ");
+        item.iconPath = new vscode.ThemeIcon(active ? "repo-force-push" : "repo");
         item.contextValue = "vsgit.repo";
         item.tooltip = node.repo.root;
+        item.command = {
+          command: "vsgit.repositories.setActive",
+          title: "Set Active Repository",
+          arguments: [node],
+        };
         return item;
       }
       case "group": {

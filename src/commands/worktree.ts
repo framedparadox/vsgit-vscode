@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { WorktreeInfo } from "../git/Repository";
 import { errMsg, withProgress } from "./shared";
+import { confirmDestructiveAction, DestructiveOperations } from "../util/confirmation";
 
 export type WorktreeNode =
   | { type: "worktreeRoot"; repo_root: string; manager: RepositoryManager }
@@ -106,14 +107,16 @@ export function registerWorktreeCommands(
   reg("vsgit.worktree.remove", async (node: unknown) => {
     const n = node as WorktreeNode | undefined;
     if (!n || n.type !== "worktree") return;
-    const confirm = await vscode.window.showWarningMessage(
-      `Remove worktree at ${n.info.path}?`,
-      { modal: true },
-      "Remove",
-      "Force Remove",
-    );
-    if (!confirm) return;
-    const force = confirm === "Force Remove";
+    const forcePick = await vscode.window.showQuickPick(["Remove", "Force Remove"], {
+      placeHolder: `Remove worktree at ${n.info.path}`,
+    });
+    if (!forcePick) return;
+    const force = forcePick === "Force Remove";
+    const confirmed = await confirmDestructiveAction({
+      operation: DestructiveOperations.DISCARD_CHANGES,
+      message: `${forcePick} worktree at ${n.info.path}?`,
+    });
+    if (!confirmed) return;
     const repo = n.manager.getAll().find((r) => r.root === n.repo_root);
     if (!repo) return;
     try {

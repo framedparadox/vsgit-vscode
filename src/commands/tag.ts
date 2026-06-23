@@ -4,6 +4,7 @@ import { Repository } from "../git/Repository";
 import { VsgitNode } from "../views/RepositoriesProvider";
 import { resolveRepo, withProgress } from "./shared";
 import { showCreateTagDialog } from "../webviews/CreateTagDialog";
+import { confirmDestructiveAction, DestructiveOperations } from "../util/confirmation";
 
 /** Tag operations: create (lightweight/annotated/signed), delete, checkout, push. */
 export function registerTagCommands(
@@ -29,12 +30,11 @@ export function registerTagCommands(
     const message = request.message?.trim() || undefined;
     const exists = repo.tags.some((t) => t.shortName === name);
     if (exists && !request.force) {
-      const choice = await vscode.window.showWarningMessage(
-        `Tag '${name}' already exists. Force re-tag it to point at HEAD?`,
-        { modal: true },
-        "Force Re-tag",
-      );
-      if (choice !== "Force Re-tag") {
+      const confirmed = await confirmDestructiveAction({
+        operation: DestructiveOperations.DELETE_TAG,
+        message: `Tag '${name}' already exists. Force re-tag it to point at HEAD?`,
+      });
+      if (!confirmed) {
         return;
       }
     }
@@ -66,12 +66,11 @@ export function registerTagCommands(
     if (!n || n.type !== "tag") {
       return;
     }
-    const confirm = await vscode.window.showWarningMessage(
-      `Delete tag ${n.ref.shortName}?`,
-      { modal: true },
-      "Delete",
-    );
-    if (confirm !== "Delete") {
+    const confirmed = await confirmDestructiveAction({
+      operation: DestructiveOperations.DELETE_TAG,
+      message: `Delete tag ${n.ref.shortName}?`,
+    });
+    if (!confirmed) {
       return;
     }
     await withProgress(manager, `Delete tag ${n.ref.shortName}`, () =>
@@ -116,12 +115,11 @@ export function registerTagCommands(
       validateInput: (v) => (v.trim() === "" ? "Required" : undefined),
     });
     if (!sha) return;
-    const confirm = await vscode.window.showWarningMessage(
-      `Force replace tag '${existing}' pointing to '${sha.trim()}'?`,
-      { modal: true },
-      "Force Replace",
-    );
-    if (confirm !== "Force Replace") return;
+    const confirmed = await confirmDestructiveAction({
+      operation: DestructiveOperations.DELETE_TAG,
+      message: `Force replace tag '${existing}' pointing to '${sha.trim()}'?`,
+    });
+    if (!confirmed) return;
     await withProgress(manager, `Force re-tag ${existing}`, () =>
       n.repo.createTagAt(existing, sha.trim(), undefined, false, true),
     );
@@ -134,12 +132,11 @@ export function registerTagCommands(
     }
     const remote = await pickRemote(n.repo);
     if (!remote) return;
-    const confirm = await vscode.window.showWarningMessage(
-      `Delete remote tag '${n.ref.shortName}' from '${remote}'? This cannot be undone.`,
-      { modal: true },
-      "Delete",
-    );
-    if (confirm !== "Delete") return;
+    const confirmed = await confirmDestructiveAction({
+      operation: DestructiveOperations.DELETE_TAG,
+      message: `Delete remote tag '${n.ref.shortName}' from '${remote}'? This cannot be undone.`,
+    });
+    if (!confirmed) return;
     await withProgress(manager, `Delete remote tag ${n.ref.shortName}`, () =>
       n.repo.deleteRemoteTag(remote, n.ref.shortName),
     );

@@ -28,7 +28,7 @@ export function registerCompareCommands(
       return;
     }
     const fsPath = uri.fsPath;
-    const repo = manager.getAll().find((r) => fsPath.startsWith(r.root));
+    const repo = manager.findByUri(uri);
     if (!repo) {
       vscode.window.showWarningMessage("File is not in a known repository.");
       return;
@@ -37,7 +37,7 @@ export function registerCompareCommands(
     if (!ref) {
       return;
     }
-    const rel = fsPath.slice(repo.root.length + 1);
+    const rel = manager.relativePath(repo, uri);
     const left = GitContentProvider.uri(repo.root, rel, ref, fsPath);
     await vscode.commands.executeCommand(
       "vscode.diff",
@@ -331,4 +331,3 @@ function fileStatusIcon(status: string): string {
     default:  return "circle-outline";
   }
 }
-

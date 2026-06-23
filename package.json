@@ -2244,12 +2244,12 @@
       "scm/resourceState/context": [
         {
           "command": "vsgit.scm.stage",
-          "when": "scmProvider == vsgit",
+          "when": "scmProvider == vsgit && scmResourceGroup != index",
           "group": "inline@1"
         },
         {
           "command": "vsgit.scm.unstage",
-          "when": "scmProvider == vsgit",
+          "when": "scmProvider == vsgit && scmResourceGroup == index",
           "group": "inline@2"
         },
         {
@@ -2279,7 +2279,7 @@
         },
         {
           "command": "vsgit.scm.discard",
-          "when": "scmProvider == vsgit",
+          "when": "scmProvider == vsgit && scmResourceGroup != index",
           "group": "9_destructive@1"
         },
         {
@@ -2296,17 +2296,17 @@
       "scm/resourceGroup/context": [
         {
           "command": "vsgit.scm.stageAll",
-          "when": "scmProvider == vsgit",
+          "when": "scmProvider == vsgit && scmResourceGroup != index",
           "group": "1_modify@1"
         },
         {
           "command": "vsgit.scm.unstageAll",
-          "when": "scmProvider == vsgit",
+          "when": "scmProvider == vsgit && scmResourceGroup == index",
           "group": "1_modify@2"
         },
         {
           "command": "vsgit.scm.discardAll",
-          "when": "scmProvider == vsgit",
+          "when": "scmProvider == vsgit && scmResourceGroup != index",
           "group": "9_destructive@1"
         }
       ],

@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { VsgitNode } from "../views/RepositoriesProvider";
 import { resolveRepo, withProgress } from "./shared";
+import { confirmDestructiveAction, DestructiveOperations } from "../util/confirmation";
 
 /** Remote management: add, edit (rename/url), delete. */
 export function registerRemoteCommands(
@@ -37,12 +38,11 @@ export function registerRemoteCommands(
     if (!n || n.type !== "remote") {
       return;
     }
-    const confirm = await vscode.window.showWarningMessage(
-      `Remove remote ${n.remoteName}?`,
-      { modal: true },
-      "Remove",
-    );
-    if (confirm !== "Remove") {
+    const confirmed = await confirmDestructiveAction({
+      operation: DestructiveOperations.DELETE_REMOTE_BRANCH,
+      message: `Remove remote ${n.remoteName}?`,
+    });
+    if (!confirmed) {
       return;
     }
     await withProgress(manager, `Remove remote ${n.remoteName}`, () =>

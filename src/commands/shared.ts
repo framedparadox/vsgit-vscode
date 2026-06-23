@@ -2,9 +2,13 @@ import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { Repository } from "../git/Repository";
 import { VsgitNode } from "../views/RepositoriesProvider";
+import { GitCommandCancelled } from "../git/GitExecutor";
 import { GitError } from "../git/GitError";
 
 export function errMsg(err: unknown): string {
+  if (err instanceof GitCommandCancelled) {
+    return "Cancelled.";
+  }
   return err instanceof Error ? err.message : String(err);
 }
 
@@ -14,6 +18,9 @@ export function errMsg(err: unknown): string {
  */
 export function humanizeGitError(err: unknown): string {
   if (!(err instanceof GitError)) {
+    if (err instanceof GitCommandCancelled) {
+      return "Cancelled.";
+    }
     return errMsg(err);
   }
   const stderr = err.stderr ?? "";
@@ -78,6 +85,10 @@ export async function withProgress(
     await manager.refreshAll();
     return true;
   } catch (e) {
+    if (e instanceof GitCommandCancelled) {
+      await manager.refreshAll();
+      return false;
+    }
     vscode.window.showErrorMessage(`${title} failed: ${humanizeGitError(e)}`);
     await manager.refreshAll();
     return false;

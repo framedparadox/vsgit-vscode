@@ -799,8 +799,8 @@ function applyColumnWidths() {
 }
 // `configKey` is the CONFIG.columns visibility key; `widthKey` is the (possibly
 // different) key the resized width is persisted under in colWidths.
-function visibleColumnWidth(configKey, widthKey, defaultWidth) {
-  return CONFIG.columns[configKey] === false ? 0 : (colWidths[widthKey] || defaultWidth);
+function visibleColumnWidth(key, widthKey, defaultWidth) {
+  return CONFIG.columns[key] === false ? 0 : (colWidths[widthKey] || defaultWidth);
 }
 function updateDescriptionColumnWidth() {
   const main = document.getElementById('main');

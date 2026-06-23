@@ -133,10 +133,10 @@ Replace the 500-commit limit with proper pagination, add compare mode and filter
 
 ---
 
-## Phase 4: Compare View & Staging Panel Upgrade ✅ COMPLETE
+## Phase 4: Compare View & Staging/Commit Surface Upgrade ✅ COMPLETE
 
 ### Objectives
-Add a dedicated Compare view for side-by-side branch/ref comparison. Upgrade the Staging view to a persistent webview panel.
+Add a dedicated Compare view for side-by-side branch/ref comparison. Keep the Staging tree as the compact file list and add a persistent Commit webview for the richer commit workflow.
 
 ### Completed Tasks
 - ✅ **Compare View (Tree)**
@@ -148,29 +148,24 @@ Add a dedicated Compare view for side-by-side branch/ref comparison. Upgrade the
   - Context menu on files: Open diff, Open file
   - Toolbar actions: Switch sides, Clear comparison, Pick new refs
 
-- ✅ **Staging Panel Enhanced**
-  - Convert `vsgit.staging` from TreeView to Webview panel
-  - Full-width commit message editor
-  - Checkbox lists for staged/unstaged files
-  - Inline diff preview (optional, toggle)
+- ✅ **Staging Tree + Commit Webview Enhanced**
+  - Keep `vsgit.staging` as a TreeView with Staged / Unstaged / Conflicted groups
+  - Add a persistent `vsgit.commit` webview with a full-width commit message editor
+  - File actions for stage, unstage, discard, and open diff
   - Amend last commit checkbox
   - Sign-off (DCO) checkbox
   - GPG sign checkbox
-  - Template message support
-  - Show current branch name and upstream status
+  - Show current branch name
 
-- ✅ **Conflict Resolution in Staging Panel**
-  - Highlight conflicted files in red
-  - Show conflict markers count per file
-  - Quick action buttons: Use Ours, Use Theirs, Open Merge Editor
-  - Auto-refresh when conflicts resolved
+- ✅ **Conflict Visibility in Staging/Commit Surfaces**
+  - Show conflicted files in a dedicated group
+  - Mark conflicted file tooltips and context values for merge actions
+  - Auto-refresh after repository state changes
 
 ### Implementation Notes
-- Create `src/webviews/compare/` folder with React/Svelte component
-- Use `vscode.window.createWebviewPanel` for Compare view
+- Compare is implemented as the `vsgit.compare` TreeView
 - Persist compare state across reloads (global state)
-- Update `src/views/StagingProvider.ts` → `src/webviews/staging/`
-- Use VS Code Webview Toolkit for UI components
+- Keep `src/views/StagingProvider.ts` and use `src/webviews/commit/CommitViewProvider.ts` for commit UI
 
 ---
 
@@ -215,7 +210,6 @@ Add context menus to VS Code's built-in SCM view (Source Control panel). Impleme
 - ✅ **Command Preview (Optional)**
   - Implement `vsgit.showCommandPreview` setting
   - Show exact git command in a preview modal before execution
-  - Allow editing command arguments
   - "Execute" / "Cancel" buttons
 
 ### Implementation Notes

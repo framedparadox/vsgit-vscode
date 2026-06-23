@@ -29,6 +29,10 @@ export interface StashInfo {
   index: number;
   /** Ref name, e.g. stash@{0}. */
   ref: string;
+  /** Commit object for the stash entry itself. */
+  objectId?: string;
+  /** First parent of the stash commit: the commit the stash was based on. */
+  baseObjectId?: string;
   message: string;
 }
 
@@ -1029,7 +1033,7 @@ export class Repository {
     }
   }
 
-  async reset(sha: string, mode: "soft" | "mixed" | "hard"): Promise<void> {
+  async reset(sha: string, mode: "soft" | "mixed" | "hard" | "keep" | "merge"): Promise<void> {
     await this.git.run(["reset", `--${mode}`, safeRef(sha, "commit")], { cwd: this.root });
   }
 
@@ -1303,7 +1307,7 @@ export class Repository {
 
   private async refreshStashes(): Promise<void> {
     const out = await this.git.stdout(
-      ["stash", "list", "--format=%gd\x1f%gs"],
+      ["stash", "list", "--format=%gd\x1f%H\x1f%P\x1f%gs"],
       { cwd: this.root },
     );
     const stashes: StashInfo[] = [];
@@ -1311,10 +1315,13 @@ export class Repository {
       if (line.trim() === "") {
         continue;
       }
-      const [ref, message] = line.split("\x1f");
+      const [ref, objectId, parents, message] = line.split("\x1f");
+      const baseObjectId = parents?.split(/\s+/).filter(Boolean)[0];
       const m = /stash@\{(\d+)\}/.exec(ref);
       stashes.push({
         ref,
+        objectId: objectId || undefined,
+        baseObjectId,
         message: message ?? "",
         index: m ? Number(m[1]) : stashes.length,
       });

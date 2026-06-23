@@ -1,9 +1,11 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
+import { Repository } from "../git/Repository";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { withProgress } from "./shared";
 import { CommitPickerView } from "../webviews/CommitPickerView";
 import { RefPickerView } from "../webviews/RefPickerView";
+import { confirmDestructiveAction, DestructiveOperations } from "../util/confirmation";
 
 /**
  * "Replace With" operations — restore a file's content from a known ref.
@@ -101,12 +103,21 @@ function resolveUris(uriArg: unknown, allUris: unknown): vscode.Uri[] {
 }
 
 function repoForUri(manager: RepositoryManager, uri: vscode.Uri) {
-  if (uri.scheme !== "file") return undefined;
-  const repo = manager.getAll().find((r) => uri.fsPath.startsWith(r.root));
+  const repo = manager.findByUri(uri);
   if (!repo) {
     vscode.window.showWarningMessage("File is not in a known Git repository.");
   }
   return repo;
+}
+
+function relativePaths(
+  manager: RepositoryManager,
+  repo: Repository,
+  uris: vscode.Uri[],
+): string[] {
+  return uris
+    .filter((uri) => manager.uriBelongsTo(repo, uri))
+    .map((uri) => manager.relativePath(repo, uri));
 }
 
 async function replaceWith(
@@ -120,16 +131,16 @@ async function replaceWith(
   const label = uris.length === 1
     ? `Replace with ${ref}: ${path.basename(uris[0].fsPath)}`
     : `Replace ${uris.length} file(s) with ${ref}`;
-  const confirm = await vscode.window.showWarningMessage(
-    `${label}? Local changes will be lost.`,
-    { modal: true },
-    "Replace",
-  );
-  if (confirm !== "Replace") return;
+  const confirmed = await confirmDestructiveAction({
+    operation: DestructiveOperations.DISCARD_CHANGES,
+    message: `${label}? Local changes will be lost.`,
+    items: relativePaths(manager, repo, uris),
+  });
+  if (!confirmed) return;
   await withProgress(manager, label, async () => {
     for (const uri of uris) {
-      if (!uri.fsPath.startsWith(repo.root)) continue;
-      const rel = path.relative(repo.root, uri.fsPath);
+      if (!manager.uriBelongsTo(repo, uri)) continue;
+      const rel = manager.relativePath(repo, uri);
       await repo.replaceWithRef(rel, ref);
     }
   });
@@ -145,17 +156,16 @@ async function replaceWithIndex(
   const label = uris.length === 1
     ? `Replace with Index: ${path.basename(uris[0].fsPath)}`
     : `Replace ${uris.length} file(s) with Index`;
-  const confirm = await vscode.window.showWarningMessage(
-    `${label}? Unstaged changes will be lost.`,
-    { modal: true },
-    "Replace",
-  );
-  if (confirm !== "Replace") return;
+  const confirmed = await confirmDestructiveAction({
+    operation: DestructiveOperations.DISCARD_CHANGES,
+    message: `${label}? Unstaged changes will be lost.`,
+    items: relativePaths(manager, repo, uris),
+  });
+  if (!confirmed) return;
   await withProgress(manager, label, async () => {
     const rels = uris
-      .filter((u) => u.fsPath.startsWith(repo.root))
-      .map((u) => path.relative(repo.root, u.fsPath));
+      .filter((u) => manager.uriBelongsTo(repo, u))
+      .map((u) => manager.relativePath(repo, u));
     await repo.discard(rels, []);
   });
 }
-

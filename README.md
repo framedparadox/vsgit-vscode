@@ -51,6 +51,9 @@ config, hooks, credential helpers, and aliases apply.
   branch/author/message/date filtering, and a Compare-Branches mode.
 - 🗂️ **Rich sidebar** — Repositories, Staging, Synchronize, Conflicts, Reflog,
   Worktrees, and Compare trees, all multi-root aware.
+- 🔁 **Native Source Control integration** — VsGit publishes real SCM resource
+  groups for staged, working-tree, and merge changes so VS Code's Source
+  Control panel gets VsGit menus, quick diff, and commit input support.
 - ✍️ **Commit webview** — stage by hunk, GPG-sign, DCO sign-off, amend.
 - 🔧 **Everything else** — interactive rebase, LFS, notes, bisect, subtree,
   archive, patch, Gerrit, submodules, and a built-in git-config editor.
@@ -93,6 +96,8 @@ and Staging trees, among others.
 
 ### Staging view & Commit webview
 - Staged / Changes / Conflicts groups.
+- The active repository can be selected from the Repositories view; staging,
+  synchronize, reflog, history, graph, and commit surfaces follow that selection.
 - Changed files render as a collapsible **tree or flat list** (toggle persisted
   across sessions), with a descriptive status label per file.
 - Hunk-level stage and unstage (forward/reverse patch apply to the index).
@@ -213,7 +218,7 @@ All settings live under the `vsgit.*` namespace.
 | Setting | Default | Description |
 |---|---|---|
 | `vsgit.showAdvancedViews` | `false` | Show advanced sidebar sections such as Staging, Reflog, Synchronize, Worktrees, Conflicts, and Compare. |
-| `vsgit.git.path` | `""` | Custom path to the `git` executable; empty uses `$PATH`. |
+| `vsgit.git.path` | `""` | Custom path to the `git` executable used by VsGit's shared executor; empty uses `$PATH`. |
 | `vsgit.autoRefresh` | `true` | Refresh views automatically when the repo changes. |
 | `vsgit.autoFetch.enabled` | `false` | Periodically fetch from all remotes. |
 | `vsgit.autoFetch.intervalMinutes` | `3` | Minutes between automatic fetches. |
@@ -221,7 +226,7 @@ All settings live under the `vsgit.*` namespace.
 | `vsgit.fetch.pruneOnFetch` | `true` | Prune deleted remote-tracking branches on fetch. |
 | `vsgit.defaultPullMode` | `merge` | Pull strategy: `merge` or `rebase`. |
 | `vsgit.confirmDestructiveActions` | `true` | Confirm hard reset, clean, force-push, etc. |
-| `vsgit.showCommandPreview` | `false` | Preview the exact git command before running it. |
+| `vsgit.showCommandPreview` | `false` | Preview mutating git commands before execution; read-only refresh/diff commands run without prompting. |
 | `vsgit.commit.gpgSign` | `false` | Sign commits with GPG by default (`-S`). |
 | `vsgit.commit.signOff` | `false` | Add a `Signed-off-by` trailer by default (DCO). |
 | `vsgit.blame.enabledByDefault` | `false` | Show inline blame when opening files. |
@@ -261,7 +266,7 @@ src/
     parsers/              pure, unit-tested output parsers
                           (log, graphLog, status, refs, diff, blame, config,
                            reflog, rebaseTodo, worktree)
-  views/                  tree data providers (Repositories, Staging, …)
+  views/                  tree data providers + native Source Control bridge
   webviews/               webview panels (Graph, History, Commit, Create Tag,
                           pickers)
   services/               auto-fetch, file-system watcher, status bar

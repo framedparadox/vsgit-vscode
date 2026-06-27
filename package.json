@@ -3104,16 +3104,16 @@
           },
           "default": [
             "#0085d9",
-            "#d9008f",
+            "#ff7700",
             "#00d90a",
             "#d98500",
-            "#a300d9",
-            "#ff0000",
+            "#ffd000",
+            "#0a6976",
+            "#6f24d6",
             "#00d9cc",
-            "#e138e8",
             "#85d900",
             "#dc5b23",
-            "#6f24d6",
+            "#BB8EF8",
             "#ffcc00"
           ],
           "description": "Branch line colours (HEX or rgb) cycled through in the Git Graph."

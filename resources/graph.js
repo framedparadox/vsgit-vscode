@@ -25,9 +25,16 @@ const COL_W = 14; // px per graph column
 const R = 4;      // commit dot radius
 const PAD = 8;    // left / right padding inside the graph cell
 
+var LANE_COLORS_X = {
+  sugg: ['#4D90FE', '#F28B30', '#2DC55E', '#C678DD', '#E06C75', '#56B6C2',
+    '#D19A66', '#98C379', '#61AFEF', '#F9826C', '#BB8EF8', '#E5C07B'],
+
+  palette: ['#0085d9', '#d9008f', '#00d90a', '#282520', '#a300d9', '#ff0000',
+    '#00d9cc', '#e138e8', '#85d900', '#dc5b23', '#6f24d6', '#ffcc00'],
+}
 let CONFIG = {
-  palette: ['#0085d9','#d9008f','#00d90a','#d98500','#a300d9','#ff0000',
-            '#00d9cc','#e138e8','#85d900','#dc5b23','#6f24d6','#ffcc00'],
+  palette: ['#0085d9','#ff7700','#00d90a','#d98500','#ffd000','#0a6976',
+            '#6f24d6','#00d9cc','#85d900','#dc5b23','#BB8EF8','#ffcc00'],
   style: 'rounded',
   dateFormat: 'standard',
   // VsGit/EGit-style columns: Graph | Description | Author | Authored Date |

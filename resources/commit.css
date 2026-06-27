@@ -185,15 +185,17 @@ body {
   font-weight: 600;
 }
 .group-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: none;
-  color: var(--vscode-foreground);
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
   cursor: pointer;
   border-radius: 3px;
-  width: 18px;
-  height: 18px;
-  line-height: 16px;
-  font-size: 14px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
 }
 .group-action:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
 
@@ -244,21 +246,22 @@ body {
 }
 .tree-children.collapsed { display: none; }
 
-/* LEFT extension chip. */
+/* LEFT type badge — a compact ≤2-char chip (JS, TS, {} …). */
 .file-ext {
-  min-width: 30px;
-  max-width: 48px;
-  padding: 0 4px;
-  height: 15px;
-  line-height: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 16px;
+  padding: 0 2px;
   text-align: center;
   font-family: var(--vscode-editor-font-family, monospace);
-  font-weight: 600;
-  font-size: 10px;
+  font-weight: 700;
+  font-size: 9px;
+  letter-spacing: -0.02em;
   border-radius: 3px;
   flex-shrink: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   background-color: rgba(128, 128, 128, 0.16);
 }
@@ -286,10 +289,13 @@ body {
   max-width: 45%;
 }
 
-/* RIGHT change label (Modified, Added, …). */
+/* RIGHT single-letter change code (M, A, D, …), matching VS Code's SCM. */
 .file-change {
   flex-shrink: 0;
-  font-size: 11px;
+  width: 16px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--vscode-descriptionForeground);
 }
 .file-change.s-A { color: #4ec94e; }
@@ -309,14 +315,24 @@ body {
 }
 .file-row:hover .file-actions { display: inline-flex; }
 .file-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: none;
-  color: var(--vscode-foreground);
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
   cursor: pointer;
   border-radius: 3px;
-  width: 18px;
-  height: 18px;
-  line-height: 16px;
-  font-size: 13px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
 }
 .file-action:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
+
+/* Codicon-style SVG glyph inside the group/file action buttons. */
+.action-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}

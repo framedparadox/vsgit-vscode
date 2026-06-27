@@ -1077,6 +1077,10 @@
     ],
     "submenus": [
       {
+        "id": "vsgit.repo",
+        "label": "VsGit"
+      },
+      {
         "id": "vsgit.team",
         "label": "Team"
       },
@@ -1171,6 +1175,13 @@
           "command": "vsgit.graph.show",
           "when": "scmProvider == vsgit",
           "group": "navigation@9"
+        }
+      ],
+      "scm/sourceControl": [
+        {
+          "submenu": "vsgit.repo",
+          "when": "scmProvider == git",
+          "group": "9_vsgit@1"
         }
       ],
       "explorer/context": [
@@ -1317,6 +1328,100 @@
         {
           "command": "vsgit.clean",
           "group": "2@2"
+        }
+      ],
+      "vsgit.repo": [
+        {
+          "submenu": "vsgit.repo.pushPull",
+          "group": "1@1"
+        },
+        {
+          "submenu": "vsgit.repo.history",
+          "group": "1@2"
+        },
+        {
+          "command": "vsgit.merge",
+          "group": "1b@1"
+        },
+        {
+          "command": "vsgit.rebase",
+          "group": "1b@2"
+        },
+        {
+          "submenu": "vsgit.repo.reset",
+          "group": "1b@3"
+        },
+        {
+          "command": "vsgit.tag.create",
+          "group": "1b@4"
+        },
+        {
+          "submenu": "vsgit.repo.switchTo",
+          "group": "2@1"
+        },
+        {
+          "submenu": "vsgit.repo.commit",
+          "group": "2@2"
+        },
+        {
+          "submenu": "vsgit.repo.sequencer",
+          "group": "2@3"
+        },
+        {
+          "submenu": "vsgit.repo.remote",
+          "group": "3@1"
+        },
+        {
+          "submenu": "vsgit.repo.submodule",
+          "group": "3@2"
+        },
+        {
+          "submenu": "vsgit.repo.patch",
+          "group": "3@3"
+        },
+        {
+          "submenu": "vsgit.repo.advanced.rebase",
+          "group": "4@1"
+        },
+        {
+          "submenu": "vsgit.repo.advanced.bisect",
+          "group": "4@2"
+        },
+        {
+          "submenu": "vsgit.repo.advanced.notes",
+          "group": "4@3"
+        },
+        {
+          "submenu": "vsgit.repo.advanced.subtree",
+          "group": "4@4"
+        },
+        {
+          "submenu": "vsgit.repo.advanced.lfs",
+          "group": "4@5"
+        },
+        {
+          "submenu": "vsgit.repo.advanced.gerrit",
+          "group": "4@6"
+        },
+        {
+          "command": "vsgit.clean",
+          "group": "5@1"
+        },
+        {
+          "command": "vsgit.archive.create",
+          "group": "5@2"
+        },
+        {
+          "submenu": "vsgit.repo.maintenance",
+          "group": "8@1"
+        },
+        {
+          "submenu": "vsgit.repo.prune",
+          "group": "8@2"
+        },
+        {
+          "submenu": "vsgit.repo.config",
+          "group": "9@1"
         }
       ],
       "vsgit.repo.pushPull": [
@@ -2308,6 +2413,11 @@
           "command": "vsgit.scm.discardAll",
           "when": "scmProvider == vsgit && scmResourceGroup != index",
           "group": "9_destructive@1"
+        },
+        {
+          "submenu": "vsgit.repo",
+          "when": "scmProvider == git && scmResourceGroup == workingTree",
+          "group": "9_vsgit@1"
         }
       ],
       "editor/title": [

@@ -25,9 +25,10 @@ interface HistoryState {
   };
 }
 
-export class HistoryView {
+export class HistoryView implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
   private repo: Repository | undefined;
+  private readonly disposables: vscode.Disposable[] = [];
   private commitsBySha = new Map<string, Commit>();
   private state: HistoryState = {
     loadedCommits: [],
@@ -41,11 +42,20 @@ export class HistoryView {
     private readonly manager: RepositoryManager,
     private readonly extensionUri: vscode.Uri,
   ) {
-    manager.onDidChange(() => {
-      if (this.panel) {
-        void this.reload();
-      }
-    });
+    this.disposables.push(
+      manager.onDidChange(() => {
+        if (this.panel) {
+          void this.reload();
+        }
+      }),
+    );
+  }
+
+  dispose(): void {
+    this.panel?.dispose();
+    this.panel = undefined;
+    for (const d of this.disposables) d.dispose();
+    this.disposables.length = 0;
   }
 
   async show(repo?: Repository, file?: string): Promise<void> {

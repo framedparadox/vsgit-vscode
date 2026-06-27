@@ -131,6 +131,7 @@ export async function activate(
     stagingProvider,
   );
   context.subscriptions.push(
+    commitProvider,
     vscode.window.registerWebviewViewProvider(
       CommitViewProvider.viewType,
       commitProvider,
@@ -170,10 +171,10 @@ export async function activate(
   registerReflogCommands(context, manager, reflogProvider);
 
   // Decorations, blame, quick-diff, compare/conflicts.
+  const fileDecorationProvider = new VsgitFileDecorationProvider(manager);
   context.subscriptions.push(
-    vscode.window.registerFileDecorationProvider(
-      new VsgitFileDecorationProvider(manager),
-    ),
+    fileDecorationProvider,
+    vscode.window.registerFileDecorationProvider(fileDecorationProvider),
   );
   const blameController = new BlameController(manager);
   context.subscriptions.push(blameController);

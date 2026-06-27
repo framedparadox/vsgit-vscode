@@ -7,6 +7,7 @@ const {
   statusLabel,
   statusCode,
   fileExt,
+  fileTypeBadge,
   escapeHtml,
   buildFileTree,
 } = require('./commitView.js');
@@ -59,6 +60,36 @@ test('fileExt returns a bullet when there is no usable extension', () => {
   assert.strictEqual(fileExt('trailingdot.'), '•');
   assert.strictEqual(fileExt(''), '•');
   assert.strictEqual(fileExt(undefined), '•');
+});
+
+// ─── fileTypeBadge ───────────────────────────────────────────────────────────
+test('fileTypeBadge maps known languages to a short ≤2-char badge', () => {
+  assert.strictEqual(fileTypeBadge('app.js'), 'JS');
+  assert.strictEqual(fileTypeBadge('Component.tsx'), 'TS');
+  assert.strictEqual(fileTypeBadge('package.json'), '{}');
+  assert.strictEqual(fileTypeBadge('main.py'), 'PY');
+  assert.strictEqual(fileTypeBadge('styles.scss'), '#');
+});
+
+test('fileTypeBadge handles extensionless/dotfile config names', () => {
+  assert.strictEqual(fileTypeBadge('.gitignore'), 'GI');
+  assert.strictEqual(fileTypeBadge('Dockerfile'), 'DK');
+  assert.strictEqual(fileTypeBadge('yarn.lock'), 'LK');
+});
+
+test('fileTypeBadge falls back to the first two letters, then a bullet', () => {
+  // Unknown extension → upper-cased first two letters.
+  assert.strictEqual(fileTypeBadge('data.xyz'), 'XY');
+  // No usable extension and no whole-name rule → bullet.
+  assert.strictEqual(fileTypeBadge('Makefile'), 'MK'); // whole-name rule
+  assert.strictEqual(fileTypeBadge('NOTES'), '•');
+  assert.strictEqual(fileTypeBadge(''), '•');
+});
+
+test('fileTypeBadge never returns more than two characters', () => {
+  for (const name of ['a.markdown', 'b.dockerfile', 'c.graphql', 'd.unknownext']) {
+    assert.ok(fileTypeBadge(name).length <= 2, name + ' badge ≤ 2 chars');
+  }
 });
 
 // ─── escapeHtml ──────────────────────────────────────────────────────────────

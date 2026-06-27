@@ -50,6 +50,44 @@
     return base.slice(dot + 1).toLowerCase();
   }
 
+  // Short (≤2 char) type badge per file, mirroring how editors label file kinds
+  // (JS for JavaScript, {} for JSON, etc.). Keyed by extension; whole-name rules
+  // cover common dotfiles/config files that have no usable extension.
+  const TYPE_BADGES = {
+    js: 'JS', jsx: 'JS', mjs: 'JS', cjs: 'JS',
+    ts: 'TS', tsx: 'TS', mts: 'TS', cts: 'TS',
+    json: '{}', jsonc: '{}', json5: '{}',
+    html: '<>', htm: '<>', xml: '<>', svg: '<>', vue: 'V', svelte: 'S',
+    css: '#', scss: '#', sass: '#', less: '#',
+    md: 'M↓', markdown: 'M↓', mdx: 'M↓',
+    py: 'PY', rb: 'RB', go: 'GO', rs: 'RS', java: 'JV', kt: 'KT',
+    c: 'C', h: 'H', cpp: 'C+', cc: 'C+', cxx: 'C+', hpp: 'H+',
+    cs: 'C#', php: 'PH', swift: 'SW', dart: 'DT', lua: 'LU',
+    sh: 'SH', bash: 'SH', zsh: 'SH', fish: 'SH', ps1: 'PS',
+    yml: 'YM', yaml: 'YM', toml: 'TM', ini: 'IN', cfg: 'IN', conf: 'IN', env: 'EN',
+    sql: 'SQ', graphql: 'GQ', gql: 'GQ', proto: 'PB',
+    png: 'IM', jpg: 'IM', jpeg: 'IM', gif: 'IM', webp: 'IM', ico: 'IM', bmp: 'IM',
+    pdf: 'PD', zip: 'ZP', tar: 'ZP', gz: 'ZP', tgz: 'ZP', rar: 'ZP',
+    txt: 'TX', log: 'LG', csv: 'CS', tsv: 'CS',
+    lock: 'LK', gitignore: 'GI', gitattributes: 'GA', dockerignore: 'DK',
+    dockerfile: 'DK', makefile: 'MK', license: 'LI',
+  };
+
+  // Resolve a file name to its ≤2-char type badge. Tries the extension first,
+  // then a few whole-name special cases, then the upper-cased first two letters
+  // of the extension, and finally a bullet for extension-less files.
+  function fileTypeBadge(name) {
+    const base = String(name || '');
+    const lower = base.toLowerCase();
+    const ext = fileExt(base);
+    if (ext !== '•' && TYPE_BADGES[ext]) return TYPE_BADGES[ext];
+    // Whole-name matches (dotfiles / extensionless config files).
+    const bare = lower.replace(/^\./, '');
+    if (TYPE_BADGES[bare]) return TYPE_BADGES[bare];
+    if (ext !== '•') return ext.slice(0, 2).toUpperCase();
+    return '•';
+  }
+
   // Escape a value for safe interpolation into innerHTML.
   function escapeHtml(value) {
     return String(value == null ? '' : value).replace(
@@ -92,9 +130,11 @@
 
   return {
     STATUS_LABELS,
+    TYPE_BADGES,
     statusLabel,
     statusCode,
     fileExt,
+    fileTypeBadge,
     escapeHtml,
     buildFileTree,
   };

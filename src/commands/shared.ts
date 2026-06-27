@@ -48,14 +48,47 @@ export function humanizeGitError(err: unknown): string {
   return firstLine || errMsg(err);
 }
 
-/** Resolve the repository for a node, or prompt when invoked from the palette. */
+/**
+ * Pull a `rootUri` out of an argument passed by VS Code's native Git SCM menus.
+ * `scm/sourceControl` items receive a `SourceControl` with a `.rootUri`; some
+ * native objects nest it under `.provider`. Returns undefined for shapes that
+ * carry no root (e.g. a `SourceControlResourceGroup`).
+ */
+function nativeScmRootUri(arg: unknown): vscode.Uri | undefined {
+  if (!arg || typeof arg !== "object") {
+    return undefined;
+  }
+  const candidate =
+    (arg as { rootUri?: unknown }).rootUri ??
+    (arg as { provider?: { rootUri?: unknown } }).provider?.rootUri;
+  return candidate instanceof vscode.Uri ? candidate : undefined;
+}
+
+/**
+ * Resolve the repository for a command invocation.
+ *
+ * Handles three argument sources:
+ * - VsGit tree nodes (carry a `.repo`).
+ * - VS Code native Git SCM menus (carry a `.rootUri`, mapped via the manager).
+ * - The command palette / native resource-group menus (no usable target):
+ *   single repo, otherwise a quick-pick.
+ */
 export async function resolveRepo(
   manager: RepositoryManager,
-  node?: VsgitNode,
+  node?: VsgitNode | unknown,
 ): Promise<Repository | undefined> {
-  if (node && "repo" in node) {
-    return node.repo;
+  if (node && typeof node === "object" && "repo" in node) {
+    return (node as { repo: Repository }).repo;
   }
+
+  const rootUri = nativeScmRootUri(node);
+  if (rootUri) {
+    const byRoot = manager.get(rootUri.fsPath) ?? manager.findByUri(rootUri);
+    if (byRoot) {
+      return byRoot;
+    }
+  }
+
   const repos = manager.getAll();
   if (repos.length === 0) {
     vscode.window.showWarningMessage("No Git repositories found.");
@@ -64,6 +97,15 @@ export async function resolveRepo(
   if (repos.length === 1) {
     return repos[0];
   }
+
+  // No explicit target (native "Changes" group ellipsis or the palette): in a
+  // multi-repo workspace, prefer the repo for the active editor before asking.
+  const activeDoc = vscode.window.activeTextEditor?.document.uri;
+  const byActiveDoc = activeDoc ? manager.findByUri(activeDoc) : undefined;
+  if (byActiveDoc) {
+    return byActiveDoc;
+  }
+
   const pick = await vscode.window.showQuickPick(
     repos.map((r) => ({ label: r.name, repo: r })),
     { placeHolder: "Select a repository" },

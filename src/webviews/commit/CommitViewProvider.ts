@@ -14,11 +14,18 @@ import { FileChange } from "../../git/parsers/status";
  * Staging and commit all flow through existing `Repository` methods and the
  * registered `vsgit.staging.*` commands — this view only owns the UI.
  */
-export class CommitViewProvider implements vscode.WebviewViewProvider {
+export class CommitViewProvider
+  implements vscode.WebviewViewProvider, vscode.Disposable
+{
   public static readonly viewType = "vsgit.commit";
 
   private view?: vscode.WebviewView;
   private message = "";
+  // Subscriptions tied to the provider's lifetime (disposed on dispose()).
+  private readonly disposables: vscode.Disposable[] = [];
+  // Subscriptions tied to the currently-resolved webview; replaced whenever the
+  // view is (re)resolved so per-view listeners don't accumulate.
+  private viewDisposables: vscode.Disposable[] = [];
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -26,7 +33,14 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     private readonly staging: StagingProvider,
   ) {
     // Re-push file lists whenever any repository's status changes.
-    manager.onDidChange(() => this.refresh());
+    this.disposables.push(manager.onDidChange(() => this.refresh()));
+  }
+
+  dispose(): void {
+    for (const d of this.viewDisposables) d.dispose();
+    this.viewDisposables = [];
+    for (const d of this.disposables) d.dispose();
+    this.disposables.length = 0;
   }
 
   private get repo(): Repository | undefined {
@@ -34,16 +48,26 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
   }
 
   resolveWebviewView(view: vscode.WebviewView): void {
+    // A view can be resolved more than once (e.g. moved between panels); drop
+    // any listeners from a previous resolution before wiring the new view.
+    for (const d of this.viewDisposables) d.dispose();
+    this.viewDisposables = [];
+
     this.view = view;
     view.webview.options = {
       enableScripts: true,
       localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, "resources")],
     };
     view.webview.html = this.getHtml(view.webview);
-    view.webview.onDidReceiveMessage((m) => this.handleMessage(m));
-    view.onDidChangeVisibility(() => {
-      if (view.visible) this.refresh();
-    });
+    this.viewDisposables.push(
+      view.webview.onDidReceiveMessage((m) => this.handleMessage(m)),
+      view.onDidChangeVisibility(() => {
+        if (view.visible) this.refresh();
+      }),
+      view.onDidDispose(() => {
+        if (this.view === view) this.view = undefined;
+      }),
+    );
     this.refresh();
   }
 

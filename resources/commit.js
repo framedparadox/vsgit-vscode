@@ -11,7 +11,7 @@ const vscode = acquireVsCodeApi();
 
 // Pure, DOM-free helpers shared with Node tests (resources/commitView.js,
 // loaded as a global by the webview before this script).
-const { statusLabel, statusCode, fileExt, escapeHtml, buildFileTree } =
+const { statusCode, fileTypeBadge, escapeHtml, buildFileTree } =
   self.CommitView;
 
 let state = { active: false };
@@ -22,6 +22,31 @@ let advancedOpen = (vscode.getState() || {}).commitAdvancedOpen === true;
 
 const el = (id) => document.getElementById(id);
 const post = (type, data) => vscode.postMessage({ type, data });
+
+// Codicon path data (16×16 viewBox), matching VS Code's SCM inline action icons
+// so add / discard / remove look like the native Source Control buttons rather
+// than tiny text glyphs.
+const ICON_PATHS = {
+  // codicon-add (plus)
+  add: 'M14 7v1H8v6H7V8H1V7h6V1h1v6h6z',
+  // codicon-remove (minus)
+  remove: 'M14 8H2V7h12v1z',
+  // codicon-discard (counter-clockwise refresh arrow)
+  discard:
+    'M5.56 3.92L7 2.49V6h-.01L3.49 6l1.43-1.43A4 4 0 0 0 4 8a4 4 0 1 0 4-4V3a5 5 0 1 1-5 5 5 5 0 0 1 2.56-4.08z',
+};
+
+// Build a 16×16 codicon-style SVG glyph for a button.
+function iconSvg(name) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 16 16');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.classList.add('action-icon');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', ICON_PATHS[name] || '');
+  svg.appendChild(path);
+  return svg;
+}
 
 // ─── render ────────────────────────────────────────────────────────────────
 function render() {
@@ -61,9 +86,9 @@ function renderGroup(title, group, files) {
 
   // Group-level action: stage-all / unstage-all.
   if (group === 'unstaged' && files.length) {
-    header.appendChild(groupAction('Stage All Changes', '+', () => post('stageAll')));
+    header.appendChild(groupAction('Stage All Changes', 'add', () => post('stageAll')));
   } else if (group === 'staged' && files.length) {
-    header.appendChild(groupAction('Unstage All Changes', '−', () => post('unstageAll')));
+    header.appendChild(groupAction('Unstage All Changes', 'remove', () => post('unstageAll')));
   }
   header.appendChild(count);
   wrap.appendChild(header);
@@ -84,11 +109,12 @@ function renderGroup(title, group, files) {
   return wrap;
 }
 
-function groupAction(title, glyph, action) {
+function groupAction(title, icon, action) {
   const b = document.createElement('button');
   b.className = 'group-action';
   b.title = title;
-  b.textContent = glyph;
+  b.setAttribute('aria-label', title);
+  b.appendChild(iconSvg(icon));
   b.addEventListener('click', (e) => { e.stopPropagation(); action(); });
   return b;
 }
@@ -135,10 +161,10 @@ function renderFile(f, group, depth = 0, label = f.name) {
 
   const code = statusCode(f);
 
-  // LEFT: file extension chip.
+  // LEFT: short file-type badge (JS, TS, {} …).
   const ext = document.createElement('span');
   ext.className = 'file-ext s-' + code;
-  ext.textContent = fileExt(f.name);
+  ext.textContent = fileTypeBadge(f.name);
   row.appendChild(ext);
 
   const name = document.createElement('span');
@@ -153,25 +179,27 @@ function renderFile(f, group, depth = 0, label = f.name) {
     row.appendChild(dir);
   }
 
-  // RIGHT: full change label (Modified, Added, …).
+  // RIGHT: single-letter change code (M, A, D, …), matching VS Code's SCM. The
+  // full label stays available via the tooltip.
   const change = document.createElement('span');
   change.className = 'file-change s-' + code;
-  change.textContent = statusLabel(code);
+  change.textContent = code;
+  change.title = self.CommitView.statusLabel(code);
   row.appendChild(change);
 
   const actions = document.createElement('span');
   actions.className = 'file-actions';
   if (group === 'unstaged' || group === 'conflicted') {
-    actions.appendChild(fileAction('Reset Changes', '↺', (e) => {
+    actions.appendChild(fileAction('Discard Changes', 'discard', (e) => {
       e.stopPropagation();
       post('discard', { path: f.path, group });
     }));
-    actions.appendChild(fileAction('Stage Changes', '+', (e) => {
+    actions.appendChild(fileAction('Stage Changes', 'add', (e) => {
       e.stopPropagation();
       post('stage', { path: f.path, group });
     }));
   } else {
-    actions.appendChild(fileAction('Unstage Changes', '−', (e) => {
+    actions.appendChild(fileAction('Unstage Changes', 'remove', (e) => {
       e.stopPropagation();
       post('unstage', { path: f.path, group });
     }));
@@ -224,11 +252,12 @@ function syncAdvancedBadge() {
   toggle.classList.toggle('has-active', active);
 }
 
-function fileAction(title, glyph, handler) {
+function fileAction(title, icon, handler) {
   const b = document.createElement('button');
   b.className = 'file-action';
   b.title = title;
-  b.textContent = glyph;
+  b.setAttribute('aria-label', title);
+  b.appendChild(iconSvg(icon));
   b.addEventListener('click', handler);
   return b;
 }

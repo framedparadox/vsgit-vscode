@@ -157,6 +157,53 @@ test('native SCM provider is registered and menu actions target resource groups'
   );
 });
 
+test('VsGit submenu is attached to the native Git SCM menus', () => {
+  const pkg = JSON.parse(read('package.json'));
+  const menus = pkg.contributes?.menus ?? {};
+  const submenus = pkg.contributes?.submenus ?? [];
+  const shared = read('src/commands/shared.ts');
+
+  // Parent submenu exists and is labelled "VsGit".
+  const repoSubmenu = submenus.find((s) => s.id === 'vsgit.repo');
+  assert.ok(repoSubmenu, 'vsgit.repo submenu is declared');
+  assert.strictEqual(repoSubmenu.label, 'VsGit', 'native submenu is labelled VsGit');
+
+  // The submenu has a non-empty body of repo actions.
+  const repoItems = menus['vsgit.repo'] ?? [];
+  assert.ok(repoItems.length > 0, 'vsgit.repo submenu has entries');
+  assert.ok(
+    repoItems.some((item) => item.submenu === 'vsgit.repo.pushPull'),
+    'vsgit.repo submenu surfaces push/pull actions',
+  );
+
+  // Attached to the native repository node (right-click the repo header).
+  const sourceControlMenu = menus['scm/sourceControl'] ?? [];
+  const repoNodeEntry = sourceControlMenu.find((item) => item.submenu === 'vsgit.repo');
+  assert.ok(repoNodeEntry, 'vsgit.repo is attached to scm/sourceControl');
+  assert.strictEqual(
+    repoNodeEntry.when,
+    'scmProvider == git',
+    'native repo submenu targets the built-in git provider',
+  );
+
+  // Attached to the native "Changes" group ellipsis (working tree only).
+  const resourceGroupMenus = menus['scm/resourceGroup/context'] ?? [];
+  const changesEntry = resourceGroupMenus.find((item) => item.submenu === 'vsgit.repo');
+  assert.ok(changesEntry, 'vsgit.repo is attached to scm/resourceGroup/context');
+  assert.strictEqual(
+    changesEntry.when,
+    'scmProvider == git && scmResourceGroup == workingTree',
+    'native group submenu targets the working-tree (Changes) group',
+  );
+
+  // resolveRepo can map a native SourceControl rootUri to a repository.
+  assert.ok(shared.includes('nativeScmRootUri'), 'resolveRepo extracts a native rootUri');
+  assert.ok(
+    shared.includes('manager.get(rootUri.fsPath) ?? manager.findByUri(rootUri)'),
+    'resolveRepo maps the native rootUri to a repository',
+  );
+});
+
 test('configured git path and command preview are wired through the shared executor', () => {
   const executor = read('src/git/GitExecutor.ts');
   const manager = read('src/git/RepositoryManager.ts');

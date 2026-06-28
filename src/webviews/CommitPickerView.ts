@@ -9,10 +9,13 @@ import { commitPickerHtml } from "./commitPickerHtml";
  * commit SHA, or undefined if the user cancelled.
  *
  * Usage:
- *   const sha = await CommitPickerView.pick(repo);
+ *   const sha = await CommitPickerView.pick(repo, context.extensionUri);
  */
 export class CommitPickerView {
-  static async pick(repo: Repository): Promise<string | undefined> {
+  static async pick(
+    repo: Repository,
+    extensionUri: vscode.Uri,
+  ): Promise<string | undefined> {
     return new Promise<string | undefined>((resolve) => {
       const panel = vscode.window.createWebviewPanel(
         "vsgit.commitPicker",
@@ -21,12 +24,19 @@ export class CommitPickerView {
         {
           enableScripts: true,
           retainContextWhenHidden: false,
-          localResourceRoots: [],
+          localResourceRoots: [vscode.Uri.joinPath(extensionUri, "resources")],
         },
       );
 
       const nonce = crypto.randomBytes(16).toString("hex");
-      panel.webview.html = commitPickerHtml(nonce, panel.webview.cspSource);
+      const codiconCssUri = panel.webview.asWebviewUri(
+        vscode.Uri.joinPath(extensionUri, "resources", "codicon.css"),
+      );
+      panel.webview.html = commitPickerHtml(
+        nonce,
+        panel.webview.cspSource,
+        codiconCssUri.toString(),
+      );
 
       let resolved = false;
 

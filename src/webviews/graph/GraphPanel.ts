@@ -838,6 +838,9 @@ export class GraphPanel {
     const cssUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, "resources", "graph.css"),
     );
+    const codiconCssUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "resources", "codicon.css"),
+    );
     const jsUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, "resources", "graph.js"),
     );
@@ -847,6 +850,7 @@ export class GraphPanel {
     const csp = [
       "default-src 'none'",
       `style-src ${webview.cspSource}`,
+      `font-src ${webview.cspSource}`,
       `script-src 'nonce-${nonce}'`,
       `img-src ${webview.cspSource} data:`,
     ].join("; ");
@@ -857,6 +861,7 @@ export class GraphPanel {
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="${csp}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="${codiconCssUri}">
   <link rel="stylesheet" href="${cssUri}">
   <title>VsGit Graph</title>
 </head>

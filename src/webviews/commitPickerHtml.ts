@@ -8,13 +8,18 @@
  *   - Keyboard navigation (↑/↓/Enter), double-click to confirm
  *   - Posts { command:"pick", sha } back to the extension on confirm
  */
-export function commitPickerHtml(nonce: string, _cspSource: string): string {
+export function commitPickerHtml(
+  nonce: string,
+  cspSource: string,
+  codiconCssUri: string,
+): string {
   return /* html */ `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
 <meta http-equiv="Content-Security-Policy"
-  content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';" />
+  content="default-src 'none'; style-src ${cspSource} 'nonce-${nonce}'; font-src ${cspSource}; script-src 'nonce-${nonce}';" />
+<link rel="stylesheet" href="${codiconCssUri}" />
 <style nonce="${nonce}">
   *, *::before, *::after { box-sizing: border-box; }
 
@@ -53,7 +58,7 @@ export function commitPickerHtml(nonce: string, _cspSource: string): string {
     background: var(--vscode-input-background);
     padding: 0 4px;
   }
-  #searchWrap svg { flex-shrink: 0; opacity: 0.6; }
+  #searchWrap .codicon { flex-shrink: 0; opacity: 0.6; font-size: 14px; }
   #search {
     flex: 1; border: none; outline: none; background: transparent;
     color: var(--vscode-input-foreground);
@@ -162,9 +167,7 @@ export function commitPickerHtml(nonce: string, _cspSource: string): string {
     <h2 id="headTitle">Select a Commit</h2>
     <p id="headSub">Please select a commit from the list</p>
     <div id="searchWrap">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-        <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.868-3.834zm-5.242 1.156a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/>
-      </svg>
+      <i class="codicon codicon-search"></i>
       <input id="search" type="text" placeholder="Find" autocomplete="off" spellcheck="false" />
     </div>
   </div>

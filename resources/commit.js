@@ -23,29 +23,20 @@ let advancedOpen = (vscode.getState() || {}).commitAdvancedOpen === true;
 const el = (id) => document.getElementById(id);
 const post = (type, data) => vscode.postMessage({ type, data });
 
-// Codicon path data (16×16 viewBox), matching VS Code's SCM inline action icons
-// so add / discard / remove look like the native Source Control buttons rather
-// than tiny text glyphs.
-const ICON_PATHS = {
-  // codicon-add (plus)
-  add: 'M14 7v1H8v6H7V8H1V7h6V1h1v6h6z',
-  // codicon-remove (minus)
-  remove: 'M14 8H2V7h12v1z',
-  // codicon-discard (counter-clockwise refresh arrow)
-  discard:
-    'M5.56 3.92L7 2.49V6h-.01L3.49 6l1.43-1.43A4 4 0 0 0 4 8a4 4 0 1 0 4-4V3a5 5 0 1 1-5 5 5 5 0 0 1 2.56-4.08z',
+// Logical action name → codicon id, matching VS Code's SCM inline action icons
+// so add / discard / remove render as the native Source Control buttons.
+const ICON_NAMES = {
+  add: 'add',
+  remove: 'remove',
+  discard: 'discard',
 };
 
-// Build a 16×16 codicon-style SVG glyph for a button.
+// Build a codicon glyph element for a button.
 function iconSvg(name) {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 16 16');
-  svg.setAttribute('aria-hidden', 'true');
-  svg.classList.add('action-icon');
-  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  path.setAttribute('d', ICON_PATHS[name] || '');
-  svg.appendChild(path);
-  return svg;
+  const i = document.createElement('i');
+  i.className = 'codicon codicon-' + (ICON_NAMES[name] || name) + ' action-icon';
+  i.setAttribute('aria-hidden', 'true');
+  return i;
 }
 
 // ─── render ────────────────────────────────────────────────────────────────
@@ -133,7 +124,7 @@ function renderTreeLevel(parent, node, group, depth) {
     folder.className = 'tree-folder';
     folder.style.paddingLeft = (12 + depth * 14) + 'px';
     folder.innerHTML =
-      '<span class="chev expanded">▶</span>' +
+      '<span class="chev codicon codicon-chevron-right expanded"></span>' +
       '<span class="folder-name">' + escapeHtml(name) + '</span>';
 
     const children = document.createElement('div');

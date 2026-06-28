@@ -85,7 +85,7 @@ body {
 .advanced-toggle:hover { color: var(--vscode-foreground); }
 .advanced-toggle .chev {
   display: inline-block;
-  font-size: 9px;
+  font-size: 14px;
   transition: transform 0.1s ease;
 }
 .advanced-toggle.open .chev { transform: rotate(90deg); }
@@ -143,9 +143,9 @@ body {
 }
 .header-icon {
   display: block;
-  width: 16px;
-  height: 16px;
-  fill: currentColor;
+  font-size: 16px;
+  line-height: 16px;
+  color: currentColor;
 }
 
 .opt {
@@ -235,7 +235,7 @@ body {
   height: 14px;
   flex-shrink: 0;
   color: var(--vscode-icon-foreground, var(--vscode-foreground));
-  font-size: 10px;
+  font-size: 14px;
   transition: transform 0.1s ease;
 }
 .tree-folder .chev.expanded { transform: rotate(90deg); }
@@ -329,10 +329,10 @@ body {
 }
 .file-action:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
 
-/* Codicon-style SVG glyph inside the group/file action buttons. */
+/* Codicon glyph inside the group/file action buttons. */
 .action-icon {
   display: block;
-  width: 16px;
-  height: 16px;
-  fill: currentColor;
+  font-size: 16px;
+  line-height: 16px;
+  color: currentColor;
 }

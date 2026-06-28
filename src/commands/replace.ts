@@ -51,7 +51,7 @@ export function registerReplaceCommands(
     if (uris.length === 0) return;
     const repo = repoForUri(manager, uris[0]);
     if (!repo) return;
-    const sha = await CommitPickerView.pick(repo);
+    const sha = await CommitPickerView.pick(repo, context.extensionUri);
     if (!sha) return;
     await replaceWith(manager, uris, sha);
   });

@@ -85,7 +85,14 @@ export class HistoryView implements vscode.Disposable {
       },
     );
     const nonce = makeNonce();
-    this.panel.webview.html = historyHtml(nonce, this.panel.webview.cspSource);
+    const codiconCssUri = this.panel.webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "resources", "codicon.css"),
+    );
+    this.panel.webview.html = historyHtml(
+      nonce,
+      this.panel.webview.cspSource,
+      codiconCssUri.toString(),
+    );
     this.panel.onDidDispose(() => (this.panel = undefined));
     this.panel.webview.onDidReceiveMessage((m) => this.onMessage(m));
     await this.reload();

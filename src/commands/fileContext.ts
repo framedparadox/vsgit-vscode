@@ -78,7 +78,7 @@ export function registerFileContextCommands(
     if (!uri) return;
     const repo = repoForUri(manager, uri);
     if (!repo) return;
-    const sha = await CommitPickerView.pick(repo);
+    const sha = await CommitPickerView.pick(repo, context.extensionUri);
     if (!sha) return;
     await compareFileWith(manager, uri, sha);
   });

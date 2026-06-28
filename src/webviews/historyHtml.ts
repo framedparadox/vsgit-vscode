@@ -8,13 +8,18 @@
  *
  * All styling uses VS Code theme variables so it matches the active color theme.
  */
-export function historyHtml(nonce: string, cspSource: string): string {
+export function historyHtml(
+  nonce: string,
+  cspSource: string,
+  codiconCssUri: string,
+): string {
   return /* html */ `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta http-equiv="Content-Security-Policy"
-  content="default-src 'none'; img-src ${cspSource}; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';" />
+  content="default-src 'none'; img-src ${cspSource}; style-src ${cspSource} 'nonce-${nonce}'; font-src ${cspSource}; script-src 'nonce-${nonce}';" />
+<link rel="stylesheet" href="${codiconCssUri}" />
 <style nonce="${nonce}">
   * { box-sizing: border-box; }
   body { margin: 0; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size);
@@ -82,7 +87,7 @@ export function historyHtml(nonce: string, cspSource: string): string {
     border-radius: 4px; cursor: pointer; color: var(--vscode-icon-foreground, var(--vscode-foreground)); }
   .fv-btn:hover { background: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
   .fv-btn.active { background: var(--vscode-inputOption-activeBackground, rgba(128,128,128,0.25)); }
-  .fv-btn svg { width: 16px; height: 16px; fill: currentColor; fill-opacity: 0.85; }
+  .fv-btn .codicon { font-size: 16px; line-height: 16px; color: currentColor; opacity: 0.85; }
 
   #files { padding-left: 0; margin: 0; }
   .file-row { cursor: pointer; padding: 2px 4px; border-radius: 3px; display: flex; gap: 6px; align-items: center;
@@ -99,7 +104,7 @@ export function historyHtml(nonce: string, cspSource: string): string {
   .tree-folder:hover { background: var(--vscode-list-hoverBackground); }
   .tree-folder .chev { display: inline-flex; align-items: center; width: 16px; height: 16px; flex: 0 0 auto; transition: transform 0.1s ease; }
   .tree-folder .chev.expanded { transform: rotate(90deg); }
-  .tree-folder .chev svg { width: 16px; height: 16px; fill: var(--vscode-icon-foreground, var(--vscode-foreground)); fill-opacity: 0.8; }
+  .tree-folder .chev .codicon { font-size: 16px; line-height: 16px; color: var(--vscode-icon-foreground, var(--vscode-foreground)); opacity: 0.8; }
   .tree-folder .fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tree-children.collapsed { display: none; }
   .empty { padding: 16px; color: var(--vscode-descriptionForeground); }
@@ -127,9 +132,9 @@ let commits = [], selected = null, hasMore = false, compareMode = null, filePath
 let fileViewMode = (vscode.getState() || {}).historyFileViewMode || 'tree';
 let detailsData = null; // { commit, files } — cached so the toggle re-renders.
 
-const ICON_TREE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2 3v1.5h4V3H2zm6 0v1.5h10V3H8zM2 7v1.5h4V7H2zm6 4v1.5h4V11H8zm0 4v1.5h4V15H8zm-3-7.75v8.5H6.5V15H12v-1.5H6.5v-2.75H12V9.25H6.5V7.25H5z"/></svg>';
-const ICON_LIST = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M 2,3 V 4.5 H 4 V 3 Z M 5.5,3 V 4.5 H 18 V 3 Z M 2,7 V 8.5 H 4 V 7 Z M 5.5,7 V 8.5 H 18 V 7 Z M 2,11 v 1.5 H 4 V 11 Z m 3.5,0 v 1.5 H 18 V 11 Z M 2,15 v 1.5 H 4 V 15 Z m 3.5,0 v 1.5 H 18 V 15 Z"/></svg>';
-const ICON_CHEVRON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M6 4l4 4-4 4V4z"/></svg>';
+const ICON_TREE = '<i class="codicon codicon-list-tree"></i>';
+const ICON_LIST = '<i class="codicon codicon-list-flat"></i>';
+const ICON_CHEVRON = '<i class="codicon codicon-chevron-right"></i>';
 
 function render() {
   const list = document.getElementById('list');

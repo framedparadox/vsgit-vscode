@@ -83,11 +83,9 @@ body {
   width: 16px;
   height: 16px;
 }
-/* The toolbar octicons ship without an explicit fill (so they'd render solid
-   black). Tint them with the button's themed colour so they track the active VS
-   Code colour theme instead of staying black. */
-.tb-ico svg { display: block; fill: currentColor; width: 16px; height: 16px; }
-.tb-ico svg path { fill: currentColor; }
+/* Codicons inherit the button's themed colour so they track the active VS Code
+   colour theme. */
+.tb-ico .codicon { font-size: 16px; line-height: 16px; color: currentColor; }
 .tb-badge {
   position: absolute;
   top: -2px;
@@ -282,8 +280,8 @@ body {
   color: var(--vscode-menu-selectionForeground, #fff);
 }
 .dropdownOptionMultiSelected { position: absolute; width: 12px; height: 16px; top: 7px; left: 10px; }
-.dropdownOptionMultiSelected svg { fill: var(--vscode-menu-foreground, #ccc); opacity: 0.7; width: 12px; }
-.dropdownOption:hover .dropdownOptionMultiSelected svg { fill: var(--vscode-menu-selectionForeground, #fff); opacity: 0.85; }
+.dropdownOptionMultiSelected .codicon { color: var(--vscode-menu-foreground, #ccc); opacity: 0.7; font-size: 12px; }
+.dropdownOption:hover .dropdownOptionMultiSelected .codicon { color: var(--vscode-menu-selectionForeground, #fff); opacity: 0.85; }
 .dropdownNoResults { position: relative; padding: 4px 10px; user-select: none; font-style: italic; }
 
 #commit-count {
@@ -443,11 +441,11 @@ tr.commit-row.uncommitted td.col-desc { font-style: italic; color: var(--vscode-
 }
 .gitRef.active { border-color: var(--git-graph-color); }
 .gitRef.active .gitRefName { font-weight: bold; }
-.gitRef > svg {
+.gitRef > .codicon {
   background-color: var(--git-graph-color);
-  fill: var(--vscode-editor-background);
-  width: 14px;
-  height: 14px;
+  color: var(--vscode-editor-background);
+  font-size: 14px;
+  line-height: 14px;
   padding: 2px;
   vertical-align: top;
 }
@@ -523,16 +521,18 @@ tr.cdv-row > td.cdv-cell {
 }
 .cdvHeaderBtn:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.25)); }
 .cdvHeaderBtn.active { background-color: var(--vscode-inputOption-activeBackground, rgba(128, 128, 128, 0.25)); }
-.cdvHeaderBtn svg {
+.cdvHeaderBtn .codicon {
   position: absolute;
+  font-size: 18px;
+  line-height: 18px;
   width: 18px;
   height: 18px;
   left: 3px;
   top: 3px;
-  fill: currentColor;
-  fill-opacity: 0.75;
+  color: currentColor;
+  opacity: 0.75;
 }
-.cdvHeaderBtn:hover svg, .cdvHeaderBtn.active svg { fill-opacity: 1; }
+.cdvHeaderBtn:hover .codicon, .cdvHeaderBtn.active .codicon { opacity: 1; }
 
 #cdvBody { position: absolute; top: 30px; bottom: 0; left: 0; right: 0; }
 #cdvSummary, #cdvFiles {
@@ -652,7 +652,7 @@ tr.cdv-row > td.cdv-cell {
   transform: rotate(0deg);
 }
 .tree-chevron.expanded { transform: rotate(90deg); }
-.tree-chevron svg { fill: var(--vscode-icon-foreground, var(--vscode-foreground)); fill-opacity: 0.8; }
+.tree-chevron .codicon { font-size: 16px; line-height: 16px; color: var(--vscode-icon-foreground, var(--vscode-foreground)); opacity: 0.8; }
 .tree-folder-name {
   overflow: hidden;
   text-overflow: ellipsis;

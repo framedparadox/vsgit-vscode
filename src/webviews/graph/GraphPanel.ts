@@ -841,6 +841,12 @@ export class GraphPanel {
     const codiconCssUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, "resources", "codicon.css"),
     );
+    const setiCssUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "resources", "seti.css"),
+    );
+    const setiJsUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "resources", "setiIcons.js"),
+    );
     const jsUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, "resources", "graph.js"),
     );
@@ -862,6 +868,7 @@ export class GraphPanel {
   <meta http-equiv="Content-Security-Policy" content="${csp}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="${codiconCssUri}">
+  <link rel="stylesheet" href="${setiCssUri}">
   <link rel="stylesheet" href="${cssUri}">
   <title>VsGit Graph</title>
 </head>
@@ -875,6 +882,7 @@ export class GraphPanel {
       <span id="repoControl"><span class="ctrl-label">Repo: </span><div id="repoDropdown" class="dropdown"></div></span>
       <span id="branchControl"><span class="ctrl-label">Branches: </span><div id="branchDropdown" class="dropdown"></div></span>
       <label id="showRemoteBranchesControl"><input type="checkbox" id="showRemoteBranchesCheckbox" tabindex="-1"><span class="customCheckbox"></span>Show Remote Branches</label>
+      <button class="tb-btn after-control" id="tb-trace" title="Trace flow: ancestors / descendants / off" aria-label="Trace"><span class="tb-ico" data-icon="trace"></span><span class="tb-label">Trace</span></button>
       <span class="tb-spacer"></span>
       <span id="commit-count"></span>
       <span class="tb-sep"></span>
@@ -894,7 +902,6 @@ export class GraphPanel {
       <button class="tb-btn icon-only" id="tb-find" title="Find (Ctrl/Cmd+F)" data-label="Find" aria-label="Find"><span class="tb-ico" data-icon="find"></span></button>
       <button class="tb-btn icon-only" id="tb-columns" title="Columns" data-label="Columns" aria-label="Columns"><span class="tb-ico" data-icon="columns"></span></button>
       <button class="tb-btn icon-only" id="tb-tracking" title="Tracking: off" data-label="Tracking" aria-label="Tracking"><span class="tb-ico" data-icon="tracking"></span></button>
-      <button class="tb-btn icon-only" id="tb-trace" title="Trace flow: ancestors / descendants / off" data-label="Trace" aria-label="Trace"><span class="tb-ico" data-icon="trace"></span></button>
       <button class="tb-btn icon-only" id="tb-refresh" title="Refresh (Ctrl/Cmd+R)" data-label="Refresh" aria-label="Refresh"><span class="tb-ico" data-icon="refresh"></span></button>
       <div id="columns-menu" class="columns-menu" hidden></div>
     </div>
@@ -997,6 +1004,7 @@ export class GraphPanel {
     </form>
   </div>
 
+  <script nonce="${nonce}" src="${setiJsUri}"></script>
   <script nonce="${nonce}" src="${layoutUri}"></script>
   <script nonce="${nonce}" src="${jsUri}"></script>
 </body>

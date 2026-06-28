@@ -64,11 +64,16 @@ test('commit.js toggles and persists the advanced disclosure state', () => {
   assert.ok(!/const STATUS_LABELS =/.test(js), 'STATUS_LABELS is no longer redefined in commit.js');
 });
 
-test('commit.css hides the bar by default and styles the disclosure', () => {
+test('commit.css hides the bar by default and styles the advanced toggle', () => {
   const css = read('resources/commit.css');
+  const html = read('src/webviews/commit/CommitViewProvider.ts');
   assert.ok(css.includes('#commit-bar[hidden]'), 'hidden commit-bar collapses');
-  assert.ok(css.includes('.advanced-toggle'), 'disclosure toggle is styled');
-  assert.ok(css.includes('.advanced-toggle.open .chev'), 'open state rotates the chevron');
+  assert.ok(css.includes('.advanced-toggle'), 'advanced toggle is styled');
+  // The toggle now lives in the header row as a gear button (a .header-btn).
+  assert.ok(
+    /<button id="advanced-toggle"[^>]*class="header-btn advanced-toggle"/.test(html),
+    'advanced toggle is a header button in the actions row',
+  );
 });
 
 test('the collapsed toggle still surfaces an indicator when an option is active', () => {

@@ -623,6 +623,14 @@ function updateTraceButton() {
   btn.setAttribute('aria-label', label);
   btn.classList.toggle('active', traceMode !== 'off');
   btn.dataset.traceMode = traceMode;
+  // Reflect the current mode in the visible button label.
+  const labelEl = btn.querySelector('.tb-label');
+  if (labelEl) {
+    labelEl.textContent =
+      traceMode === 'off' ? 'Trace'
+      : traceMode === 'both' ? 'Trace: both'
+      : 'Trace: ancestors';
+  }
 }
 function traceModeLabel() {
   if (traceMode === 'off') return 'off';
@@ -1205,22 +1213,14 @@ const CDV_STATUS_LABELS = {
 
 // File extension (lowercase, no dot) shown on the left of each row, or '•' when
 // the file has no extension.
-function cdvFileExt(p) {
-  const base = String(p || '').split('/').pop() || '';
-  const dot = base.lastIndexOf('.');
-  if (dot <= 0 || dot === base.length - 1) return '•';
-  return base.slice(dot + 1).toLowerCase();
-}
-
 function makeFileRow(f, onOpen, label) {
   const fileRow = document.createElement('div');
   fileRow.className = 'file-row';
   const code = (f.status || 'M').charAt(0).toUpperCase();
 
-  // LEFT: file extension chip.
+  // LEFT: Seti file-type icon (the icon VS Code shows in the Explorer).
   const ext = document.createElement('span');
-  ext.className = 'file-ext ' + code;
-  ext.textContent = cdvFileExt(f.path);
+  ext.className = 'file-ext seti-icon ' + self.SetiIcons.setiIconClass(f.path);
 
   const p = document.createElement('span');
   p.className = 'file-path';

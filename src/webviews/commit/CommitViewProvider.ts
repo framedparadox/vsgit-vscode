@@ -156,12 +156,14 @@ export class CommitViewProvider
           amend: boolean;
           signoff: boolean;
           gpg: boolean;
+          mode: CommitMode;
         }> | undefined;
         await this.commit(repo, {
           message: typeof data?.message === "string" ? data.message : "",
           amend: data?.amend === true,
           signoff: data?.signoff === true,
           gpg: data?.gpg === true,
+          mode: isCommitMode(data?.mode) ? data.mode : "commit",
         });
         return;
       }
@@ -190,7 +192,13 @@ export class CommitViewProvider
 
   private async commit(
     repo: Repository | undefined,
-    opts: { message: string; amend: boolean; signoff: boolean; gpg: boolean },
+    opts: {
+      message: string;
+      amend: boolean;
+      signoff: boolean;
+      gpg: boolean;
+      mode: CommitMode;
+    },
   ): Promise<void> {
     if (!repo) {
       vscode.window.showWarningMessage("No active repository.");
@@ -224,6 +232,15 @@ export class CommitViewProvider
         opts.amend ? "Amended commit" : "Committed",
         3000,
       );
+      // After-commit transport, mirroring VS Code's "Commit & Push/Sync". These
+      // reuse the existing commands so credentials, progress and remote-picking
+      // behave identically to the standalone Push/Pull buttons.
+      if (opts.mode === "push") {
+        await vscode.commands.executeCommand("vsgit.push", { repo });
+      } else if (opts.mode === "sync") {
+        await vscode.commands.executeCommand("vsgit.pull", { repo });
+        await vscode.commands.executeCommand("vsgit.push", { repo });
+      }
     } catch (e) {
       vscode.window.showErrorMessage(
         `Commit failed: ${e instanceof Error ? e.message : String(e)}`,
@@ -238,6 +255,12 @@ export class CommitViewProvider
     );
     const codiconCssUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, "resources", "codicon.css"),
+    );
+    const setiCssUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "resources", "seti.css"),
+    );
+    const setiJsUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "resources", "setiIcons.js"),
     );
     const helpersUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, "resources", "commitView.js"),
@@ -257,6 +280,7 @@ export class CommitViewProvider
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="${csp}">
   <link rel="stylesheet" href="${codiconCssUri}">
+  <link rel="stylesheet" href="${setiCssUri}">
   <link rel="stylesheet" href="${cssUri}">
   <title>Commit</title>
 </head>
@@ -266,34 +290,54 @@ export class CommitViewProvider
     <div id="message-box">
       <div id="commit-header">
         <div id="commit-title">
-          <span class="title">Commit</span>
           <span id="branch-name"></span>
         </div>
         <div id="commit-actions">
+          <button id="advanced-toggle" class="header-btn advanced-toggle" type="button"
+                  title="More commit options" aria-label="More commit options"
+                  aria-expanded="false" aria-controls="commit-bar">
+            <i class="codicon codicon-ellipsis header-icon" aria-hidden="true"></i>
+            <span id="advanced-badge" class="advanced-badge" hidden title="Advanced options are active"></span>
+          </button>
           <button id="view-tree" class="header-btn" title="Tree View" aria-label="Tree View">
             <i class="codicon codicon-list-tree header-icon" aria-hidden="true"></i>
           </button>
           <button id="view-list" class="header-btn" title="List View" aria-label="List View">
             <i class="codicon codicon-list-flat header-icon" aria-hidden="true"></i>
           </button>
-          <button id="commit-btn" class="primary" title="Commit staged changes">Commit</button>
         </div>
       </div>
-      <textarea id="message" placeholder="Message (commit on this branch)"></textarea>
-      <button id="advanced-toggle" class="advanced-toggle" type="button"
-              aria-expanded="false" aria-controls="commit-bar">
-        <span class="chev codicon codicon-chevron-right" aria-hidden="true"></span>
-        <span>Advanced</span>
-        <span id="advanced-badge" class="advanced-badge" hidden title="Advanced options are active"></span>
-      </button>
       <div id="commit-bar" hidden>
         <label class="opt"><input type="checkbox" id="opt-amend"> Amend</label>
         <label class="opt"><input type="checkbox" id="opt-signoff"> Sign off</label>
         <label class="opt"><input type="checkbox" id="opt-gpg"> GPG</label>
       </div>
+      <textarea id="message" placeholder="Message (commit on this branch)"></textarea>
+      <!-- Split button: primary action + dropdown of commit modes, like the
+           Source Control panel's Commit button. -->
+      <div id="commit-split" class="split-button">
+        <button id="commit-btn" class="primary" title="Commit staged changes">
+          <i class="codicon codicon-check" aria-hidden="true"></i>
+          <span id="commit-btn-label">Commit</span>
+        </button>
+        <button id="commit-more" class="primary split-caret" type="button"
+                title="More commit actions" aria-label="More commit actions"
+                aria-haspopup="menu" aria-expanded="false">
+          <i class="codicon codicon-chevron-down" aria-hidden="true"></i>
+        </button>
+        <div id="commit-menu" class="commit-menu" role="menu" hidden>
+          <button class="commit-menu-item" role="menuitem" data-mode="commit">Commit</button>
+          <button class="commit-menu-item" role="menuitem" data-mode="push">Commit &amp; Push</button>
+          <button class="commit-menu-item" role="menuitem" data-mode="sync">Commit &amp; Sync</button>
+          <div class="commit-menu-sep"></div>
+          <button class="commit-menu-item" role="menuitem" data-toggle="amend">Commit (Amend)</button>
+          <button class="commit-menu-item" role="menuitem" data-toggle="signoff">Commit (Signed Off)</button>
+        </div>
+      </div>
     </div>
     <div id="groups"></div>
   </div>
+  <script nonce="${nonce}" src="${setiJsUri}"></script>
   <script nonce="${nonce}" src="${helpersUri}"></script>
   <script nonce="${nonce}" src="${jsUri}"></script>
 </body>
@@ -302,6 +346,13 @@ export class CommitViewProvider
 }
 
 type StagingGroup = "staged" | "unstaged" | "conflicted";
+
+/** What to do after a successful commit, mirroring VS Code's commit dropdown. */
+type CommitMode = "commit" | "push" | "sync";
+
+function isCommitMode(value: unknown): value is CommitMode {
+  return value === "commit" || value === "push" || value === "sync";
+}
 
 function isStagingGroup(value: unknown): value is StagingGroup {
   return value === "staged" || value === "unstaged" || value === "conflicted";

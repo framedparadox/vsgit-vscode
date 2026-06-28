@@ -7,7 +7,7 @@ const {
   statusLabel,
   statusCode,
   fileExt,
-  fileTypeBadge,
+  setiIconClass,
   escapeHtml,
   buildFileTree,
 } = require('./commitView.js');
@@ -62,34 +62,36 @@ test('fileExt returns a bullet when there is no usable extension', () => {
   assert.strictEqual(fileExt(undefined), '•');
 });
 
-// ─── fileTypeBadge ───────────────────────────────────────────────────────────
-test('fileTypeBadge maps known languages to a short ≤2-char badge', () => {
-  assert.strictEqual(fileTypeBadge('app.js'), 'JS');
-  assert.strictEqual(fileTypeBadge('Component.tsx'), 'TS');
-  assert.strictEqual(fileTypeBadge('package.json'), '{}');
-  assert.strictEqual(fileTypeBadge('main.py'), 'PY');
-  assert.strictEqual(fileTypeBadge('styles.scss'), '#');
+// ─── setiIconClass ───────────────────────────────────────────────────────────
+test('setiIconClass maps common extensions to their Seti icon class', () => {
+  assert.strictEqual(setiIconClass('app.js'), 'seti-javascript');
+  assert.strictEqual(setiIconClass('Component.tsx'), 'seti-react');
+  assert.strictEqual(setiIconClass('main.py'), 'seti-python');
+  assert.strictEqual(setiIconClass('styles.scss'), 'seti-sass');
+  assert.strictEqual(setiIconClass('data.json'), 'seti-json');
 });
 
-test('fileTypeBadge handles extensionless/dotfile config names', () => {
-  assert.strictEqual(fileTypeBadge('.gitignore'), 'GI');
-  assert.strictEqual(fileTypeBadge('Dockerfile'), 'DK');
-  assert.strictEqual(fileTypeBadge('yarn.lock'), 'LK');
+test('setiIconClass matches whole file names before extensions', () => {
+  assert.strictEqual(setiIconClass('README.md'), 'seti-info');
+  assert.strictEqual(setiIconClass('tsconfig.json'), 'seti-tsconfig');
+  assert.strictEqual(setiIconClass('yarn.lock'), 'seti-yarn');
+  assert.strictEqual(setiIconClass('LICENSE'), 'seti-license');
 });
 
-test('fileTypeBadge falls back to the first two letters, then a bullet', () => {
-  // Unknown extension → upper-cased first two letters.
-  assert.strictEqual(fileTypeBadge('data.xyz'), 'XY');
-  // No usable extension and no whole-name rule → bullet.
-  assert.strictEqual(fileTypeBadge('Makefile'), 'MK'); // whole-name rule
-  assert.strictEqual(fileTypeBadge('NOTES'), '•');
-  assert.strictEqual(fileTypeBadge(''), '•');
+test('setiIconClass prefers the longest matching trailing extension', () => {
+  // spec.ts / test.ts have dedicated icons distinct from a plain .ts file.
+  assert.strictEqual(setiIconClass('button.spec.ts'), 'seti-typescript_1');
+  assert.strictEqual(setiIconClass('button.ts'), 'seti-typescript');
 });
 
-test('fileTypeBadge never returns more than two characters', () => {
-  for (const name of ['a.markdown', 'b.dockerfile', 'c.graphql', 'd.unknownext']) {
-    assert.ok(fileTypeBadge(name).length <= 2, name + ' badge ≤ 2 chars');
-  }
+test('setiIconClass falls back to the default icon for unknown files', () => {
+  assert.strictEqual(setiIconClass('data.unknownext'), 'seti-default');
+  assert.strictEqual(setiIconClass('NOTES'), 'seti-default');
+  assert.strictEqual(setiIconClass(''), 'seti-default');
+});
+
+test('setiIconClass ignores any leading directory path', () => {
+  assert.strictEqual(setiIconClass('src/utils/app.js'), 'seti-javascript');
 });
 
 // ─── escapeHtml ──────────────────────────────────────────────────────────────

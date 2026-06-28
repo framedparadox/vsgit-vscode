@@ -11,7 +11,7 @@ const vscode = acquireVsCodeApi();
 
 // Pure, DOM-free helpers shared with Node tests (resources/commitView.js,
 // loaded as a global by the webview before this script).
-const { statusCode, fileTypeBadge, escapeHtml, buildFileTree } =
+const { statusCode, setiIconClass, escapeHtml, buildFileTree } =
   self.CommitView;
 
 let state = { active: false };
@@ -19,6 +19,13 @@ let viewMode = (vscode.getState() || {}).commitViewMode || 'tree';
 // Advanced commit options (Amend / Sign off / GPG) are hidden behind a
 // disclosure by default; remember whether the user expanded them.
 let advancedOpen = (vscode.getState() || {}).commitAdvancedOpen === true;
+// The primary commit action chosen from the split-button dropdown
+// ('commit' | 'push' | 'sync'); remembered so the button defaults to it.
+let commitMode = (vscode.getState() || {}).commitMode || 'commit';
+// Labels for the primary commit button per mode.
+const COMMIT_MODE_LABELS = { commit: 'Commit', push: 'Commit & Push', sync: 'Commit & Sync' };
+// Which file groups ('staged' | 'unstaged' | 'conflicted') the user collapsed.
+let collapsedGroups = (vscode.getState() || {}).commitCollapsedGroups || {};
 
 const el = (id) => document.getElementById(id);
 const post = (type, data) => vscode.postMessage({ type, data });
@@ -64,9 +71,18 @@ function render() {
 function renderGroup(title, group, files) {
   const wrap = document.createElement('div');
   wrap.className = 'group';
+  const collapsed = collapsedGroups[group] === true;
+  if (collapsed) wrap.classList.add('collapsed');
 
   const header = document.createElement('div');
   header.className = 'group-header';
+
+  // Collapse chevron (▸ when collapsed, ▾ when expanded) — clicking the header
+  // toggles the group, like the Source Control panel's section headers.
+  const chev = document.createElement('span');
+  chev.className = 'group-chevron codicon codicon-chevron-down';
+  header.appendChild(chev);
+
   const label = document.createElement('span');
   label.className = 'group-label';
   label.textContent = title;
@@ -75,29 +91,38 @@ function renderGroup(title, group, files) {
   count.textContent = String(files.length);
   header.appendChild(label);
 
-  // Group-level action: stage-all / unstage-all.
+  // Group-level action: stage-all / unstage-all. These sit inside the header but
+  // must not toggle the collapse, so each stops propagation in groupAction().
   if (group === 'unstaged' && files.length) {
     header.appendChild(groupAction('Stage All Changes', 'add', () => post('stageAll')));
   } else if (group === 'staged' && files.length) {
     header.appendChild(groupAction('Unstage All Changes', 'remove', () => post('unstageAll')));
   }
   header.appendChild(count);
+  header.addEventListener('click', () => setGroupCollapsed(group, !wrap.classList.contains('collapsed')));
   wrap.appendChild(header);
 
+  const body = document.createElement('div');
+  body.className = 'group-body';
   if (!files.length) {
     const empty = document.createElement('div');
     empty.className = 'file-empty';
     empty.textContent = 'No changes';
-    wrap.appendChild(empty);
-    return wrap;
-  }
-
-  if (viewMode === 'tree') {
-    wrap.appendChild(renderTree(group, files));
+    body.appendChild(empty);
+  } else if (viewMode === 'tree') {
+    body.appendChild(renderTree(group, files));
   } else {
-    files.forEach((f) => wrap.appendChild(renderFile(f, group)));
+    files.forEach((f) => body.appendChild(renderFile(f, group)));
   }
+  wrap.appendChild(body);
   return wrap;
+}
+
+// Collapse/expand a file group and persist it across reloads.
+function setGroupCollapsed(group, collapsed) {
+  collapsedGroups = { ...collapsedGroups, [group]: collapsed };
+  vscode.setState({ ...(vscode.getState() || {}), commitCollapsedGroups: collapsedGroups });
+  render();
 }
 
 function groupAction(title, icon, action) {
@@ -152,10 +177,9 @@ function renderFile(f, group, depth = 0, label = f.name) {
 
   const code = statusCode(f);
 
-  // LEFT: short file-type badge (JS, TS, {} …).
+  // LEFT: Seti file-type icon (the icon VS Code shows in the Explorer).
   const ext = document.createElement('span');
-  ext.className = 'file-ext s-' + code;
-  ext.textContent = fileTypeBadge(f.name);
+  ext.className = 'file-ext seti-icon ' + setiIconClass(f.name);
   row.appendChild(ext);
 
   const name = document.createElement('span');
@@ -219,13 +243,14 @@ function setAdvancedOpen(open) {
   syncAdvanced();
 }
 
-// Reflect the advanced-options disclosure state into the DOM: toggle button
-// (chevron + aria-expanded) and the hidden state of the options bar.
+// Reflect the advanced-options disclosure state into the DOM: the gear toggle
+// (active + aria-expanded) and the hidden state of the options bar.
 function syncAdvanced() {
   const toggle = el('advanced-toggle');
   const bar = el('commit-bar');
   if (!toggle || !bar) return;
   toggle.classList.toggle('open', advancedOpen);
+  toggle.classList.toggle('active', advancedOpen);
   toggle.setAttribute('aria-expanded', String(advancedOpen));
   bar.hidden = !advancedOpen;
   syncAdvancedBadge();
@@ -254,13 +279,53 @@ function fileAction(title, icon, handler) {
 }
 
 // ─── commit ──────────────────────────────────────────────────────────────────
-function doCommit() {
+function doCommit(mode) {
   post('commit', {
     message: el('message').value,
     amend: el('opt-amend').checked,
     signoff: el('opt-signoff').checked,
     gpg: el('opt-gpg').checked,
+    mode: mode || commitMode,
   });
+}
+
+// Set which commit action the primary button performs and persist it.
+function setCommitMode(mode) {
+  commitMode = mode;
+  vscode.setState({ ...(vscode.getState() || {}), commitMode: mode });
+  const label = el('commit-btn-label');
+  if (label) label.textContent = COMMIT_MODE_LABELS[mode] || 'Commit';
+}
+
+// Show/hide the split-button dropdown of commit actions.
+function setCommitMenuOpen(open) {
+  const menu = el('commit-menu');
+  const caret = el('commit-more');
+  if (!menu || !caret) return;
+  menu.hidden = !open;
+  caret.setAttribute('aria-expanded', String(open));
+}
+
+function onCommitMenuClick(e) {
+  const item = e.target.closest('.commit-menu-item');
+  if (!item) return;
+  setCommitMenuOpen(false);
+  if (item.dataset.toggle) {
+    // "Commit (Amend)" / "Commit (Signed Off)" — enable the option, reveal the
+    // advanced bar so it's visible, then commit straight away.
+    const opt = el('opt-' + item.dataset.toggle);
+    if (opt && !opt.checked) {
+      opt.checked = true;
+      if (item.dataset.toggle === 'amend') onAmendToggled();
+      else syncAdvancedBadge();
+    }
+    setAdvancedOpen(true);
+    doCommit('commit');
+    return;
+  }
+  const mode = item.dataset.mode || 'commit';
+  setCommitMode(mode);
+  doCommit(mode);
 }
 
 // Message that was in the box right before Amend was checked, restored if the
@@ -292,13 +357,24 @@ function wire() {
       doCommit();
     }
   });
-  el('commit-btn').addEventListener('click', doCommit);
+  el('commit-btn').addEventListener('click', () => doCommit());
+  el('commit-more').addEventListener('click', (e) => {
+    e.stopPropagation();
+    setCommitMenuOpen(el('commit-menu').hidden);
+  });
+  el('commit-menu').addEventListener('click', onCommitMenuClick);
+  // Close the dropdown on outside click or Escape.
+  document.addEventListener('click', () => setCommitMenuOpen(false));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') setCommitMenuOpen(false);
+  });
   el('view-tree').addEventListener('click', () => setViewMode('tree'));
   el('view-list').addEventListener('click', () => setViewMode('list'));
   el('advanced-toggle').addEventListener('click', () => setAdvancedOpen(!advancedOpen));
   el('opt-amend').addEventListener('change', onAmendToggled);
   el('opt-signoff').addEventListener('change', syncAdvancedBadge);
   el('opt-gpg').addEventListener('change', syncAdvancedBadge);
+  setCommitMode(commitMode);
 }
 
 // ─── messages ────────────────────────────────────────────────────────────────

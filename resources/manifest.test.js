@@ -318,8 +318,16 @@ test('Git Graph top bar buttons expose labels and table fills available width', 
   for (const id of buttonIds) {
     const button = graphPanel.match(new RegExp(`<button[^>]+id="${id}"[^>]+>`));
     assert.ok(button, `${id} exists`);
-    assert.ok(button[0].includes('data-label='), `${id} has data-label`);
     assert.ok(button[0].includes('aria-label='), `${id} has aria-label`);
+    if (id === 'tb-trace') {
+      // Trace shows a visible text label rather than the hover-only data-label.
+      assert.ok(
+        graphPanel.includes('<span class="tb-label">Trace</span>'),
+        'tb-trace has a visible text label',
+      );
+    } else {
+      assert.ok(button[0].includes('data-label='), `${id} has data-label`);
+    }
   }
 
   assert.ok(graphCss.includes('.tb-btn.icon-only[data-label]::after'), 'toolbar labels use CSS tooltip');

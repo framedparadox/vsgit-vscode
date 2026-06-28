@@ -9,3 +9,18 @@ tsconfig.test.json
 **/*.map
 **/*.ts
 .gitignore
+
+# Dev-only / scratch artifacts that should never ship in the VSIX.
+.claude/**
+.github/**
+graphify-out/**
+archive/**
+**/*.test.js
+*.vsix
+.DS_Store
+**/.DS_Store
+
+# Ship only the screenshots the README embeds; exclude internal design docs.
+docs/**
+!docs/git-graph.png
+!docs/sidebar.png

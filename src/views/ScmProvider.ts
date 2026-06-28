@@ -78,13 +78,9 @@ export class VsgitScmProvider implements vscode.Disposable {
       title: "Commit",
       arguments: [repo.root],
     };
-    scm.statusBarCommands = [
-      {
-        command: "vsgit.graph.show",
-        title: "$(git-branch) Graph",
-        arguments: [{ type: "repo", repo }],
-      },
-    ];
+    // The Git Graph status-bar button is owned by GraphStatusBarService (a single,
+    // settings-gated $(git-branch) item). Don't also publish it as an SCM
+    // statusBarCommand, which would show a duplicate Graph button in the footer.
 
     const index = scm.createResourceGroup("index", "Staged Changes");
     const workingTree = scm.createResourceGroup("workingTree", "Changes");

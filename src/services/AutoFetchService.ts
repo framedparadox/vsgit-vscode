@@ -1,8 +1,3 @@
-/**
- * Background service that periodically fetches all remotes across known
- * repositories and reflects status (last fetch time, behind count) in a
- * status bar item. Restarts its timer when the autoFetch configuration changes.
- */
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { Credentials } from "../util/credentials";

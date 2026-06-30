@@ -1,5 +1,6 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
+import { Repository } from "../git/Repository";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { GitContentProvider } from "../git/GitContentProvider";
 import { errMsg, withProgress } from "./shared";
@@ -26,7 +27,7 @@ export function registerFileContextCommands(
     if (uris.length === 0) return;
     const repo = repoForUri(manager, uris[0]);
     if (!repo) return;
-    const rels = uris.map((u) => path.relative(repo.root, u.fsPath));
+    const rels = relativePaths(manager, repo, uris);
     await withProgress(manager, "Stage", () => repo.stage(rels));
   });
 
@@ -35,7 +36,7 @@ export function registerFileContextCommands(
     if (uris.length === 0) return;
     const repo = repoForUri(manager, uris[0]);
     if (!repo) return;
-    const rels = uris.map((u) => path.relative(repo.root, u.fsPath));
+    const rels = relativePaths(manager, repo, uris);
     await withProgress(manager, "Unstage", () => repo.unstage(rels));
   });
 
@@ -44,7 +45,7 @@ export function registerFileContextCommands(
     if (uris.length === 0) return;
     const repo = repoForUri(manager, uris[0]);
     if (!repo) return;
-    const rels = uris.map((u) => path.relative(repo.root, u.fsPath));
+    const rels = relativePaths(manager, repo, uris);
     try {
       await repo.addToGitignore(rels);
       vscode.window.showInformationMessage(`Added ${rels.length} pattern(s) to .gitignore`);
@@ -77,7 +78,7 @@ export function registerFileContextCommands(
     if (!uri) return;
     const repo = repoForUri(manager, uri);
     if (!repo) return;
-    const sha = await CommitPickerView.pick(repo);
+    const sha = await CommitPickerView.pick(repo, context.extensionUri);
     if (!sha) return;
     await compareFileWith(manager, uri, sha);
   });
@@ -180,7 +181,7 @@ export function registerFileContextCommands(
     if (!uri) return;
     const repo = repoForUri(manager, uri);
     if (!repo) return;
-    const rel = path.relative(repo.root, uri.fsPath);
+    const rel = manager.relativePath(repo, uri);
     await vscode.commands.executeCommand("vsgit.history.show", {
       repoRoot: repo.root,
       file: rel,
@@ -194,7 +195,7 @@ export function registerFileContextCommands(
     if (uris.length === 0) return;
     const repo = repoForUri(manager, uris[0]);
     if (!repo) return;
-    const rels = uris.map((u) => path.relative(repo.root, u.fsPath));
+    const rels = relativePaths(manager, repo, uris);
     await withProgress(manager, "Assume unchanged", () =>
       repo.assumeUnchanged(rels, true),
     );
@@ -205,7 +206,7 @@ export function registerFileContextCommands(
     if (uris.length === 0) return;
     const repo = repoForUri(manager, uris[0]);
     if (!repo) return;
-    const rels = uris.map((u) => path.relative(repo.root, u.fsPath));
+    const rels = relativePaths(manager, repo, uris);
     await withProgress(manager, "No assume unchanged", () =>
       repo.assumeUnchanged(rels, false),
     );
@@ -216,7 +217,7 @@ export function registerFileContextCommands(
     if (uris.length === 0) return;
     const repo = repoForUri(manager, uris[0]);
     if (!repo) return;
-    const rels = uris.map((u) => path.relative(repo.root, u.fsPath));
+    const rels = relativePaths(manager, repo, uris);
     await withProgress(manager, "Skip worktree", () =>
       repo.skipWorktree(rels, true),
     );
@@ -227,7 +228,7 @@ export function registerFileContextCommands(
     if (uris.length === 0) return;
     const repo = repoForUri(manager, uris[0]);
     if (!repo) return;
-    const rels = uris.map((u) => path.relative(repo.root, u.fsPath));
+    const rels = relativePaths(manager, repo, uris);
     await withProgress(manager, "No skip worktree", () =>
       repo.skipWorktree(rels, false),
     );
@@ -238,13 +239,13 @@ export function registerFileContextCommands(
     if (uris.length === 0) return;
     const repo = repoForUri(manager, uris[0]);
     if (!repo) return;
-    const rels = uris.map((u) => path.relative(repo.root, u.fsPath));
-    const confirm = await vscode.window.showWarningMessage(
-      `Remove ${rels.length} file(s) from Git tracking (git rm --cached)?`,
-      { modal: true },
-      "Untrack",
-    );
-    if (confirm !== "Untrack") return;
+    const rels = relativePaths(manager, repo, uris);
+    const confirmed = await confirmDestructiveAction({
+      operation: DestructiveOperations.DISCARD_CHANGES,
+      message: `Remove ${rels.length} file(s) from Git tracking (git rm --cached)?`,
+      items: rels,
+    });
+    if (!confirmed) return;
     await withProgress(manager, "Untrack", () => repo.untrack(rels));
   });
 
@@ -254,12 +255,12 @@ export function registerFileContextCommands(
     const uris = resolveUris(uriArg, allUris);
     const repo = uris.length > 0
       ? repoForUri(manager, uris[0])
-      : manager.getAll()[0];
+      : manager.getActive();
     if (!repo) return;
 
     const rels = uris
-      .filter((u) => u.fsPath.startsWith(repo.root))
-      .map((u) => path.relative(repo.root, u.fsPath));
+      .filter((u) => manager.uriBelongsTo(repo, u))
+      .map((u) => manager.relativePath(repo, u));
 
     const confirmed = await confirmDestructiveAction({
       operation: DestructiveOperations.CLEAN_UNTRACKED,
@@ -290,12 +291,21 @@ function resolveUris(uriArg: unknown, allUris: unknown): vscode.Uri[] {
 }
 
 function repoForUri(manager: RepositoryManager, uri: vscode.Uri) {
-  if (uri.scheme !== "file") return undefined;
-  const repo = manager.getAll().find((r) => uri.fsPath.startsWith(r.root));
+  const repo = manager.findByUri(uri);
   if (!repo) {
     vscode.window.showWarningMessage("File is not in a known Git repository.");
   }
   return repo;
+}
+
+function relativePaths(
+  manager: RepositoryManager,
+  repo: Repository,
+  uris: vscode.Uri[],
+): string[] {
+  return uris
+    .filter((uri) => manager.uriBelongsTo(repo, uri))
+    .map((uri) => manager.relativePath(repo, uri));
 }
 
 async function compareFileWith(
@@ -306,7 +316,7 @@ async function compareFileWith(
   if (!uri) return;
   const repo = repoForUri(manager, uri);
   if (!repo) return;
-  const rel = path.relative(repo.root, uri.fsPath);
+  const rel = manager.relativePath(repo, uri);
   const left = GitContentProvider.uri(repo.root, rel, ref, uri.fsPath);
   const label = `${path.basename(rel)} (${ref} ↔ working tree)`;
   try {
@@ -323,7 +333,7 @@ async function compareFileWithIndex(
   if (!uri) return;
   const repo = repoForUri(manager, uri);
   if (!repo) return;
-  const rel = path.relative(repo.root, uri.fsPath);
+  const rel = manager.relativePath(repo, uri);
   // Use "" (empty string) as the ref to mean "index / staged"
   const left = GitContentProvider.uri(repo.root, rel, "", uri.fsPath);
   const label = `${path.basename(rel)} (Index ↔ working tree)`;
@@ -342,7 +352,7 @@ async function compareIndexWithHead(
   if (!uri) return;
   const repo = repoForUri(manager, uri);
   if (!repo) return;
-  const rel = path.relative(repo.root, uri.fsPath);
+  const rel = manager.relativePath(repo, uri);
   const headUri = GitContentProvider.uri(repo.root, rel, "HEAD", uri.fsPath);
   const indexUri = GitContentProvider.uri(repo.root, rel, "", uri.fsPath);
   const label = `${path.basename(rel)} (HEAD ↔ Index)`;

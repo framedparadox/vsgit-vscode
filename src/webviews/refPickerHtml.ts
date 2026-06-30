@@ -25,6 +25,11 @@ export function refPickerHtml(nonce: string, _cspSource: string): string {
     background: var(--vscode-editor-background);
     display: flex; flex-direction: column; height: 100vh; overflow: hidden;
   }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  button:focus-visible, input:focus-visible, [role="treeitem"]:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px;
+  }
 
   /* ── Header ── */
   #header {
@@ -165,9 +170,14 @@ export function refPickerHtml(nonce: string, _cspSource: string): string {
 
   .empty { padding: 20px; color: var(--vscode-descriptionForeground); text-align: center; }
   .hidden { display: none; }
+  @media (forced-colors: active) {
+    button, input, .leaf, .group-header { forced-color-adjust: auto; }
+    .leaf.selected { outline: 2px solid CanvasText; outline-offset: -2px; }
+  }
 </style>
 </head>
 <body>
+  <div id="aria-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
   <div id="header">
     <h2 id="headTitle">Select a Branch, Tag, or Reference</h2>
     <p id="headSub">Select a branch, tag, or reference to compare the resource with</p>
@@ -175,13 +185,13 @@ export function refPickerHtml(nonce: string, _cspSource: string): string {
 
   <div id="searchRow">
     <div id="filterWrap">
-      <input id="filter" type="text" placeholder="type filter text" autocomplete="off" spellcheck="false"/>
-      <button id="clearBtn" title="Clear filter">✕</button>
+      <input id="filter" type="text" placeholder="type filter text" aria-label="Filter branches, tags, and references" autocomplete="off" spellcheck="false"/>
+      <button id="clearBtn" title="Clear filter" aria-label="Clear filter">✕</button>
     </div>
   </div>
 
   <div id="treeWrap">
-    <div id="tree"></div>
+    <div id="tree" role="tree" aria-label="Git references"></div>
     <div id="empty" class="empty hidden">No refs match your filter.</div>
   </div>
 
@@ -192,6 +202,17 @@ export function refPickerHtml(nonce: string, _cspSource: string): string {
 
 <script nonce="${nonce}">
 const vscode = acquireVsCodeApi();
+const announce = (message) => {
+  const status = document.getElementById('aria-status');
+  status.textContent = '';
+  requestAnimationFrame(() => { status.textContent = message; });
+};
+function keyboardClick(node, handler) {
+  node.addEventListener('keydown', event => {
+    if (event.target !== node || (event.key !== 'Enter' && event.key !== ' ')) return;
+    event.preventDefault(); handler();
+  });
+}
 
 // ── State ──────────────────────────────────────────────────────────────────
 let groups = [];          // [{ id, label, icon, items: [{ref, shortSha, subject, isHead, icon}] }]
@@ -210,6 +231,7 @@ window.addEventListener('message', ({ data }) => {
   });
   render('');
   document.getElementById('filter').focus();
+  announce(groups.reduce((count, group) => count + group.items.length, 0) + ' references loaded.');
 });
 
 // ── Filter ─────────────────────────────────────────────────────────────────
@@ -252,12 +274,17 @@ function render(q) {
     // Header
     const hdr = document.createElement('div');
     hdr.className = 'group-header';
+    hdr.tabIndex = 0;
+    hdr.setAttribute('role', 'treeitem');
     const collapsed = !lq && collapsedGroups[g.id];
+    hdr.setAttribute('aria-expanded', String(!collapsed));
+    hdr.setAttribute('aria-label', g.label + ', group');
     hdr.innerHTML =
       \`<span class="chevron \${collapsed ? '' : 'open'}">&#9658;</span>\` +
       \`<span class="group-icon">\${g.icon}</span>\` +
       \`<span class="group-name">\${esc(g.label)}</span>\`;
-    hdr.addEventListener('click', () => toggleGroup(g.id, childrenEl, hdr.querySelector('.chevron')));
+    hdr.addEventListener('click', () => toggleGroup(g.id, childrenEl, hdr.querySelector('.chevron'), hdr));
+    keyboardClick(hdr, () => hdr.click());
     groupEl.appendChild(hdr);
 
     // Children
@@ -268,6 +295,10 @@ function render(q) {
       const leaf = document.createElement('div');
       leaf.className = 'leaf' + (it.ref === selectedRef ? ' selected' : '');
       leaf.dataset.ref = it.ref;
+      leaf.tabIndex = 0;
+      leaf.setAttribute('role', 'treeitem');
+      leaf.setAttribute('aria-selected', String(it.ref === selectedRef));
+      leaf.setAttribute('aria-label', it.ref + (it.isHead ? ', current HEAD' : '') + (it.shortSha ? ', commit ' + it.shortSha : ''));
 
       let html = \`<span class="leaf-icon">\${it.icon || '📄'}</span>\`;
       html += \`<span class="leaf-name">\${esc(it.ref)}</span>\`;
@@ -277,6 +308,7 @@ function render(q) {
       leaf.innerHTML = html;
 
       leaf.addEventListener('click', () => selectLeaf(it.ref));
+      keyboardClick(leaf, () => selectLeaf(it.ref));
       leaf.addEventListener('dblclick', () => { selectLeaf(it.ref); confirm(); });
       childrenEl.appendChild(leaf);
     });
@@ -289,20 +321,24 @@ function render(q) {
   syncOkButton();
 }
 
-function toggleGroup(id, childrenEl, chevron) {
+function toggleGroup(id, childrenEl, chevron, header) {
   const isOpen = !childrenEl.classList.contains('collapsed');
   collapsedGroups[id] = isOpen;
   childrenEl.classList.toggle('collapsed', isOpen);
   chevron.classList.toggle('open', !isOpen);
+  header.setAttribute('aria-expanded', String(!isOpen));
 }
 
 // ── Selection ──────────────────────────────────────────────────────────────
 function selectLeaf(ref) {
   selectedRef = ref;
   document.querySelectorAll('.leaf').forEach(el => {
-    el.classList.toggle('selected', el.dataset.ref === ref);
+    const selected = el.dataset.ref === ref;
+    el.classList.toggle('selected', selected);
+    el.setAttribute('aria-selected', String(selected));
   });
   syncOkButton();
+  announce('Selected ' + ref + '.');
 }
 
 function syncOkButton() {

@@ -8,19 +8,23 @@ import { GitContentProvider } from "./GitContentProvider";
  * Registered as an SCM quick-diff provider.
  */
 export class VsgitQuickDiffProvider implements vscode.QuickDiffProvider {
-  constructor(private readonly manager: RepositoryManager) {}
+  constructor(
+    private readonly manager: RepositoryManager,
+    private readonly root?: string,
+  ) {}
 
   provideOriginalResource(uri: vscode.Uri): vscode.Uri | undefined {
     if (uri.scheme !== "file") {
       return undefined;
     }
-    const repo = this.manager
-      .getAll()
-      .find((r) => uri.fsPath.startsWith(r.root));
+    const repo = this.manager.findByUri(uri);
     if (!repo) {
       return undefined;
     }
-    const rel = uri.fsPath.slice(repo.root.length + 1);
+    if (this.root && repo.root !== this.root) {
+      return undefined;
+    }
+    const rel = this.manager.relativePath(repo, uri);
     // Compare against the index so staged changes don't show as gutter diff.
     return GitContentProvider.uri(repo.root, rel, "~index", uri.fsPath);
   }

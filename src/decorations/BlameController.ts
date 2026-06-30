@@ -59,13 +59,11 @@ export class BlameController implements vscode.Disposable {
     if (this.cache.has(fsPath)) {
       return;
     }
-    const repo = this.manager
-      .getAll()
-      .find((r) => fsPath.startsWith(r.root + "/") || fsPath.startsWith(r.root));
+    const repo = this.manager.findByUri(editor.document.uri);
     if (!repo) {
       return;
     }
-    const rel = fsPath.slice(repo.root.length + 1);
+    const rel = this.manager.relativePath(repo, editor.document.uri);
     try {
       this.cache.set(fsPath, await repo.blame(rel));
     } catch {

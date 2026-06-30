@@ -9,6 +9,26 @@ body {
   background-color: var(--vscode-sideBar-background);
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+button:focus-visible,
+[role="button"]:focus-visible,
+textarea:focus-visible,
+input:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
+
 .empty {
   padding: 16px 12px;
   color: var(--vscode-descriptionForeground);
@@ -29,22 +49,26 @@ body {
   flex: 1;
   min-width: 0;
   display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-#commit-title .title {
-  font-size: 12px;
-  font-weight: 600;
+  align-items: center;
 }
 
 #branch-name {
-  color: var(--vscode-descriptionForeground);
-  font-size: 11px;
+  color: var(--vscode-foreground);
+  font-size: 12px;
+  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+#branch-name::before {
+  font-family: "codicon";
+  content: "\ec6f"; /* codicon-git-branch */
+  margin-right: 5px;
+  color: var(--vscode-descriptionForeground);
+  font-weight: normal;
+  vertical-align: -1px;
+}
+#branch-name:empty { display: none; }
 
 #commit-actions {
   display: inline-flex;
@@ -69,24 +93,126 @@ body {
 }
 #message:focus { border-color: var(--vscode-focusBorder); }
 
+/* The advanced-options toggle is a gear icon button in the header row (it shares
+   the .header-btn styling); it just needs to anchor the active-options badge. */
+.advanced-toggle { position: relative; }
+
+/* Dot shown on the gear toggle when amend/sign-off/GPG is active, so a checked
+   option is never silently hidden while the options bar is collapsed. */
+.advanced-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--vscode-notificationsWarningIcon-foreground, #cca700);
+}
+
 #commit-bar {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 6px;
+  margin-bottom: 6px;
   flex-wrap: wrap;
 }
+/* `hidden` collapses the bar by default until the gear toggle is opened. */
+#commit-bar[hidden] { display: none; }
 
-#commit-btn {
-  border: none;
+#commit-btn { gap: 5px; }
+#commit-btn .codicon { font-size: 16px; line-height: 16px; }
+
+/* Split button: a wide primary Commit action + a narrow caret that opens the
+   commit-mode dropdown, mirroring the Source Control panel's Commit button. */
+.split-button {
+  position: relative;
+  display: flex;
+  width: 100%;
+  margin-top: 6px;
   border-radius: 2px;
-  padding: 4px 12px;
+}
+/* Both halves of the split button are themed primary (blue) buttons. */
+.split-button > .primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
   cursor: pointer;
-  font-size: 12px;
+  font-family: var(--vscode-font-family);
+  font-size: 13px;
   background-color: var(--vscode-button-background);
   color: var(--vscode-button-foreground);
 }
-#commit-btn:hover { background-color: var(--vscode-button-hoverBackground); }
+.split-button > .primary:hover { background-color: var(--vscode-button-hoverBackground); }
+.split-button > #commit-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 12px;
+  border-radius: 2px 0 0 2px;
+}
+.split-caret {
+  flex: 0 0 auto;
+  width: 26px;
+  padding: 0;
+  border-radius: 0 2px 2px 0;
+  border-left: 1px solid var(--vscode-button-separator, rgba(255,255,255,0.2)) !important;
+}
+.split-caret .codicon { font-size: 14px; }
+.split-button .primary:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 2px; }
+
+@media (forced-colors: active) {
+  .file-row,
+  .tree-folder,
+  .group-header,
+  button {
+    forced-color-adjust: auto;
+  }
+
+  .file-row:focus-visible,
+  .tree-folder:focus-visible,
+  .group-header:focus-visible {
+    outline: 2px solid CanvasText;
+  }
+}
+
+/* Dropdown menu of commit actions — drops down below the split button. */
+.commit-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  background-color: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+  border: 1px solid var(--vscode-menu-border, var(--vscode-widget-border, transparent));
+  border-radius: 4px;
+  box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0,0,0,0.36));
+}
+.commit-menu[hidden] { display: none; }
+.commit-menu-item {
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-family: var(--vscode-font-family);
+  font-size: 13px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.commit-menu-item:hover {
+  background-color: var(--vscode-menu-selectionBackground, var(--vscode-list-activeSelectionBackground));
+  color: var(--vscode-menu-selectionForeground, var(--vscode-list-activeSelectionForeground));
+}
+.commit-menu-sep {
+  height: 1px;
+  margin: 4px 2px;
+  background-color: var(--vscode-menu-separatorBackground, rgba(128,128,128,0.3));
+}
 
 .header-btn {
   display: inline-flex;
@@ -109,9 +235,9 @@ body {
 }
 .header-icon {
   display: block;
-  width: 16px;
-  height: 16px;
-  fill: currentColor;
+  font-size: 16px;
+  line-height: 16px;
+  color: currentColor;
 }
 
 .opt {
@@ -130,7 +256,7 @@ body {
 .group-header {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   padding: 3px 10px;
   font-size: 11px;
   font-weight: 700;
@@ -140,7 +266,17 @@ body {
   position: sticky;
   top: 0;
   background-color: var(--vscode-sideBar-background);
+  cursor: pointer;
+  user-select: none;
 }
+.group-chevron {
+  font-size: 16px;
+  line-height: 16px;
+  flex-shrink: 0;
+  transition: transform 0.1s ease;
+}
+.group.collapsed .group-chevron { transform: rotate(-90deg); }
+.group.collapsed .group-body { display: none; }
 .group-label { flex: 1; }
 .group-count {
   background-color: var(--vscode-badge-background);
@@ -151,15 +287,17 @@ body {
   font-weight: 600;
 }
 .group-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: none;
-  color: var(--vscode-foreground);
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
   cursor: pointer;
   border-radius: 3px;
-  width: 18px;
-  height: 18px;
-  line-height: 16px;
-  font-size: 14px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
 }
 .group-action:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
 
@@ -178,6 +316,9 @@ body {
   padding: 2px 10px 2px 12px;
   cursor: pointer;
   font-size: 13px;
+  /* Pin the row's line box to the icon height so the Seti icon and the file
+     name share one baseline-neutral line and stay vertically centred. */
+  line-height: 16px;
 }
 .file-row:hover { background-color: var(--vscode-list-hoverBackground); }
 
@@ -199,7 +340,7 @@ body {
   height: 14px;
   flex-shrink: 0;
   color: var(--vscode-icon-foreground, var(--vscode-foreground));
-  font-size: 10px;
+  font-size: 14px;
   transition: transform 0.1s ease;
 }
 .tree-folder .chev.expanded { transform: rotate(90deg); }
@@ -210,30 +351,21 @@ body {
 }
 .tree-children.collapsed { display: none; }
 
-/* LEFT extension chip. */
+/* LEFT type badge — a compact ≤2-char chip (JS, TS, {} …). */
+/* Seti file-type icon slot (matches VS Code's Explorer file icons). The Seti
+   font supplies the glyph and its colour, so this only sizes/positions it. */
 .file-ext {
-  min-width: 30px;
-  max-width: 48px;
-  padding: 0 4px;
-  height: 15px;
-  line-height: 15px;
-  text-align: center;
-  font-family: var(--vscode-editor-font-family, monospace);
-  font-weight: 600;
-  font-size: 10px;
-  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  background-color: rgba(128, 128, 128, 0.16);
 }
-.file-ext.s-A { color: #4ec94e; }
-.file-ext.s-M { color: #e2c08d; }
-.file-ext.s-D { color: #f14c4c; }
-.file-ext.s-R { color: #4daafc; }
-.file-ext.s-U { color: #e2c08d; }
-.file-ext.s-C { color: #f14c4c; }
+/* line-height:1 collapses the glyph's line box to its own height so the
+   inline-flex slot centres the actual glyph (not an inflated line box),
+   keeping the icon level with the file name on the same row. */
+.file-ext.seti-icon::before { font-size: 16px; line-height: 1; }
 
 .file-name {
   flex: 1;
@@ -252,10 +384,13 @@ body {
   max-width: 45%;
 }
 
-/* RIGHT change label (Modified, Added, …). */
+/* RIGHT single-letter change code (M, A, D, …), matching VS Code's SCM. */
 .file-change {
   flex-shrink: 0;
-  font-size: 11px;
+  width: 16px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--vscode-descriptionForeground);
 }
 .file-change.s-A { color: #4ec94e; }
@@ -275,14 +410,24 @@ body {
 }
 .file-row:hover .file-actions { display: inline-flex; }
 .file-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: none;
-  color: var(--vscode-foreground);
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
   cursor: pointer;
   border-radius: 3px;
-  width: 18px;
-  height: 18px;
-  line-height: 16px;
-  font-size: 13px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
 }
 .file-action:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
+
+/* Codicon glyph inside the group/file action buttons. */
+.action-icon {
+  display: block;
+  font-size: 16px;
+  line-height: 16px;
+  color: currentColor;
+}

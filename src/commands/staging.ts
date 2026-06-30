@@ -6,6 +6,7 @@ import { StagingNode, StagingProvider } from "../views/StagingProvider";
 import { GitContentProvider } from "../git/GitContentProvider";
 import { FileChange } from "../git/parsers/status";
 import { parseUnifiedDiff, buildHunkPatch } from "../git/parsers/diff";
+import { confirmDestructiveAction, DestructiveOperations } from "../util/confirmation";
 
 /**
  * Staging view commands: stage/unstage (file + all + hunk), discard, open diff,
@@ -86,12 +87,12 @@ export function registerStagingCommands(
       if (n?.type !== "file") {
         return;
       }
-      const confirm = await vscode.window.showWarningMessage(
-        `Discard changes in ${n.change.path}? This cannot be undone.`,
-        { modal: true },
-        "Discard",
-      );
-      if (confirm !== "Discard") {
+      const confirmed = await confirmDestructiveAction({
+        operation: DestructiveOperations.DISCARD_CHANGES,
+        message: `Discard changes in ${n.change.path}? This cannot be undone.`,
+        items: [n.change.path],
+      });
+      if (!confirmed) {
         return;
       }
       const isUntracked = n.change.worktreeState === "untracked";

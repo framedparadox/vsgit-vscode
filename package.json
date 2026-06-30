@@ -2,9 +2,10 @@
   "name": "vsgit-vscode",
   "displayName": "VsGit",
   "description": "VsGit-style Git client for VS Code: Repositories, Staging, History, Graph, Compare, Worktrees, LFS, Gerrit, and more.",
-  "version": "0.0.2",
+  "version": "0.0.5",
   "publisher": "framedparadox",
   "license": "MIT",
+  "icon": "resources/icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/framedparadox/vsgit-vscode.git"
@@ -39,6 +40,16 @@
   "activationEvents": [
     "onStartupFinished"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "VsGit executes the repository's Git configuration and hooks. Trust the workspace before enabling Git operations."
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "VsGit requires a local filesystem checkout and an installed Git executable."
+    }
+  },
   "main": "./dist/extension.js",
   "contributes": {
     "viewsContainers": {
@@ -106,6 +117,13 @@
           "name": "Compare",
           "icon": "$(git-compare)",
           "when": "vsgit.advancedViews"
+        },
+        {
+          "id": "vsgit.documentation",
+          "name": "Documentation",
+          "type": "webview",
+          "icon": "$(book)",
+          "visibility": "visible"
         }
       ]
     },
@@ -829,6 +847,12 @@
         "icon": "$(git-branch)"
       },
       {
+        "command": "vsgit.documentation.open",
+        "title": "Open Documentation",
+        "category": "VsGit",
+        "icon": "$(book)"
+      },
+      {
         "command": "vsgit.autoFetch.fetchNow",
         "title": "Fetch All Remotes Now",
         "category": "VsGit",
@@ -1077,6 +1101,10 @@
     ],
     "submenus": [
       {
+        "id": "vsgit.repo",
+        "label": "VsGit"
+      },
+      {
         "id": "vsgit.team",
         "label": "Team"
       },
@@ -1171,6 +1199,13 @@
           "command": "vsgit.graph.show",
           "when": "scmProvider == vsgit",
           "group": "navigation@9"
+        }
+      ],
+      "scm/sourceControl": [
+        {
+          "submenu": "vsgit.repo",
+          "when": "scmProvider == git",
+          "group": "9_vsgit@1"
         }
       ],
       "explorer/context": [
@@ -1317,6 +1352,100 @@
         {
           "command": "vsgit.clean",
           "group": "2@2"
+        }
+      ],
+      "vsgit.repo": [
+        {
+          "submenu": "vsgit.repo.pushPull",
+          "group": "1@1"
+        },
+        {
+          "submenu": "vsgit.repo.history",
+          "group": "1@2"
+        },
+        {
+          "command": "vsgit.merge",
+          "group": "1b@1"
+        },
+        {
+          "command": "vsgit.rebase",
+          "group": "1b@2"
+        },
+        {
+          "submenu": "vsgit.repo.reset",
+          "group": "1b@3"
+        },
+        {
+          "command": "vsgit.tag.create",
+          "group": "1b@4"
+        },
+        {
+          "submenu": "vsgit.repo.switchTo",
+          "group": "2@1"
+        },
+        {
+          "submenu": "vsgit.repo.commit",
+          "group": "2@2"
+        },
+        {
+          "submenu": "vsgit.repo.sequencer",
+          "group": "2@3"
+        },
+        {
+          "submenu": "vsgit.repo.remote",
+          "group": "3@1"
+        },
+        {
+          "submenu": "vsgit.repo.submodule",
+          "group": "3@2"
+        },
+        {
+          "submenu": "vsgit.repo.patch",
+          "group": "3@3"
+        },
+        {
+          "submenu": "vsgit.repo.advanced.rebase",
+          "group": "4@1"
+        },
+        {
+          "submenu": "vsgit.repo.advanced.bisect",
+          "group": "4@2"
+        },
+        {
+          "submenu": "vsgit.repo.advanced.notes",
+          "group": "4@3"
+        },
+        {
+          "submenu": "vsgit.repo.advanced.subtree",
+          "group": "4@4"
+        },
+        {
+          "submenu": "vsgit.repo.advanced.lfs",
+          "group": "4@5"
+        },
+        {
+          "submenu": "vsgit.repo.advanced.gerrit",
+          "group": "4@6"
+        },
+        {
+          "command": "vsgit.clean",
+          "group": "5@1"
+        },
+        {
+          "command": "vsgit.archive.create",
+          "group": "5@2"
+        },
+        {
+          "submenu": "vsgit.repo.maintenance",
+          "group": "8@1"
+        },
+        {
+          "submenu": "vsgit.repo.prune",
+          "group": "8@2"
+        },
+        {
+          "submenu": "vsgit.repo.config",
+          "group": "9@1"
         }
       ],
       "vsgit.repo.pushPull": [
@@ -1702,6 +1831,11 @@
           "command": "vsgit.compare.clear",
           "when": "view == vsgit.compare",
           "group": "navigation@3"
+        },
+        {
+          "command": "vsgit.documentation.open",
+          "when": "view == vsgit.documentation",
+          "group": "navigation@1"
         }
       ],
       "view/item/context": [
@@ -2244,12 +2378,12 @@
       "scm/resourceState/context": [
         {
           "command": "vsgit.scm.stage",
-          "when": "scmProvider == vsgit",
+          "when": "scmProvider == vsgit && scmResourceGroup != index",
           "group": "inline@1"
         },
         {
           "command": "vsgit.scm.unstage",
-          "when": "scmProvider == vsgit",
+          "when": "scmProvider == vsgit && scmResourceGroup == index",
           "group": "inline@2"
         },
         {
@@ -2279,7 +2413,7 @@
         },
         {
           "command": "vsgit.scm.discard",
-          "when": "scmProvider == vsgit",
+          "when": "scmProvider == vsgit && scmResourceGroup != index",
           "group": "9_destructive@1"
         },
         {
@@ -2296,18 +2430,23 @@
       "scm/resourceGroup/context": [
         {
           "command": "vsgit.scm.stageAll",
-          "when": "scmProvider == vsgit",
+          "when": "scmProvider == vsgit && scmResourceGroup != index",
           "group": "1_modify@1"
         },
         {
           "command": "vsgit.scm.unstageAll",
-          "when": "scmProvider == vsgit",
+          "when": "scmProvider == vsgit && scmResourceGroup == index",
           "group": "1_modify@2"
         },
         {
           "command": "vsgit.scm.discardAll",
-          "when": "scmProvider == vsgit",
+          "when": "scmProvider == vsgit && scmResourceGroup != index",
           "group": "9_destructive@1"
+        },
+        {
+          "submenu": "vsgit.repo",
+          "when": "scmProvider == git && scmResourceGroup == workingTree",
+          "group": "9_vsgit@1"
         }
       ],
       "editor/title": [
@@ -2994,16 +3133,16 @@
           },
           "default": [
             "#0085d9",
-            "#d9008f",
+            "#ff7700",
             "#00d90a",
             "#d98500",
-            "#a300d9",
-            "#ff0000",
+            "#ffd000",
+            "#0a6976",
+            "#6f24d6",
             "#00d9cc",
-            "#e138e8",
             "#85d900",
             "#dc5b23",
-            "#6f24d6",
+            "#BB8EF8",
             "#ffcc00"
           ],
           "description": "Branch line colours (HEX or rgb) cycled through in the Git Graph."
@@ -3082,12 +3221,27 @@
     "compile": "tsc -p ./",
     "check-types": "tsc --noEmit",
     "test": "node --test \"out-test/**/*.test.js\" \"resources/**/*.test.js\"",
-    "pretest": "tsc -p ./tsconfig.test.json"
+    "pretest": "tsc -p ./tsconfig.test.json",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-exclude=\"**/*.test.js\" --test-coverage-lines=80 --test-coverage-branches=80 --test-coverage-functions=70 \"out-test/**/*.test.js\" \"resources/**/*.test.js\"",
+    "pretest:coverage": "tsc -p ./tsconfig.test.json",
+    "compile:integration": "tsc -p ./tsconfig.integration.json",
+    "test:integration": "npm run build && npm run compile:integration && vscode-test",
+    "package:vsix": "npm run build && node -e \"require('fs').mkdirSync('artifacts',{recursive:true})\" && vsce package --no-dependencies --out artifacts/vsgit-vscode.vsix",
+    "package:verify": "npm run package:vsix && node scripts/verify-vsix.mjs artifacts/vsgit-vscode.vsix",
+    "verify": "npm run check-types && npm test && npm run test:coverage && npm run build"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
-    "esbuild": "^0.20.0",
+    "@vscode/codicons": "^0.0.45",
+    "@vscode/test-cli": "^0.0.11",
+    "@vscode/test-electron": "^3.0.0",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.28.1",
     "typescript": "^5.4.0"
+  },
+  "overrides": {
+    "diff": "8.0.3",
+    "serialize-javascript": "7.0.5"
   }
 }

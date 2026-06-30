@@ -15,6 +15,8 @@
     "src/git/argGuard.test.ts",
     "src/git/Repository.ts",
     "src/git/Repository.test.ts",
+    "src/webviews/documentation/documentationContent.ts",
+    "src/webviews/documentation/documentationContent.test.ts",
     "src/util/token.ts",
     "src/util/token.test.ts",
     "src/util/html.ts",

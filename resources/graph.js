@@ -25,9 +25,16 @@ const COL_W = 14; // px per graph column
 const R = 4;      // commit dot radius
 const PAD = 8;    // left / right padding inside the graph cell
 
+var LANE_COLORS_X = {
+  sugg: ['#4D90FE', '#F28B30', '#2DC55E', '#C678DD', '#E06C75', '#56B6C2',
+    '#D19A66', '#98C379', '#61AFEF', '#F9826C', '#BB8EF8', '#E5C07B'],
+
+  palette: ['#0085d9', '#d9008f', '#00d90a', '#282520', '#a300d9', '#ff0000',
+    '#00d9cc', '#e138e8', '#85d900', '#dc5b23', '#6f24d6', '#ffcc00'],
+}
 let CONFIG = {
-  palette: ['#0085d9','#d9008f','#00d90a','#d98500','#a300d9','#ff0000',
-            '#00d9cc','#e138e8','#85d900','#dc5b23','#6f24d6','#ffcc00'],
+  palette: ['#0085d9','#ff7700','#00d90a','#d98500','#ffd000','#0a6976',
+            '#6f24d6','#00d9cc','#85d900','#dc5b23','#BB8EF8','#ffcc00'],
   style: 'rounded',
   dateFormat: 'standard',
   // VsGit/EGit-style columns: Graph | Description | Author | Authored Date |
@@ -49,6 +56,7 @@ function laneColor(idx) { return CONFIG.palette[idx % CONFIG.palette.length]; }
 let graphData = null;       // full payload from the host
 let layoutRows = [];        // output of buildLayout
 let selectedSha = null;
+let lastAnnouncedCommitCount = -1;  // avoid re-announcing the same count on refresh
 let compareSha = null;      // 2nd commit for CTRL/CMD-click comparison
 let findMatches = [];
 let findIndex = -1;
@@ -92,38 +100,43 @@ function savePersisted() {
   });
 }
 
-// ─── SVG icons (the exact Octicons used by vscode-git-graph) ─────────────────
-// branch/tag/stash/check/info/search/download/refresh are GitHub Octicons (see
-// licenses/LICENSE_OCTICONS in mhutchie/vscode-git-graph); merge/commit/close
-// are custom. Each is a self-contained <svg> with its own intrinsic size so the
-// .gitRef > svg and toolbar CSS can scale them uniformly.
-const SVG_ICONS = {
-  branch: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="16" viewBox="0 0 10 16"><path fill-rule="evenodd" d="M10 5c0-1.11-.89-2-2-2a1.993 1.993 0 0 0-1 3.72v.3c-.02.52-.23.98-.63 1.38-.4.4-.86.61-1.38.63-.83.02-1.48.16-2 .45V4.72a1.993 1.993 0 0 0-1-3.72C.88 1 0 1.89 0 3a2 2 0 0 0 1 1.72v6.56c-.59.35-1 .99-1 1.72 0 1.11.89 2 2 2 1.11 0 2-.89 2-2 0-.53-.2-1-.53-1.36.09-.06.48-.41.59-.47.25-.11.56-.17.94-.17 1.05-.05 1.95-.45 2.75-1.25S8.95 7.77 9 6.73h-.02C9.59 6.37 10 5.73 10 5zM2 1.8c.66 0 1.2.55 1.2 1.2 0 .65-.55 1.2-1.2 1.2C1.35 4.2.8 3.65.8 3c0-.65.55-1.2 1.2-1.2zm0 12.41c-.66 0-1.2-.55-1.2-1.2 0-.65.55-1.2 1.2-1.2.65 0 1.2.55 1.2 1.2 0 .65-.55 1.2-1.2 1.2zm6-8c-.66 0-1.2-.55-1.2-1.2 0-.65.55-1.2 1.2-1.2.65 0 1.2.55 1.2 1.2 0 .65-.55 1.2-1.2 1.2z"/></svg>',
-  tag: '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="16" viewBox="0 0 15 16"><path fill-rule="evenodd" d="M7.73 1.73C7.26 1.26 6.62 1 5.96 1H3.5C2.13 1 1 2.13 1 3.5v2.47c0 .66.27 1.3.73 1.77l6.06 6.06c.39.39 1.02.39 1.41 0l4.59-4.59a.996.996 0 0 0 0-1.41L7.73 1.73zM2.38 7.09c-.31-.3-.47-.7-.47-1.13V3.5c0-.88.72-1.59 1.59-1.59h2.47c.42 0 .83.16 1.13.47l6.14 6.13-4.73 4.73-6.13-6.15zM3.01 3h2v2H3V3h.01z"/></svg>',
-  stash: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="16" viewBox="0 0 14 16"><path fill-rule="evenodd" d="M14 9l-1.13-7.14c-.08-.48-.5-.86-1-.86H2.13c-.5 0-.92.38-1 .86L0 9v5c0 .55.45 1 1 1h12c.55 0 1-.45 1-1V9zm-3.28.55l-.44.89c-.17.34-.52.56-.91.56H4.61c-.38 0-.72-.22-.89-.55l-.44-.91c-.17-.33-.52-.55-.89-.55H1l1-7h10l1 7h-1.38c-.39 0-.73.22-.91.55l.01.01z"/></svg>',
-  commit: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="16" viewBox="0 0 14 16"><path fill-rule="evenodd" d="M10.86 7c-.45-1.72-2-3-3.86-3-1.86 0-3.41 1.28-3.86 3H0v2h3.14c.45 1.72 2 3 3.86 3 1.86 0 3.41-1.28 3.86-3H14V7h-3.14zM7 10.2c-1.22 0-2.2-.98-2.2-2.2 0-1.22.98-2.2 2.2-2.2 1.22 0 2.2.98 2.2 2.2 0 1.22-.98 2.2-2.2 2.2z"/></svg>',
-  download: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 -0.5 16 16.5"><path fill-rule="evenodd" d="M9 12h2l-3 3-3-3h2V7h2v5zm3-8c0-.44-.91-3-4.5-3C5.08 1 3 2.92 3 5 1.02 5 0 6.52 0 8c0 1.53 1 3 3 3h3V9.7H3C1.38 9.7 1.3 8.28 1.3 8c0-.17.05-1.7 1.7-1.7h1.3V5c0-1.39 1.56-2.7 3.2-2.7 2.55 0 3.13 1.55 3.2 1.8v1.2H12c.81 0 2.7.22 2.7 2.2 0 2.09-2.25 2.2-2.7 2.2h-2V11h2c2.08 0 4-1.16 4-3.5C16 5.06 14.08 4 12 4z"/></svg>',
-  refresh: '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M 8.244,15.672 C 11.441,15.558 14.868,13.024 14.828,8.55 14.773,6.644 13.911,4.852 12.456,3.619 l -1.648,1.198 c 1.265,0.861 2.037,2.279 2.074,3.809 0.016,2.25 -1.808,5.025 -4.707,5.077 -2.898,0.052 -4.933,-2.08 -5.047,-4.671 C 3.07,6.705 4.635,4.651 6.893,4.088 l 0.041,1.866 3.853,-3.126 -3.978,-2.772 0.032,2.077 c -3.294,0.616 -5.755,3.541 -5.667,6.982 -3.88e-4,4.233 3.873,6.670 7.07,6.557 z"/></svg>',
-  search: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="-0.5 -2 18 18"><path fill-rule="evenodd" d="M15.7 13.3l-3.81-3.83A5.93 5.93 0 0 0 13 6c0-3.31-2.69-6-6-6S1 2.69 1 6s2.69 6 6 6c1.3 0 2.48-.41 3.47-1.11l3.83 3.81c.19.2.45.3.7.3.25 0 .52-.09.7-.3a.996.996 0 0 0 0-1.41v.01zM7 10.7c-2.59 0-4.7-2.11-4.7-4.7 0-2.59 2.11-4.7 4.7-4.7 2.59 0 4.7 2.11 4.7 4.7 0 2.59-2.11 4.7-4.7 4.7z"/></svg>',
-  check: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="16" viewBox="0 0 12 16"><path fill-rule="evenodd" d="M12 5l-8 8-4-4 1.5-1.5L4 10l6.5-6.5L12 5z"></path></svg>',
-  info: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="16" viewBox="0 0 14 16"><path fill-rule="evenodd" d="M6.3 5.69a.942.942 0 0 1-.28-.7c0-.28.09-.52.28-.7.19-.18.42-.28.7-.28.28 0 .52.09.7.28.18.19.28.42.28.7 0 .28-.09.52-.28.7a1 1 0 0 1-.7.3c-.28 0-.52-.11-.7-.3zM8 7.99c-.02-.25-.11-.48-.31-.69-.2-.19-.42-.3-.69-.31H6c-.27.02-.48.13-.69.31-.2.2-.3.44-.31.69h1v3c.02.27.11.5.31.69.2.2.42.31.69.31h1c.27 0 .48-.11.69-.31.2-.19.3-.42.31-.69H8V7.98v.01zM7 2.3c-3.14 0-5.7 2.54-5.7 5.68 0 3.14 2.56 5.7 5.7 5.7s5.7-2.55 5.7-5.7c0-3.15-2.56-5.69-5.7-5.69v.01zM7 .98c3.86 0 7 3.14 7 7s-3.14 7-7 7-7-3.12-7-7 3.14-7 7-7z"/></svg>',
-  close: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14"><path fill-rule="evenodd" d="M3.8,2.4L2.4,3.8L5.7,7L2.4,10.2L3.8,11.6L7,8.3L10.2,11.6L11.6,10.2L8.3,7L11.6,3.8L10.2,2.4L7,5.7L3.8,2.4z"/></svg>',
-  fileList: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M 2,3 V 4.5 H 4 V 3 Z M 5.5,3 V 4.5 H 18 V 3 Z M 2,7 V 8.5 H 4 V 7 Z M 5.5,7 V 8.5 H 18 V 7 Z M 2,11 v 1.5 H 4 V 11 Z m 3.5,0 v 1.5 H 18 V 11 Z M 2,15 v 1.5 H 4 V 15 Z m 3.5,0 v 1.5 H 18 V 15 Z"/></svg>',
-  fileTree: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2 3v1.5h4V3H2zm6 0v1.5h10V3H8zM2 7v1.5h4V7H2zm6 4v1.5h4V11H8zm0 4v1.5h4V15H8zm-3-7.75v8.5H6.5V15H12v-1.5H6.5v-2.75H12V9.25H6.5V7.25H5z"/></svg>',
-  chevron: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M6 4l4 4-4 4V4z"/></svg>',
-  pull: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M7.25 1.75a.75.75 0 0 1 1.5 0v6.69l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1 1.06-1.06l2.22 2.22V1.75zM2.75 13a.75.75 0 0 0 0 1.5h10.5a.75.75 0 0 0 0-1.5H2.75z"/></svg>',
-  push: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M7.47 1.22a.75.75 0 0 1 1.06 0l3.5 3.5a.75.75 0 1 1-1.06 1.06L8.75 3.56v6.69a.75.75 0 0 1-1.5 0V3.56L5.03 5.78a.75.75 0 0 1-1.06-1.06l3.5-3.5zM2.75 13a.75.75 0 0 0 0 1.5h10.5a.75.75 0 0 0 0-1.5H2.75z"/></svg>',
-  merge: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5 3.25a2.25 2.25 0 1 0-3 2.122v5.256a2.251 2.251 0 1 0 1.5 0V5.372A2.25 2.25 0 0 0 5 3.25zm8.75 5.5a2.25 2.25 0 0 0-2.122 1.5h-.378c-2.9 0-5.25-2.35-5.25-5.25V3.75a.75.75 0 0 0-1.5 0V5a6.75 6.75 0 0 0 6.75 6.75h.378a2.251 2.251 0 1 0 2.122-3z"/></svg>',
-  columns: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 2A1.75 1.75 0 0 0 1 3.75v8.5c0 .966.784 1.75 1.75 1.75h10.5A1.75 1.75 0 0 0 15 12.25v-8.5A1.75 1.75 0 0 0 13.25 2H2.75zM2.5 3.75a.25.25 0 0 1 .25-.25h2.5v9h-2.5a.25.25 0 0 1-.25-.25v-8.5zm4.25 8.75v-9h2.5v9h-2.5zm4 0v-9h2.5a.25.25 0 0 1 .25.25v8.5a.25.25 0 0 1-.25.25h-2.5z"/></svg>',
-  tracking: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8 1.5a.75.75 0 0 1 .75.75v1.03a4.76 4.76 0 0 1 3.97 3.97h1.03a.75.75 0 0 1 0 1.5h-1.03a4.76 4.76 0 0 1-3.97 3.97v1.03a.75.75 0 0 1-1.5 0v-1.03a4.76 4.76 0 0 1-3.97-3.97H2.25a.75.75 0 0 1 0-1.5h1.03a4.76 4.76 0 0 1 3.97-3.97V2.25A.75.75 0 0 1 8 1.5zm0 3.25a3.25 3.25 0 1 0 0 6.5 3.25 3.25 0 0 0 0-6.5zm0 2a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5z"/></svg>',
-  trace: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M3.75 2a1.75 1.75 0 1 0 1.64 2.35l5.26 2.63a1.757 1.757 0 0 0 0 2.04l-5.26 2.63a1.75 1.75 0 1 0 .67 1.34l5.26-2.63a1.75 1.75 0 1 0 0-4.72L6.06 3.01A1.75 1.75 0 0 0 3.75 2z"/></svg>',
+// ─── Icons (VS Code codicons) ────────────────────────────────────────────────
+// Every glyph is a real codicon rendered from the bundled codicon font (see
+// resources/codicon.css). Each logical name maps to its exact codicon id; the
+// `icon()` helper emits the standard `<i class="codicon codicon-…">` markup.
+const ICON_NAMES = {
+  branch: 'git-branch',
+  tag: 'tag',
+  stash: 'archive',
+  commit: 'git-commit',
+  download: 'cloud-download',
+  fetch: 'git-fetch',
+  refresh: 'refresh',
+  search: 'search',
+  find: 'search',
+  check: 'check',
+  info: 'info',
+  close: 'close',
+  fileList: 'list-flat',
+  fileTree: 'list-tree',
+  chevron: 'chevron-right',
+  pull: 'arrow-down',
+  push: 'arrow-up',
+  merge: 'git-merge',
+  columns: 'split-horizontal',
+  tracking: 'target',
+  trace: 'type-hierarchy',
 };
-// Toolbar data-icon aliases.
-SVG_ICONS.fetch = SVG_ICONS.download;
-SVG_ICONS.find = SVG_ICONS.search;
+// Markup for a codicon by logical name (e.g. icon('branch')).
+function icon(name) {
+  const id = ICON_NAMES[name];
+  return id ? '<i class="codicon codicon-' + id + '"></i>' : '';
+}
+// Back-compat accessor so existing `SVG_ICONS.foo` call sites keep working.
+const SVG_ICONS = new Proxy({}, { get: (_t, name) => icon(name) });
 function paintToolbarIcons() {
   document.querySelectorAll('.tb-ico[data-icon]').forEach((el) => {
-    el.innerHTML = SVG_ICONS[el.dataset.icon] || '';
+    el.innerHTML = icon(el.dataset.icon);
   });
 }
 
@@ -135,6 +148,23 @@ function paintToolbarIcons() {
 function alterClass(elem, className, enable) { elem.classList.toggle(className, enable); }
 function formatCommaSeparatedList(vals) { return vals.length ? vals.join(', ') : ''; }
 const CLASS_SELECTED = 'selected';
+function announce(message) {
+  const status = document.getElementById('aria-status');
+  if (!status) return;
+  status.textContent = '';
+  requestAnimationFrame(() => { status.textContent = message; });
+}
+function makeKeyboardClickable(node, label, handler) {
+  node.tabIndex = 0;
+  node.setAttribute('role', 'button');
+  node.setAttribute('aria-label', label);
+  node.addEventListener('click', handler);
+  node.addEventListener('keydown', (event) => {
+    if (event.target !== node || (event.key !== 'Enter' && event.key !== ' ')) return;
+    event.preventDefault();
+    handler(event);
+  });
+}
 
 class Dropdown {
   constructor(id, showInfo, multipleAllowed, dropdownType, changeCallback) {
@@ -156,6 +186,7 @@ class Dropdown {
     this.filterInput = filter.appendChild(document.createElement('input'));
     this.filterInput.className = 'dropdownFilterInput';
     this.filterInput.placeholder = 'Filter ' + dropdownType + '...';
+    this.filterInput.setAttribute('aria-label', 'Filter ' + dropdownType);
     this.optionsElem = this.menuElem.appendChild(document.createElement('div'));
     this.optionsElem.className = 'dropdownOptions';
     this.noResultsElem = this.menuElem.appendChild(document.createElement('div'));
@@ -163,6 +194,11 @@ class Dropdown {
     this.noResultsElem.innerHTML = 'No results found.';
     this.currentValueElem = this.elem.appendChild(document.createElement('div'));
     this.currentValueElem.className = 'dropdownCurrentValue';
+    this.currentValueElem.tabIndex = 0;
+    this.currentValueElem.setAttribute('role', 'combobox');
+    this.currentValueElem.setAttribute('aria-haspopup', 'listbox');
+    this.currentValueElem.setAttribute('aria-expanded', 'false');
+    this.optionsElem.setAttribute('role', 'listbox');
     alterClass(this.elem, 'multi', multipleAllowed);
     this.elem.appendChild(this.menuElem);
 
@@ -172,6 +208,7 @@ class Dropdown {
         this.dropdownVisible = !this.dropdownVisible;
         if (this.dropdownVisible) { this.filterInput.value = ''; this.filter(); }
         this.elem.classList.toggle('dropdownOpen');
+        this.currentValueElem.setAttribute('aria-expanded', String(this.dropdownVisible));
         if (this.dropdownVisible) this.filterInput.focus();
       } else if (this.dropdownVisible) {
         if (e.target.closest('.dropdown') !== this.elem) {
@@ -186,6 +223,54 @@ class Dropdown {
     }, true);
     document.addEventListener('contextmenu', () => this.close(), true);
     this.filterInput.addEventListener('keyup', () => this.filter());
+    this.filterInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        this.close();
+        this.currentValueElem.focus();
+      } else if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        const first = Array.from(this.optionsElem.children).find((option) => option.style.display !== 'none');
+        if (first) first.focus();
+      }
+    });
+    this.optionsElem.addEventListener('keydown', (event) => {
+      const option = event.target.closest('.dropdownOption');
+      if (!option) return;
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        this.onOptionClick(Number(option.dataset.id));
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        this.close();
+        this.currentValueElem.focus();
+        return;
+      }
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+      event.preventDefault();
+      const visible = Array.from(this.optionsElem.children).filter((entry) => entry.style.display !== 'none');
+      const index = visible.indexOf(option);
+      const next = event.key === 'ArrowDown'
+        ? visible[(index + 1) % visible.length]
+        : visible[(index - 1 + visible.length) % visible.length];
+      if (next) next.focus();
+    });
+    this.currentValueElem.addEventListener('keydown', (event) => {
+      if (!['Enter', ' ', 'ArrowDown', 'Escape'].includes(event.key)) return;
+      event.preventDefault();
+      if (event.key === 'Escape') {
+        this.close();
+        return;
+      }
+      this.dropdownVisible = true;
+      this.elem.classList.add('dropdownOpen');
+      this.currentValueElem.setAttribute('aria-expanded', 'true');
+      this.filterInput.value = '';
+      this.filter();
+      this.filterInput.focus();
+    });
   }
 
   setOptions(options, optionsSelected) {
@@ -207,6 +292,7 @@ class Dropdown {
   close() {
     this.elem.classList.remove('dropdownOpen');
     this.dropdownVisible = false;
+    this.currentValueElem.setAttribute('aria-expanded', 'false');
     this.clearDoubleClickTimeout();
   }
 
@@ -218,7 +304,7 @@ class Dropdown {
     let html = '';
     for (let i = 0; i < this.options.length; i++) {
       const escapedName = esc(this.options[i].name);
-      html += '<div class="dropdownOption' + (this.optionsSelected[i] ? ' ' + CLASS_SELECTED : '') + '" data-id="' + i + '" title="' + escapedName + '">' +
+      html += '<div class="dropdownOption' + (this.optionsSelected[i] ? ' ' + CLASS_SELECTED : '') + '" role="option" tabindex="-1" aria-selected="' + String(this.optionsSelected[i]) + '" data-id="' + i + '" title="' + escapedName + '">' +
         (this.multipleAllowed && this.optionsSelected[i] ? '<div class="dropdownOptionMultiSelected">' + SVG_ICONS.check + '</div>' : '') +
         escapedName +
         (this.showInfo ? '<div class="dropdownOptionInfo" title="' + esc(this.options[i].value) + '">' + SVG_ICONS.info + '</div>' : '') +
@@ -327,7 +413,7 @@ function makeRefBadge(ref, colorIdx) {
   span.dataset.refType = ref.type;
   span.style.setProperty('--git-graph-color', color);
   span.title = ref.name;
-  // SVG must be a DIRECT child of .gitRef (git-graph's .gitRef > svg styling).
+  // Glyph must be a DIRECT child of .gitRef (the .gitRef > .codicon styling).
   span.innerHTML = refGlyph(ref.type);
   const nameEl = document.createElement('span');
   nameEl.className = 'gitRefName';
@@ -611,6 +697,14 @@ function updateTraceButton() {
   btn.setAttribute('aria-label', label);
   btn.classList.toggle('active', traceMode !== 'off');
   btn.dataset.traceMode = traceMode;
+  // Reflect the current mode in the visible button label.
+  const labelEl = btn.querySelector('.tb-label');
+  if (labelEl) {
+    labelEl.textContent =
+      traceMode === 'off' ? 'Trace'
+      : traceMode === 'both' ? 'Trace: both'
+      : 'Trace: ancestors';
+  }
 }
 function traceModeLabel() {
   if (traceMode === 'off') return 'off';
@@ -721,6 +815,8 @@ function renderTable(rows) {
     const tr = document.createElement('tr');
     tr.className = 'commit-row' + (commit.kind === 'uncommitted' ? ' uncommitted' : '');
     tr.dataset.sha = commit.sha;
+    tr.tabIndex = 0;
+    tr.setAttribute('aria-label', `${commit.message}, ${commit.kind === 'uncommitted' ? 'uncommitted changes' : `commit ${commit.shortSha}, by ${commit.author || 'unknown author'}`}`);
     if (commit.sha === selectedSha) tr.classList.add('selected');
 
     // Column order mirrors VsGit / EGit history: Graph | Description | Author |
@@ -775,6 +871,18 @@ function renderTable(rows) {
     tr.appendChild(tdId);
 
     tr.addEventListener('click', (e) => selectCommit(commit, tr, e));
+    tr.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        selectCommit(commit, tr, e);
+      } else if ((e.shiftKey && e.key === 'F10') || e.key === 'ContextMenu') {
+        e.preventDefault();
+        if (commit.kind !== 'uncommitted') {
+          const rect = tr.getBoundingClientRect();
+          showCommitMenu(rect.left + 24, rect.top + Math.min(rect.height, 24), commit);
+        }
+      }
+    });
     tr.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       if (commit.kind === 'uncommitted') return;
@@ -799,8 +907,8 @@ function applyColumnWidths() {
 }
 // `configKey` is the CONFIG.columns visibility key; `widthKey` is the (possibly
 // different) key the resized width is persisted under in colWidths.
-function visibleColumnWidth(configKey, widthKey, defaultWidth) {
-  return CONFIG.columns[configKey] === false ? 0 : (colWidths[widthKey] || defaultWidth);
+function visibleColumnWidth(key, widthKey, defaultWidth) {
+  return CONFIG.columns[key] === false ? 0 : (colWidths[widthKey] || defaultWidth);
 }
 function updateDescriptionColumnWidth() {
   const main = document.getElementById('main');
@@ -1008,9 +1116,9 @@ function openExpandedRow(commit, tr) {
     '<div id="cdvHeader">' +
       '<span id="cdvHeaderTitle">' + title + '</span>' +
       '<span class="cdvHeaderSpacer"></span>' +
-      '<div id="cdvViewTree" class="cdvHeaderBtn cdvViewBtn" title="Tree View">' + SVG_ICONS.fileTree + '</div>' +
-      '<div id="cdvViewList" class="cdvHeaderBtn cdvViewBtn" title="List View">' + SVG_ICONS.fileList + '</div>' +
-      '<div id="cdvClose" class="cdvHeaderBtn" title="Close">' + SVG_ICONS.close + '</div>' +
+      '<button type="button" id="cdvViewTree" class="cdvHeaderBtn cdvViewBtn" title="Tree View" aria-label="Tree View">' + SVG_ICONS.fileTree + '</button>' +
+      '<button type="button" id="cdvViewList" class="cdvHeaderBtn cdvViewBtn" title="List View" aria-label="List View">' + SVG_ICONS.fileList + '</button>' +
+      '<button type="button" id="cdvClose" class="cdvHeaderBtn" title="Close" aria-label="Close commit details">' + SVG_ICONS.close + '</button>' +
     '</div>' +
     '<div id="cdvBody">' +
       '<div id="cdvSummary"></div>' +
@@ -1193,22 +1301,14 @@ const CDV_STATUS_LABELS = {
 
 // File extension (lowercase, no dot) shown on the left of each row, or '•' when
 // the file has no extension.
-function cdvFileExt(p) {
-  const base = String(p || '').split('/').pop() || '';
-  const dot = base.lastIndexOf('.');
-  if (dot <= 0 || dot === base.length - 1) return '•';
-  return base.slice(dot + 1).toLowerCase();
-}
-
 function makeFileRow(f, onOpen, label) {
   const fileRow = document.createElement('div');
   fileRow.className = 'file-row';
   const code = (f.status || 'M').charAt(0).toUpperCase();
 
-  // LEFT: file extension chip.
+  // LEFT: Seti file-type icon (the icon VS Code shows in the Explorer).
   const ext = document.createElement('span');
-  ext.className = 'file-ext ' + code;
-  ext.textContent = cdvFileExt(f.path);
+  ext.className = 'file-ext seti-icon ' + self.SetiIcons.setiIconClass(f.path);
 
   const p = document.createElement('span');
   p.className = 'file-path';
@@ -1223,7 +1323,9 @@ function makeFileRow(f, onOpen, label) {
   fileRow.appendChild(ext);
   fileRow.appendChild(p);
   fileRow.appendChild(change);
-  if (onOpen) fileRow.addEventListener('click', () => onOpen(f));
+  if (onOpen) {
+    makeKeyboardClickable(fileRow, `${f.path}, ${CDV_STATUS_LABELS[code] || 'Modified'}, open diff`, () => onOpen(f));
+  }
   return fileRow;
 }
 
@@ -1269,13 +1371,15 @@ function renderTreeLevel(node, parent, onOpen, depth) {
     fname.textContent = name;
     folderRow.appendChild(chev);
     folderRow.appendChild(fname);
+    folderRow.setAttribute('aria-expanded', 'true');
     const childrenWrap = document.createElement('div');
     childrenWrap.className = 'tree-children';
     renderTreeLevel(dir, childrenWrap, onOpen, depth + 1);
-    folderRow.addEventListener('click', (e) => {
+    makeKeyboardClickable(folderRow, `${name}, folder`, (e) => {
       e.stopPropagation();
       const collapsed = childrenWrap.classList.toggle('collapsed');
       chev.classList.toggle('expanded', !collapsed);
+      folderRow.setAttribute('aria-expanded', String(!collapsed));
     });
     parent.appendChild(folderRow);
     parent.appendChild(childrenWrap);
@@ -1305,11 +1409,12 @@ function buildMenu(items) {
       const el = document.createElement('div');
       el.className = 'context-menu-item';
       el.textContent = it.label;
-      el.addEventListener('click', (e) => {
+      makeKeyboardClickable(el, it.label, (e) => {
         e.stopPropagation();
         menu.classList.remove('visible');
         it.action();
       });
+      el.setAttribute('role', 'menuitem');
       menu.appendChild(el);
     }
   });
@@ -1322,6 +1427,7 @@ function placeMenu(menu, x, y) {
   const r = menu.getBoundingClientRect();
   if (r.right > window.innerWidth) menu.style.left = Math.max(0, window.innerWidth - r.width - 4) + 'px';
   if (r.bottom > window.innerHeight) menu.style.top = Math.max(0, window.innerHeight - r.height - 4) + 'px';
+  menu.querySelector('[role="menuitem"]')?.focus();
 }
 function showCommitMenu(x, y, commit) {
   const sha = commit.sha;
@@ -1574,6 +1680,7 @@ window.addEventListener('message', (event) => {
       document.getElementById('loading').style.display = 'none';
       document.getElementById('empty-state').style.display = 'block';
       document.getElementById('graph-body').innerHTML = '';
+      announce('No Git repository is active.');
       break;
     case 'graphData': {
       graphData = msg.data;
@@ -1609,8 +1716,12 @@ window.addEventListener('message', (event) => {
         }
       }
       applyTrace();
-      document.getElementById('commit-count').textContent =
-        graphData.commits.filter((c) => c.kind !== 'uncommitted').length + ' commits';
+      const commitCount = graphData.commits.filter((c) => c.kind !== 'uncommitted').length;
+      document.getElementById('commit-count').textContent = commitCount + ' commits';
+      if (commitCount !== lastAnnouncedCommitCount) {
+        lastAnnouncedCommitCount = commitCount;
+        announce(`${commitCount} commits loaded.`);
+      }
       break;
     }
     case 'files':

@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { VsgitNode } from "../views/RepositoriesProvider";
 import { resolveRepo, errMsg, withProgress } from "./shared";
+import { confirmDestructiveAction, DestructiveOperations } from "../util/confirmation";
 
 /** Git LFS operations: track, lock, pull, prune, etc. */
 export function registerLfsCommands(
@@ -132,13 +133,14 @@ export function registerLfsCommands(
     if (!selected) return;
 
     const isOwner = selected.lock.owner.name === "you"; // Simplified check
-    const force = !isOwner
-      ? await vscode.window.showWarningMessage(
-          `${selected.lock.path} is locked by ${selected.lock.owner.name}. Force unlock?`,
-          { modal: true },
-          "Force Unlock"
-        ) === "Force Unlock"
-      : false;
+    let force = false;
+    if (!isOwner) {
+      force = await confirmDestructiveAction({
+        operation: DestructiveOperations.FORCE_CHECKOUT,
+        message: `${selected.lock.path} is locked by ${selected.lock.owner.name}. Force unlock?`,
+      });
+      if (!force) return;
+    }
 
     try {
       await withProgress(manager, `Unlocking ${selected.lock.path}`, () =>
@@ -195,12 +197,11 @@ export function registerLfsCommands(
     const repo = await resolveRepo(manager, node as VsgitNode);
     if (!repo) return;
 
-    const confirm = await vscode.window.showWarningMessage(
-      "Prune old LFS objects? This will delete local LFS files that are not referenced by any commits.",
-      { modal: true },
-      "Prune"
-    );
-    if (confirm !== "Prune") return;
+    const confirmed = await confirmDestructiveAction({
+      operation: DestructiveOperations.CLEAN_UNTRACKED,
+      message: "Prune old LFS objects? This will delete local LFS files that are not referenced by any commits.",
+    });
+    if (!confirmed) return;
 
     try {
       await withProgress(manager, "Pruning LFS objects", () =>

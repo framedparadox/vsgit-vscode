@@ -1,13 +1,9 @@
-/**
- * Manages the commit graph webview panel: renders the repository's commit
- * graph and handles graph-originated requests (checkout, tag, diff, etc.)
- * by routing them back through Repository.
- */
 import * as vscode from "vscode";
 import * as path from "node:path";
 import { Repository } from "../../git/Repository";
 import { RepositoryManager } from "../../git/RepositoryManager";
 import { GitContentProvider } from "../../git/GitContentProvider";
+import { confirmDestructiveAction } from "../../util/confirmation";
 
 type RefType = "head" | "localBranch" | "remoteBranch" | "tag" | "stash";
 
@@ -70,7 +66,7 @@ export class GraphPanel {
     this.panel = panel;
     this.manager = manager;
     this.extensionUri = extensionUri;
-    this.activeRepo = initialRepo ?? manager.getAll()[0];
+    this.activeRepo = initialRepo ?? manager.getActive();
     this.panel.webview.html = this.getHtmlForWebview();
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
     this.panel.webview.onDidReceiveMessage(
@@ -145,7 +141,7 @@ export class GraphPanel {
         return live;
       }
     }
-    this.activeRepo = this.manager.getAll()[0];
+    this.activeRepo = this.manager.getActive();
     return this.activeRepo;
   }
 
@@ -211,7 +207,9 @@ export class GraphPanel {
 
       // Attach stash badges to their base commit (first cut of stash topology).
       for (const stash of repo.stashes) {
-        const target = commits.find((c) => c.sha === stash.ref) ?? commits[0];
+        const target =
+          commits.find((c) => c.sha === stash.baseObjectId) ??
+          commits.find((c) => c.sha === stash.objectId);
         if (target) target.refs.push({ name: stash.ref, type: "stash" });
       }
 
@@ -823,8 +821,10 @@ export class GraphPanel {
   }
 
   private async confirm(message: string, action: string): Promise<boolean> {
-    const choice = await vscode.window.showWarningMessage(message, { modal: true }, action);
-    return choice === action;
+    return confirmDestructiveAction({
+      operation: action,
+      message,
+    });
   }
 
   private notify(message: string): void {
@@ -838,6 +838,15 @@ export class GraphPanel {
     const cssUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, "resources", "graph.css"),
     );
+    const codiconCssUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "resources", "codicon.css"),
+    );
+    const setiCssUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "resources", "seti.css"),
+    );
+    const setiJsUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "resources", "setiIcons.js"),
+    );
     const jsUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, "resources", "graph.js"),
     );
@@ -847,6 +856,7 @@ export class GraphPanel {
     const csp = [
       "default-src 'none'",
       `style-src ${webview.cspSource}`,
+      `font-src ${webview.cspSource}`,
       `script-src 'nonce-${nonce}'`,
       `img-src ${webview.cspSource} data:`,
     ].join("; ");
@@ -857,10 +867,13 @@ export class GraphPanel {
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="${csp}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="${codiconCssUri}">
+  <link rel="stylesheet" href="${setiCssUri}">
   <link rel="stylesheet" href="${cssUri}">
   <title>VsGit Graph</title>
 </head>
 <body>
+  <div id="aria-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
   <div id="shell">
     <!-- ── top control bar (vscode-git-graph layout) ──────────────────
          LEFT: Repo dropdown, Branches (multi-select) dropdown, Show Remote
@@ -869,8 +882,8 @@ export class GraphPanel {
     <div id="toolbar">
       <span id="repoControl"><span class="ctrl-label">Repo: </span><div id="repoDropdown" class="dropdown"></div></span>
       <span id="branchControl"><span class="ctrl-label">Branches: </span><div id="branchDropdown" class="dropdown"></div></span>
-      <label id="showRemoteBranchesControl"><input type="checkbox" id="showRemoteBranchesCheckbox" tabindex="-1"><span class="customCheckbox"></span>Show Remote Branches</label>
-      <button class="tb-btn icon-only" id="tb-trace" title="Trace flow: ancestors / descendants / off" data-label="Trace" aria-label="Trace"><span class="tb-ico" data-icon="trace"></span></button>
+      <label id="showRemoteBranchesControl"><input type="checkbox" id="showRemoteBranchesCheckbox"><span class="customCheckbox" aria-hidden="true"></span>Show Remote Branches</label>
+      <button class="tb-btn after-control" id="tb-trace" title="Trace flow: ancestors / descendants / off" aria-label="Trace"><span class="tb-ico" data-icon="trace"></span><span class="tb-label">Trace</span></button>
       <span class="tb-spacer"></span>
       <span id="commit-count"></span>
       <span class="tb-sep"></span>
@@ -913,7 +926,7 @@ export class GraphPanel {
            uniform coordinate space anchored to the table's left edge; ref pills +
            message text live in the Description column, and the abbreviated commit
            hash (Commit) is the LAST column. -->
-      <table id="graph-table">
+      <table id="graph-table" aria-label="Git commit graph">
         <colgroup>
           <col id="col-graph">
           <col id="col-desc">
@@ -947,12 +960,12 @@ export class GraphPanel {
     <button id="find-close" title="Close (Esc)">✕</button>
   </div>
 
-  <div id="context-menu" class="context-menu"></div>
+  <div id="context-menu" class="context-menu" role="menu" aria-label="Commit actions"></div>
 
   <div id="create-tag-modal" class="modal-backdrop" hidden>
-    <form id="create-tag-form" class="modal" autocomplete="off">
+    <form id="create-tag-form" class="modal" autocomplete="off" role="dialog" aria-modal="true" aria-labelledby="create-tag-title">
       <div class="modal-header">
-        <h2>Create Tag</h2>
+        <h2 id="create-tag-title">Create Tag</h2>
         <button type="button" class="modal-close" id="create-tag-close" title="Close" aria-label="Close">&times;</button>
       </div>
       <div class="modal-body">
@@ -992,6 +1005,7 @@ export class GraphPanel {
     </form>
   </div>
 
+  <script nonce="${nonce}" src="${setiJsUri}"></script>
   <script nonce="${nonce}" src="${layoutUri}"></script>
   <script nonce="${nonce}" src="${jsUri}"></script>
 </body>

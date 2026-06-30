@@ -2,7 +2,7 @@
   "name": "vsgit-vscode",
   "displayName": "VsGit",
   "description": "VsGit-style Git client for VS Code: Repositories, Staging, History, Graph, Compare, Worktrees, LFS, Gerrit, and more.",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "publisher": "framedparadox",
   "license": "MIT",
   "icon": "resources/icon.png",

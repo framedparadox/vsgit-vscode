@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { VsgitNode } from "../views/RepositoriesProvider";
 import { resolveRepo, withProgress } from "./shared";
+import { confirmDestructiveAction, DestructiveOperations } from "../util/confirmation";
 
 /** Repository maintenance: garbage collection, integrity check, object prune. */
 export function registerMaintenanceCommands(
@@ -65,12 +66,11 @@ export function registerMaintenanceCommands(
     if (!repo) {
       return;
     }
-    const confirm = await vscode.window.showWarningMessage(
-      "Prune all unreachable loose objects? Recently deleted commits not yet referenced may become unrecoverable.",
-      { modal: true },
-      "Prune",
-    );
-    if (confirm !== "Prune") {
+    const confirmed = await confirmDestructiveAction({
+      operation: DestructiveOperations.CLEAN_UNTRACKED,
+      message: "Prune all unreachable loose objects? Recently deleted commits not yet referenced may become unrecoverable.",
+    });
+    if (!confirmed) {
       return;
     }
     await withProgress(manager, "Prune objects", () => repo.pruneObjects());

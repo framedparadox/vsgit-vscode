@@ -1,10 +1,8 @@
 import * as vscode from "vscode";
-import { GitExecutor } from "../git/GitExecutor";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { VsgitNode } from "../views/RepositoriesProvider";
 import { Repository } from "../git/Repository";
 import { resolveRepo, withProgress, errMsg } from "./shared";
-import { safeRef } from "../git/argGuard";
 import { confirmDestructiveAction, DestructiveOperations } from "../util/confirmation";
 
 /**
@@ -15,8 +13,6 @@ export function registerBranchCommands(
   context: vscode.ExtensionContext,
   manager: RepositoryManager,
 ): void {
-  const git = new GitExecutor();
-
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "vsgit.branch.checkout",
@@ -26,9 +22,7 @@ export function registerBranchCommands(
           return;
         }
         try {
-          await git.run(["checkout", safeRef(target.name, "branch")], {
-            cwd: target.repo.root,
-          });
+          await target.repo.checkoutRef(target.name);
           await manager.refreshAll();
           vscode.window.setStatusBarMessage(
             `Checked out ${target.name}`,
@@ -62,13 +56,8 @@ export function registerBranchCommands(
         if (!checkout) {
           return;
         }
-        const safeName = safeRef(name.trim(), "branch");
-        const args =
-          checkout === "Create and checkout"
-            ? ["checkout", "-b", safeName]
-            : ["branch", safeName];
         try {
-          await git.run(args, { cwd: repo.root });
+          await repo.createBranchAt(name.trim(), "HEAD", checkout === "Create and checkout");
           await manager.refreshAll();
         } catch (err) {
           vscode.window.showErrorMessage(
@@ -85,20 +74,21 @@ export function registerBranchCommands(
         if (!target) {
           return;
         }
-        const confirm = await vscode.window.showWarningMessage(
-          `Delete branch ${target.name}?`,
-          { modal: true },
-          "Delete",
-          "Force Delete",
-        );
-        if (!confirm) {
+        const force = await vscode.window.showQuickPick(["Delete", "Force Delete"], {
+          placeHolder: `Delete branch ${target.name}`,
+        });
+        if (!force) {
           return;
         }
-        const flag = confirm === "Force Delete" ? "-D" : "-d";
+        const confirmed = await confirmDestructiveAction({
+          operation: DestructiveOperations.DELETE_BRANCH,
+          message: `${force} branch ${target.name}?`,
+        });
+        if (!confirmed) {
+          return;
+        }
         try {
-          await git.run(["branch", flag, safeRef(target.name, "branch")], {
-            cwd: target.repo.root,
-          });
+          await target.repo.deleteBranch(target.name, force === "Force Delete");
           await manager.refreshAll();
         } catch (err) {
           vscode.window.showErrorMessage(
@@ -166,8 +156,6 @@ export function registerBranchCommands(
   );
 }
 
-type ResetMode = "soft" | "mixed" | "hard" | "keep" | "merge";
-
 /** Reset the current branch HEAD to a chosen ref. */
 async function doBranchReset(
   manager: RepositoryManager,
@@ -181,33 +169,47 @@ async function doBranchReset(
       { label: "Soft", description: "Move HEAD only; keep index and working tree" },
       { label: "Mixed", description: "Move HEAD and reset index; keep working tree" },
       { label: "Hard", description: "Move HEAD, reset index and working tree" },
-      { label: "Keep", description: "Reset index; abort if a touched file has local changes" },
-      { label: "Merge", description: "Reset index; keep local changes to untouched files" },
     ],
     { placeHolder: "Reset mode" },
   );
   if (!mode) return;
 
-  await resetToRef(manager, repo, mode.label.toLowerCase() as ResetMode);
+  const refs = [
+    "HEAD~1",
+    ...repo.localBranches.map((b) => b.shortName),
+    ...repo.remoteBranches.map((b) => b.shortName),
+    ...repo.tags.map((t) => t.shortName),
+  ];
+  const ref = await vscode.window.showQuickPick(refs, {
+    placeHolder: "Reset to ref / SHA",
+  });
+  if (!ref) return;
+
+  if (mode.label === "Hard") {
+    const confirmed = await confirmDestructiveAction({
+      operation: DestructiveOperations.HARD_RESET,
+      message: `Hard reset to ${ref}? All uncommitted changes will be lost.`,
+    });
+    if (!confirmed) return;
+  }
+
+  await withProgress(
+    manager,
+    `Reset --${mode.label.toLowerCase()} to ${ref}`,
+    () => repo.reset(ref, mode.label.toLowerCase() as ResetMode),
+  );
 }
 
-/** Reset the current branch HEAD using a fixed mode, prompting only for the ref. */
-async function doResetWithMode(
+type ResetMode = "soft" | "mixed" | "hard" | "keep" | "merge";
+
+async function resetWithMode(
   manager: RepositoryManager,
   node: unknown,
   mode: ResetMode,
 ): Promise<void> {
   const repo = await resolveRepo(manager, node as VsgitNode);
   if (!repo) return;
-  await resetToRef(manager, repo, mode);
-}
 
-/** Shared ref picker + confirmation + execution for every reset entry point. */
-async function resetToRef(
-  manager: RepositoryManager,
-  repo: Repository,
-  mode: ResetMode,
-): Promise<void> {
   const refs = [
     "HEAD~1",
     ...repo.localBranches.map((b) => b.shortName),
@@ -242,11 +244,11 @@ export function registerBranchExtraCommands(
   // ── Branch reset ──────────────────────────────────────────────────────
 
   reg("vsgit.branch.reset", (node) => doBranchReset(manager, node));
-  reg("vsgit.repo.reset.soft", (node) => doResetWithMode(manager, node, "soft"));
-  reg("vsgit.repo.reset.mixed", (node) => doResetWithMode(manager, node, "mixed"));
-  reg("vsgit.repo.reset.hard", (node) => doResetWithMode(manager, node, "hard"));
-  reg("vsgit.repo.reset.keep", (node) => doResetWithMode(manager, node, "keep"));
-  reg("vsgit.repo.reset.merge", (node) => doResetWithMode(manager, node, "merge"));
+  reg("vsgit.repo.reset.soft", (node) => resetWithMode(manager, node, "soft"));
+  reg("vsgit.repo.reset.mixed", (node) => resetWithMode(manager, node, "mixed"));
+  reg("vsgit.repo.reset.hard", (node) => resetWithMode(manager, node, "hard"));
+  reg("vsgit.repo.reset.keep", (node) => resetWithMode(manager, node, "keep"));
+  reg("vsgit.repo.reset.merge", (node) => resetWithMode(manager, node, "merge"));
 
   // ── Compare branches ─────────────────────────────────────────────────
 
@@ -331,12 +333,11 @@ export function registerBranchExtraCommands(
     }
     const [remoteName, ...branchParts] = n.ref.shortName.split("/");
     const branchName = branchParts.join("/");
-    const confirm = await vscode.window.showWarningMessage(
-      `Delete remote branch ${n.ref.shortName}? This cannot be undone.`,
-      { modal: true },
-      "Delete",
-    );
-    if (confirm !== "Delete") return;
+    const confirmed = await confirmDestructiveAction({
+      operation: DestructiveOperations.DELETE_REMOTE_BRANCH,
+      message: `Delete remote branch ${n.ref.shortName}? This cannot be undone.`,
+    });
+    if (!confirmed) return;
     await withProgress(manager, `Delete remote branch ${n.ref.shortName}`, () =>
       n.repo.deleteRemoteBranch(remoteName, branchName),
     );

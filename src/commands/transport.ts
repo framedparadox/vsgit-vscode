@@ -4,6 +4,7 @@ import { Repository } from "../git/Repository";
 import { VsgitNode } from "../views/RepositoriesProvider";
 import { Credentials } from "../util/credentials";
 import { resolveRepo, withProgress } from "./shared";
+import { confirmDestructiveAction, DestructiveOperations } from "../util/confirmation";
 
 /** Fetch / Pull / Push (with a push dialog) plus merge and rebase. */
 export function registerTransportCommands(
@@ -40,15 +41,24 @@ export function registerTransportCommands(
     if (!repo) {
       return;
     }
-    const mode = await vscode.window.showQuickPick(["Merge", "Rebase"], {
+    const defaultMode = vscode.workspace
+      .getConfiguration("vsgit")
+      .get<string>("defaultPullMode", "merge");
+    const mode = await vscode.window.showQuickPick(
+      [
+        { label: "Merge", picked: defaultMode !== "rebase" },
+        { label: "Rebase", picked: defaultMode === "rebase" },
+      ],
+      {
       placeHolder: "Pull strategy",
-    });
+      },
+    );
     if (!mode) {
       return;
     }
     await withProgress(manager, "Pull", () =>
       creds.withAskpass((env) =>
-        repo.pull({ rebase: mode === "Rebase", env }),
+        repo.pull({ rebase: mode.label === "Rebase", env }),
       ),
     );
   });
@@ -160,6 +170,17 @@ async function pushDialog(
   opts.tags = selected.has("tags");
   opts.forceWithLease = selected.has("forceWithLease");
   opts.force = selected.has("force");
+  if (opts.forceWithLease || opts.force) {
+    const confirmed = await confirmDestructiveAction({
+      operation: DestructiveOperations.FORCE_PUSH,
+      message: opts.forceWithLease
+        ? `Force push with lease to ${remote}?`
+        : `Force push to ${remote}? This can overwrite remote history.`,
+    });
+    if (!confirmed) {
+      return;
+    }
+  }
   await withProgress(manager, `Push to ${remote}`, () =>
     creds.withAskpass((env) => repo.push({ ...opts, env })),
   );

@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { ReflogNode, ReflogProvider } from "../views/ReflogProvider";
 import { withProgress } from "./shared";
+import { confirmDestructiveAction, DestructiveOperations } from "../util/confirmation";
 
 /** Reflog view commands: refresh, checkout an entry, reset HEAD to an entry. */
 export function registerReflogCommands(
@@ -37,12 +38,11 @@ export function registerReflogCommands(
       return;
     }
     if (mode === "hard") {
-      const confirm = await vscode.window.showWarningMessage(
-        `Hard reset to ${n.entry.shortSha}? Working tree changes will be lost.`,
-        { modal: true },
-        "Reset Hard",
-      );
-      if (confirm !== "Reset Hard") {
+      const confirmed = await confirmDestructiveAction({
+        operation: DestructiveOperations.HARD_RESET,
+        message: `Hard reset to ${n.entry.shortSha}? Working tree changes will be lost.`,
+      });
+      if (!confirmed) {
         return;
       }
     }

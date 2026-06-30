@@ -1,6 +1,12 @@
 import { spawn } from "node:child_process";
 import { GitError } from "./GitError";
 
+export type GitCommandPreview = (
+  args: string[],
+  cwd: string,
+  gitPath: string,
+) => Promise<boolean>;
+
 export interface GitRunOptions {
   /** Working directory the git command runs in. */
   cwd: string;
@@ -20,16 +26,36 @@ export interface GitResult {
   exitCode: number;
 }
 
+export class GitCommandCancelled extends Error {
+  constructor(readonly args: string[]) {
+    super("Git command cancelled by user.");
+    this.name = "GitCommandCancelled";
+  }
+}
+
 /**
  * Thin wrapper around spawning the `git` binary. Every higher-level operation
  * funnels through here so we have a single place for env, error handling and
  * stdin plumbing. Output is parsed by callers using machine-readable formats.
  */
 export class GitExecutor {
-  constructor(private readonly gitPath: string = "git") {}
+  constructor(
+    private gitPath: string = "git",
+    private readonly preview?: GitCommandPreview,
+  ) {}
+
+  setGitPath(gitPath: string): void {
+    this.gitPath = gitPath || "git";
+  }
 
   /** Run git, throwing GitError on unexpected non-zero exit. */
   async run(args: string[], options: GitRunOptions): Promise<GitResult> {
+    if (this.preview) {
+      const shouldRun = await this.preview(args, options.cwd, this.gitPath);
+      if (!shouldRun) {
+        throw new GitCommandCancelled(args);
+      }
+    }
     const result = await this.exec(args, options);
     const ok = result.exitCode === 0 || (options.okCodes ?? []).includes(result.exitCode);
     if (!ok) {

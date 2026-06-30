@@ -8,13 +8,18 @@
  *   - Keyboard navigation (↑/↓/Enter), double-click to confirm
  *   - Posts { command:"pick", sha } back to the extension on confirm
  */
-export function commitPickerHtml(nonce: string, _cspSource: string): string {
+export function commitPickerHtml(
+  nonce: string,
+  cspSource: string,
+  codiconCssUri: string,
+): string {
   return /* html */ `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
 <meta http-equiv="Content-Security-Policy"
-  content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';" />
+  content="default-src 'none'; style-src ${cspSource} 'nonce-${nonce}'; font-src ${cspSource}; script-src 'nonce-${nonce}';" />
+<link rel="stylesheet" href="${codiconCssUri}" />
 <style nonce="${nonce}">
   *, *::before, *::after { box-sizing: border-box; }
 
@@ -25,6 +30,11 @@ export function commitPickerHtml(nonce: string, _cspSource: string): string {
     color: var(--vscode-foreground);
     background: var(--vscode-editor-background);
     display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+  }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  button:focus-visible, input:focus-visible, th:focus-visible, tr.commit:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px;
   }
 
   /* ── Header ── */
@@ -53,7 +63,7 @@ export function commitPickerHtml(nonce: string, _cspSource: string): string {
     background: var(--vscode-input-background);
     padding: 0 4px;
   }
-  #searchWrap svg { flex-shrink: 0; opacity: 0.6; }
+  #searchWrap .codicon { flex-shrink: 0; opacity: 0.6; font-size: 14px; }
   #search {
     flex: 1; border: none; outline: none; background: transparent;
     color: var(--vscode-input-foreground);
@@ -155,22 +165,25 @@ export function commitPickerHtml(nonce: string, _cspSource: string): string {
 
   .empty { padding: 20px; color: var(--vscode-descriptionForeground); text-align: center; }
   .hidden { display: none; }
+  @media (forced-colors: active) {
+    button, input, table, tr.commit { forced-color-adjust: auto; }
+    tr.commit.selected { outline: 2px solid CanvasText; outline-offset: -2px; }
+  }
 </style>
 </head>
 <body>
+  <div id="aria-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
   <div id="header">
     <h2 id="headTitle">Select a Commit</h2>
     <p id="headSub">Please select a commit from the list</p>
     <div id="searchWrap">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-        <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.868-3.834zm-5.242 1.156a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/>
-      </svg>
-      <input id="search" type="text" placeholder="Find" autocomplete="off" spellcheck="false" />
+      <i class="codicon codicon-search"></i>
+      <input id="search" type="text" placeholder="Find" aria-label="Find commits" autocomplete="off" spellcheck="false" />
     </div>
   </div>
 
   <div id="tableWrap">
-    <table>
+    <table aria-label="Commits">
       <colgroup>
         <col class="c-graph"/>
         <col class="c-sha"/>
@@ -203,6 +216,11 @@ export function commitPickerHtml(nonce: string, _cspSource: string): string {
 
 <script nonce="${nonce}">
 const vscode = acquireVsCodeApi();
+const announce = (message) => {
+  const status = document.getElementById('aria-status');
+  status.textContent = '';
+  requestAnimationFrame(() => { status.textContent = message; });
+};
 
 // ── State ──────────────────────────────────────────────────────────────────
 let allCommits   = [];   // full list from extension
@@ -228,6 +246,7 @@ window.addEventListener('message', ({ data }) => {
         ? \`\${allCommits.length} commits in repository \${data.repoName}\`
         : \`\${allCommits.length} commits\`;
     applyFilter();
+    announce(allCommits.length + ' commits loaded.');
   }
 });
 
@@ -255,6 +274,11 @@ function applyFilter(q = '') {
 
 // ── Sort ───────────────────────────────────────────────────────────────────
 document.querySelectorAll('thead th[data-col]').forEach(th => {
+  if (th.dataset.col !== 'graph') {
+    th.tabIndex = 0;
+    th.setAttribute('role', 'button');
+    th.setAttribute('aria-label', 'Sort by ' + th.textContent.trim());
+  }
   th.addEventListener('click', () => {
     const col = th.dataset.col;
     if (col === 'graph') return;
@@ -265,6 +289,11 @@ document.querySelectorAll('thead th[data-col]').forEach(th => {
     applySortInPlace();
     selectedIdx = -1;
     render();
+  });
+  th.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    th.click();
   });
 });
 
@@ -300,11 +329,16 @@ function render() {
     const tr = document.createElement('tr');
     tr.className = 'commit' + (i === selectedIdx ? ' selected' : '');
     tr.dataset.idx = i;
+    tr.tabIndex = 0;
+    tr.setAttribute('role', 'option');
+    tr.setAttribute('aria-selected', String(i === selectedIdx));
+    tr.setAttribute('aria-label', c.subject + ', commit ' + c.shortSha + ', by ' + c.authorName);
 
     // Graph cell — canvas
     const canvasTd = document.createElement('td');
     canvasTd.className = 'c-graph';
     const { canvas, laneCount } = buildGraphCell(c, i, lanes, filtered);
+    canvas.setAttribute('aria-hidden', 'true');
     canvasTd.style.width = (laneCount * LANE_W + 4) + 'px';
     canvasTd.appendChild(canvas);
     tr.appendChild(canvasTd);
@@ -439,9 +473,12 @@ function buildGraphCell(c, rowIdx, { shaToLane, maxLane }, commits) {
 function select(idx) {
   selectedIdx = idx;
   document.querySelectorAll('tr.commit').forEach((r, i) => {
-    r.classList.toggle('selected', i === idx);
+    const selected = i === idx;
+    r.classList.toggle('selected', selected);
+    r.setAttribute('aria-selected', String(selected));
   });
   syncOkButton();
+  if (filtered[idx]) announce('Selected ' + filtered[idx].subject + ', commit ' + filtered[idx].shortSha + '.');
 }
 
 function syncOkButton() {

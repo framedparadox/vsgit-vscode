@@ -1,10 +1,3 @@
-/**
- * Repository wraps a single git working copy: it builds argv for every git
- * subcommand we support (status, log, diff, branch, remote, stash, worktree,
- * submodule, blame, reflog, config, etc.), runs it through GitExecutor, and
- * parses the output into typed results. All ref/SHA/URL parameters are routed
- * through argGuard so hostile input can't be smuggled into git's argv.
- */
 import * as path from "node:path";
 import { GitExecutor } from "./GitExecutor";
 import { safeRef, safeRemoteUrl } from "./argGuard";
@@ -36,6 +29,10 @@ export interface StashInfo {
   index: number;
   /** Ref name, e.g. stash@{0}. */
   ref: string;
+  /** Commit object for the stash entry itself. */
+  objectId?: string;
+  /** First parent of the stash commit: the commit the stash was based on. */
+  baseObjectId?: string;
   message: string;
 }
 
@@ -58,6 +55,8 @@ export class Repository {
   stashes: StashInfo[] = [];
   submodules: SubmoduleInfo[] = [];
   headName: string | undefined;
+  private submodulesLoaded = false;
+  private submodulesInFlight: Promise<void> | undefined;
 
   constructor(
     readonly root: string,
@@ -1036,10 +1035,7 @@ export class Repository {
     }
   }
 
-  async reset(
-    sha: string,
-    mode: "soft" | "mixed" | "hard" | "keep" | "merge",
-  ): Promise<void> {
+  async reset(sha: string, mode: "soft" | "mixed" | "hard" | "keep" | "merge"): Promise<void> {
     await this.git.run(["reset", `--${mode}`, safeRef(sha, "commit")], { cwd: this.root });
   }
 
@@ -1261,14 +1257,36 @@ export class Repository {
   }
 
   async refresh(): Promise<void> {
-    await Promise.all([
+    const tasks = [
       this.refreshRefs(),
       this.refreshStatus(),
       this.refreshRemotes(),
       this.refreshStashes(),
-      this.refreshSubmodules(),
       this.refreshHead(),
-    ]);
+    ];
+    // Submodule enumeration can recurse into nested repositories and is not
+    // needed for normal staging/commit workflows. Refresh it only after a view
+    // has requested submodule data at least once.
+    if (this.submodulesLoaded) {
+      tasks.push(this.refreshSubmodules());
+    }
+    await Promise.all(tasks);
+  }
+
+  async ensureSubmodules(): Promise<void> {
+    if (this.submodulesLoaded) {
+      return;
+    }
+    if (!this.submodulesInFlight) {
+      this.submodulesInFlight = this.refreshSubmodules()
+        .then(() => {
+          this.submodulesLoaded = true;
+        })
+        .finally(() => {
+          this.submodulesInFlight = undefined;
+        });
+    }
+    return this.submodulesInFlight;
   }
 
   private async refreshRefs(): Promise<void> {
@@ -1313,7 +1331,7 @@ export class Repository {
 
   private async refreshStashes(): Promise<void> {
     const out = await this.git.stdout(
-      ["stash", "list", "--format=%gd\x1f%gs"],
+      ["stash", "list", "--format=%gd\x1f%H\x1f%P\x1f%gs"],
       { cwd: this.root },
     );
     const stashes: StashInfo[] = [];
@@ -1321,10 +1339,13 @@ export class Repository {
       if (line.trim() === "") {
         continue;
       }
-      const [ref, message] = line.split("\x1f");
+      const [ref, objectId, parents, message] = line.split("\x1f");
+      const baseObjectId = parents?.split(/\s+/).filter(Boolean)[0];
       const m = /stash@\{(\d+)\}/.exec(ref);
       stashes.push({
         ref,
+        objectId: objectId || undefined,
+        baseObjectId,
         message: message ?? "",
         index: m ? Number(m[1]) : stashes.length,
       });

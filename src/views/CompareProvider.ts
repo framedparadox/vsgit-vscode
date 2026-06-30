@@ -1,12 +1,9 @@
-/**
- * Tree view that compares two refs in a repository, showing the commits
- * unique to each side plus the combined file diff between them.
- */
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { Repository } from "../git/Repository";
 import { Commit, CommitFile } from "../git/parsers/log";
+import { accessibleTreeItem } from "./treeAccessibility";
 
 export type CompareTreeNode =
   | { type: "comparison"; repo: Repository; ref1: string; ref2: string }
@@ -77,7 +74,10 @@ export class CompareProvider implements vscode.TreeDataProvider<CompareTreeNode>
       item.iconPath = new vscode.ThemeIcon("git-compare");
       item.description = node.repo.name;
       item.contextValue = "vsgit.comparison";
-      return item;
+      return accessibleTreeItem(
+        item,
+        `Comparing ${node.ref1} with ${node.ref2}, repository ${node.repo.name}`,
+      );
     }
 
     if (node.type === "section") {
@@ -95,7 +95,7 @@ export class CompareProvider implements vscode.TreeDataProvider<CompareTreeNode>
         item.iconPath = new vscode.ThemeIcon("files");
         item.contextValue = "vsgit.comparison.section.files";
       }
-      return item;
+      return accessibleTreeItem(item, `${node.label}, comparison section`);
     }
 
     if (node.type === "commit") {
@@ -110,7 +110,10 @@ export class CompareProvider implements vscode.TreeDataProvider<CompareTreeNode>
         title: "Show Commit",
         arguments: [node.repo, c.sha],
       };
-      return item;
+      return accessibleTreeItem(
+        item,
+        `${c.subject || "No message"}, commit ${c.sha.slice(0, 8)}, by ${c.authorName}`,
+      );
     }
 
     // file node
@@ -125,7 +128,7 @@ export class CompareProvider implements vscode.TreeDataProvider<CompareTreeNode>
       title: "Open Diff",
       arguments: [node.repo, f.path, node.ref1, node.ref2],
     };
-    return item;
+    return accessibleTreeItem(item, `${f.path}, changed file`);
   }
 
   async getChildren(node?: CompareTreeNode): Promise<CompareTreeNode[]> {

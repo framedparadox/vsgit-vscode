@@ -8,6 +8,27 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+button:focus-visible,
+input:focus-visible,
+[role="button"]:focus-visible,
+[role="combobox"]:focus-visible,
+tr.commit-row:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
 body {
   font-family: var(--vscode-font-family);
   font-size: var(--vscode-font-size);
@@ -51,6 +72,11 @@ body {
   white-space: nowrap;
 }
 .tb-btn:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
+/* A toolbar button that sits next to a control (e.g. the Trace button beside the
+   Show Remote Branches checkbox) gets a little breathing room from it. */
+.tb-btn.after-control { margin-left: 6px; }
+/* Visible text label inside a toolbar button (e.g. the Trace button). */
+.tb-label { font-size: 12px; line-height: 16px; }
 .tb-btn.active { background-color: var(--vscode-inputOption-activeBackground, rgba(14,99,156,0.4)); }
 .tb-btn.icon-only[data-label]::after {
   content: attr(data-label);
@@ -83,11 +109,9 @@ body {
   width: 16px;
   height: 16px;
 }
-/* The toolbar octicons ship without an explicit fill (so they'd render solid
-   black). Tint them with the button's themed colour so they track the active VS
-   Code colour theme instead of staying black. */
-.tb-ico svg { display: block; fill: currentColor; width: 16px; height: 16px; }
-.tb-ico svg path { fill: currentColor; }
+/* Codicons inherit the button's themed colour so they track the active VS Code
+   colour theme. */
+.tb-ico .codicon { font-size: 16px; line-height: 16px; color: currentColor; }
 .tb-badge {
   position: absolute;
   top: -2px;
@@ -169,7 +193,16 @@ body {
   user-select: none;
   margin-right: 10px;
 }
-#showRemoteBranchesControl input { display: none; }
+#showRemoteBranchesControl input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+#showRemoteBranchesControl:focus-within .customCheckbox {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
 .customCheckbox {
   display: inline-block;
   width: 14px;
@@ -282,8 +315,8 @@ body {
   color: var(--vscode-menu-selectionForeground, #fff);
 }
 .dropdownOptionMultiSelected { position: absolute; width: 12px; height: 16px; top: 7px; left: 10px; }
-.dropdownOptionMultiSelected svg { fill: var(--vscode-menu-foreground, #ccc); opacity: 0.7; width: 12px; }
-.dropdownOption:hover .dropdownOptionMultiSelected svg { fill: var(--vscode-menu-selectionForeground, #fff); opacity: 0.85; }
+.dropdownOptionMultiSelected .codicon { color: var(--vscode-menu-foreground, #ccc); opacity: 0.7; font-size: 12px; }
+.dropdownOption:hover .dropdownOptionMultiSelected .codicon { color: var(--vscode-menu-selectionForeground, #fff); opacity: 0.85; }
 .dropdownNoResults { position: relative; padding: 4px 10px; user-select: none; font-style: italic; }
 
 #commit-count {
@@ -424,6 +457,7 @@ tr.commit-row.uncommitted td.col-desc { font-style: italic; color: var(--vscode-
 #graph-table tr.commit-row.dimmed .gitRef { opacity: 0.5; }
 #graph-table tr.commit-row.traced td.col-desc { font-weight: 600; }
 #graph-svg .graph-line:not(.dim) { stroke-width: 2.6; }
+#graph-svg .graph-node:not(.dim) { stroke-width: 2; }
 
 /* ─── inline ref labels (gitRef pills) — exact vscode-git-graph styling ─── */
 .gitRef {
@@ -442,11 +476,11 @@ tr.commit-row.uncommitted td.col-desc { font-style: italic; color: var(--vscode-
 }
 .gitRef.active { border-color: var(--git-graph-color); }
 .gitRef.active .gitRefName { font-weight: bold; }
-.gitRef > svg {
+.gitRef > .codicon {
   background-color: var(--git-graph-color);
-  fill: var(--vscode-editor-background);
-  width: 14px;
-  height: 14px;
+  color: var(--vscode-editor-background);
+  font-size: 14px;
+  line-height: 14px;
   padding: 2px;
   vertical-align: top;
 }
@@ -522,16 +556,18 @@ tr.cdv-row > td.cdv-cell {
 }
 .cdvHeaderBtn:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.25)); }
 .cdvHeaderBtn.active { background-color: var(--vscode-inputOption-activeBackground, rgba(128, 128, 128, 0.25)); }
-.cdvHeaderBtn svg {
+.cdvHeaderBtn .codicon {
   position: absolute;
+  font-size: 18px;
+  line-height: 18px;
   width: 18px;
   height: 18px;
   left: 3px;
   top: 3px;
-  fill: currentColor;
-  fill-opacity: 0.75;
+  color: currentColor;
+  opacity: 0.75;
 }
-.cdvHeaderBtn:hover svg, .cdvHeaderBtn.active svg { fill-opacity: 1; }
+.cdvHeaderBtn:hover .codicon, .cdvHeaderBtn.active .codicon { opacity: 1; }
 
 #cdvBody { position: absolute; top: 30px; bottom: 0; left: 0; right: 0; }
 #cdvSummary, #cdvFiles {
@@ -589,30 +625,18 @@ tr.cdv-row > td.cdv-cell {
 }
 .file-row:hover { background-color: var(--vscode-list-hoverBackground); }
 /* LEFT extension chip. */
+/* Seti file-type icon slot (matches VS Code's Explorer file icons). The Seti
+   font supplies the glyph and its colour, so this only sizes/positions it — no
+   background. */
 .file-ext {
-  min-width: 30px;
-  max-width: 48px;
-  padding: 0 4px;
-  height: 15px;
-  line-height: 15px;
-  text-align: center;
-  font-family: var(--vscode-editor-font-family, monospace);
-  font-weight: 600;
-  font-size: 10px;
-  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  background-color: rgba(128, 128, 128, 0.16);
 }
-.file-ext.A { color: #4ec94e; }
-.file-ext.M { color: #e2c08d; }
-.file-ext.D { color: #f14c4c; }
-.file-ext.R { color: #4daafc; }
-.file-ext.C { color: #4daafc; }
-.file-ext.T { color: #e2c08d; }
-.file-ext.U { color: #f14c4c; }
+.file-ext.seti-icon::before { font-size: 16px; line-height: 16px; }
 .file-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* RIGHT change label. */
 .file-change {
@@ -651,7 +675,7 @@ tr.cdv-row > td.cdv-cell {
   transform: rotate(0deg);
 }
 .tree-chevron.expanded { transform: rotate(90deg); }
-.tree-chevron svg { fill: var(--vscode-icon-foreground, var(--vscode-foreground)); fill-opacity: 0.8; }
+.tree-chevron .codicon { font-size: 16px; line-height: 16px; color: var(--vscode-icon-foreground, var(--vscode-foreground)); opacity: 0.8; }
 .tree-folder-name {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -763,6 +787,26 @@ tr.cdv-row > td.cdv-cell {
   line-height: 1;
 }
 .modal-close:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
+
+@media (forced-colors: active) {
+  .graph-line,
+  .graph-node,
+  .commit-row,
+  .file-row,
+  .tree-folder-row,
+  .tb-btn,
+  .dropdownCurrentValue {
+    forced-color-adjust: auto;
+  }
+
+  tr.commit-row.selected,
+  tr.commit-row:focus-visible,
+  .file-row:focus-visible,
+  .tree-folder-row:focus-visible {
+    outline: 2px solid CanvasText;
+    outline-offset: -2px;
+  }
+}
 .modal-body {
   display: flex;
   flex-direction: column;

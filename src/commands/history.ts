@@ -11,6 +11,7 @@ export function registerHistoryCommands(
   const view = new HistoryView(manager, context.extensionUri);
 
   context.subscriptions.push(
+    view,
     vscode.commands.registerCommand(
       "vsgit.history.show",
       async (node?: VsgitNode | { repoRoot: string; file?: string }) => {

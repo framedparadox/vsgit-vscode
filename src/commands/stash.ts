@@ -4,6 +4,7 @@ import { RepositoryManager } from "../git/RepositoryManager";
 import { VsgitNode } from "../views/RepositoriesProvider";
 import { resolveRepo, withProgress } from "./shared";
 import { GitContentProvider } from "../git/GitContentProvider";
+import { confirmDestructiveAction, DestructiveOperations } from "../util/confirmation";
 
 /** Stash operations: create, apply, pop, drop, view contents. */
 export function registerStashCommands(
@@ -44,12 +45,11 @@ export function registerStashCommands(
     if (!n || n.type !== "stash") {
       return;
     }
-    const confirm = await vscode.window.showWarningMessage(
-      `Drop ${n.ref}? This cannot be undone.`,
-      { modal: true },
-      "Drop",
-    );
-    if (confirm !== "Drop") {
+    const confirmed = await confirmDestructiveAction({
+      operation: DestructiveOperations.DISCARD_CHANGES,
+      message: `Drop ${n.ref}? This cannot be undone.`,
+    });
+    if (!confirmed) {
       return;
     }
     await withProgress(manager, `Drop ${n.ref}`, () => n.repo.stashDrop(n.ref));
@@ -97,12 +97,11 @@ export function registerStashCommands(
       return;
     }
     const count = repo.stashes.length;
-    const confirm = await vscode.window.showWarningMessage(
-      `Drop all ${count} stash ${count === 1 ? "entry" : "entries"}? This cannot be undone.`,
-      { modal: true },
-      "Clear All",
-    );
-    if (confirm !== "Clear All") {
+    const confirmed = await confirmDestructiveAction({
+      operation: DestructiveOperations.DISCARD_ALL,
+      message: `Drop all ${count} stash ${count === 1 ? "entry" : "entries"}? This cannot be undone.`,
+    });
+    if (!confirmed) {
       return;
     }
     await withProgress(manager, "Clear all stashes", () => repo.stashClear());

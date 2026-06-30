@@ -1,7 +1,9 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import { RepositoryManager } from "../git/RepositoryManager";
-import { GitContentProvider } from "../git/GitContentProvider";
+import { Repository } from "../git/Repository";
+import { GitContentProvider, VSGIT_EMPTY_REF } from "../git/GitContentProvider";
+import type { FileChange } from "../git/parsers/status";
 import { confirmDestructiveAction, DestructiveOperations } from "../util/confirmation";
 import { withProgress, errMsg } from "./shared";
 
@@ -17,56 +19,47 @@ export function registerSCMCommands(
     context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
   // Stage selected file(s)
-  reg("vsgit.scm.stage", async (...resourceStates: unknown[]) => {
-    const uris = resourceStates
-      .filter((r): r is { resourceUri: vscode.Uri } => 
-        typeof r === 'object' && r !== null && 'resourceUri' in r
-      )
-      .map((r) => r.resourceUri);
+  reg("vsgit.scm.stage", async (...args: unknown[]) => {
+    const states = resourceStates(args);
+    const uris = states.map((state) => state.resourceUri);
     if (uris.length === 0) return;
 
     const repo = findRepoForUri(manager, uris[0]);
     if (!repo) return;
 
-    for (const uri of uris) {
-      const rel = uri.fsPath.slice(repo.root.length + 1);
-      await repo.stage([rel]);
-    }
+    await withProgress(manager, `Stage ${uris.length} file(s)`, () =>
+      repo.stage(relativePaths(manager, repo, uris)),
+    );
     vscode.window.setStatusBarMessage("Files staged", 2000);
   });
 
   // Unstage selected file(s)
-  reg("vsgit.scm.unstage", async (...resourceStates: unknown[]) => {
-    const uris = resourceStates
-      .filter((r): r is { resourceUri: vscode.Uri } =>
-        typeof r === 'object' && r !== null && 'resourceUri' in r
-      )
-      .map((r) => r.resourceUri);
+  reg("vsgit.scm.unstage", async (...args: unknown[]) => {
+    const states = resourceStates(args);
+    const uris = states.map((state) => state.resourceUri);
     if (uris.length === 0) return;
 
     const repo = findRepoForUri(manager, uris[0]);
     if (!repo) return;
 
-    for (const uri of uris) {
-      const rel = uri.fsPath.slice(repo.root.length + 1);
-      await repo.unstage([rel]);
-    }
+    await withProgress(manager, `Unstage ${uris.length} file(s)`, () =>
+      repo.unstage(relativePaths(manager, repo, uris)),
+    );
     vscode.window.setStatusBarMessage("Files unstaged", 2000);
   });
 
   // Discard changes in selected file(s)
-  reg("vsgit.scm.discard", async (...resourceStates: unknown[]) => {
-    const uris = resourceStates
-      .filter((r): r is { resourceUri: vscode.Uri } => 
-        typeof r === 'object' && r !== null && 'resourceUri' in r
-      )
-      .map((r) => r.resourceUri);
+  reg("vsgit.scm.discard", async (...args: unknown[]) => {
+    const states = resourceStates(args);
+    const uris = states.map((state) => state.resourceUri);
     if (uris.length === 0) return;
 
     const repo = findRepoForUri(manager, uris[0]);
     if (!repo) return;
 
-    const files = uris.map((u) => u.fsPath.slice(repo.root.length + 1));
+    const discard = discardPathSets(manager, repo, states);
+    const files = [...discard.tracked, ...discard.untracked];
+    if (files.length === 0) return;
     const confirmed = await confirmDestructiveAction({
       operation: DestructiveOperations.DISCARD_CHANGES,
       message: `Discard changes in ${files.length} file(s)? This cannot be undone.`,
@@ -77,7 +70,7 @@ export function registerSCMCommands(
 
     try {
       await withProgress(manager, `Discarding ${files.length} file(s)`, async () => {
-        await repo.discard(files, []);
+        await repo.discard(discard.tracked, discard.untracked);
       });
       vscode.window.showInformationMessage(`Discarded changes in ${files.length} file(s)`);
     } catch (e) {
@@ -97,13 +90,25 @@ export function registerSCMCommands(
     const repo = findRepoForUri(manager, uri);
     if (!repo) return;
 
-    const rel = uri.fsPath.slice(repo.root.length + 1);
-    const left = GitContentProvider.uri(repo.root, rel, "HEAD", uri.fsPath);
+    const rel = manager.relativePath(repo, uri);
+    const group = resourceGroup(resourceState);
+    const change = resourceChange(resourceState);
+    const isIndex = group === "index";
+    const left = isIndex
+      ? GitContentProvider.uri(repo.root, rel, "HEAD", uri.fsPath)
+      : GitContentProvider.uri(repo.root, rel, "~index", uri.fsPath);
+    const right = isIndex
+      ? GitContentProvider.uri(repo.root, rel, "~index", uri.fsPath)
+      : change?.worktreeState === "deleted"
+        ? GitContentProvider.uri(repo.root, rel, VSGIT_EMPTY_REF, uri.fsPath)
+        : uri;
     await vscode.commands.executeCommand(
       "vscode.diff",
       left,
-      uri,
-      `${path.basename(rel)} (HEAD ↔ Working Tree)`,
+      right,
+      isIndex
+        ? `${path.basename(rel)} (HEAD ↔ Index)`
+        : `${path.basename(rel)} (Index ↔ Working Tree)`,
     );
   });
 
@@ -131,7 +136,7 @@ export function registerSCMCommands(
     const repo = findRepoForUri(manager, uri);
     if (!repo) return;
 
-    const rel = uri.fsPath.slice(repo.root.length + 1);
+    const rel = manager.relativePath(repo, uri);
     await vscode.commands.executeCommand("vsgit.history.show", {
       repoRoot: repo.root,
       file: rel,
@@ -153,18 +158,15 @@ export function registerSCMCommands(
   });
 
   // Replace with HEAD
-  reg("vsgit.scm.replaceWithHead", async (...resourceStates: unknown[]) => {
-    const uris = resourceStates
-      .filter((r): r is { resourceUri: vscode.Uri } => 
-        typeof r === 'object' && r !== null && 'resourceUri' in r
-      )
-      .map((r) => r.resourceUri);
+  reg("vsgit.scm.replaceWithHead", async (...args: unknown[]) => {
+    const states = resourceStates(args);
+    const uris = states.map((state) => state.resourceUri);
     if (uris.length === 0) return;
 
     const repo = findRepoForUri(manager, uris[0]);
     if (!repo) return;
 
-    const files = uris.map((u) => u.fsPath.slice(repo.root.length + 1));
+    const files = relativePaths(manager, repo, uris);
     const confirmed = await confirmDestructiveAction({
       operation: DestructiveOperations.DISCARD_CHANGES,
       message: `Replace ${files.length} file(s) with HEAD version? Local changes will be lost.`,
@@ -186,18 +188,15 @@ export function registerSCMCommands(
   });
 
   // Rename/move a tracked file (git mv)
-  reg("vsgit.scm.rename", async (...resourceStates: unknown[]) => {
-    const uris = resourceStates
-      .filter((r): r is { resourceUri: vscode.Uri } =>
-        typeof r === 'object' && r !== null && 'resourceUri' in r
-      )
-      .map((r) => r.resourceUri);
+  reg("vsgit.scm.rename", async (...args: unknown[]) => {
+    const states = resourceStates(args);
+    const uris = states.map((state) => state.resourceUri);
     if (uris.length === 0) return;
 
     const repo = findRepoForUri(manager, uris[0]);
     if (!repo) return;
 
-    const rel = uris[0].fsPath.slice(repo.root.length + 1);
+    const rel = manager.relativePath(repo, uris[0]);
     const newRel = await vscode.window.showInputBox({
       prompt: "New path (relative to the repository root)",
       value: rel,
@@ -220,18 +219,15 @@ export function registerSCMCommands(
   });
 
   // Delete tracked file(s) from the working tree and index (git rm)
-  reg("vsgit.scm.delete", async (...resourceStates: unknown[]) => {
-    const uris = resourceStates
-      .filter((r): r is { resourceUri: vscode.Uri } =>
-        typeof r === 'object' && r !== null && 'resourceUri' in r
-      )
-      .map((r) => r.resourceUri);
+  reg("vsgit.scm.delete", async (...args: unknown[]) => {
+    const states = resourceStates(args);
+    const uris = states.map((state) => state.resourceUri);
     if (uris.length === 0) return;
 
     const repo = findRepoForUri(manager, uris[0]);
     if (!repo) return;
 
-    const files = uris.map((u) => u.fsPath.slice(repo.root.length + 1));
+    const files = relativePaths(manager, repo, uris);
     const confirmed = await confirmDestructiveAction({
       operation: DestructiveOperations.DISCARD_CHANGES,
       message: `Delete ${files.length} file(s) from the working tree and index (git rm)? This cannot be undone.`,
@@ -261,16 +257,13 @@ export function registerSCMCommands(
       (group as { resourceStates: unknown[] }).resourceStates.length === 0
     ) return;
     
-    const uris = (group as { resourceStates: { resourceUri: vscode.Uri }[] }).resourceStates
-      .map((r) => r.resourceUri);
+    const states = groupResourceStates(group);
+    const uris = states.map((state) => state.resourceUri);
     const repo = findRepoForUri(manager, uris[0]);
     if (!repo) return;
 
     await withProgress(manager, "Staging all changes", async () => {
-      for (const uri of uris) {
-        const rel = uri.fsPath.slice(repo.root.length + 1);
-        await repo.stage([rel]);
-      }
+      await repo.stage(relativePaths(manager, repo, uris));
     });
     vscode.window.showInformationMessage("All changes staged");
   });
@@ -285,16 +278,13 @@ export function registerSCMCommands(
       (group as { resourceStates: unknown[] }).resourceStates.length === 0
     ) return;
 
-    const uris = (group as { resourceStates: { resourceUri: vscode.Uri }[] }).resourceStates
-      .map((r) => r.resourceUri);
+    const states = groupResourceStates(group);
+    const uris = states.map((state) => state.resourceUri);
     const repo = findRepoForUri(manager, uris[0]);
     if (!repo) return;
 
     await withProgress(manager, "Unstaging all changes", async () => {
-      for (const uri of uris) {
-        const rel = uri.fsPath.slice(repo.root.length + 1);
-        await repo.unstage([rel]);
-      }
+      await repo.unstage(relativePaths(manager, repo, uris));
     });
     vscode.window.showInformationMessage("All changes unstaged");
   });
@@ -309,12 +299,14 @@ export function registerSCMCommands(
       (group as { resourceStates: unknown[] }).resourceStates.length === 0
     ) return;
     
-    const uris = (group as { resourceStates: { resourceUri: vscode.Uri }[] }).resourceStates
-      .map((r) => r.resourceUri);
+    const states = groupResourceStates(group);
+    const uris = states.map((state) => state.resourceUri);
     const repo = findRepoForUri(manager, uris[0]);
     if (!repo) return;
 
-    const files = uris.map((u) => u.fsPath.slice(repo.root.length + 1));
+    const discard = discardPathSets(manager, repo, states);
+    const files = [...discard.tracked, ...discard.untracked];
+    if (files.length === 0) return;
     const confirmed = await confirmDestructiveAction({
       operation: DestructiveOperations.DISCARD_ALL,
       message: `Discard all ${files.length} changes? This cannot be undone.`,
@@ -325,7 +317,7 @@ export function registerSCMCommands(
 
     try {
       await withProgress(manager, `Discarding ${files.length} changes`, async () => {
-        await repo.discard(files, []);
+        await repo.discard(discard.tracked, discard.untracked);
       });
       vscode.window.showInformationMessage(`Discarded all ${files.length} changes`);
     } catch (e) {
@@ -334,6 +326,77 @@ export function registerSCMCommands(
   });
 }
 
-function findRepoForUri(manager: RepositoryManager, uri: vscode.Uri): any {
-  return manager.getAll().find((r) => uri.fsPath.startsWith(r.root));
+function findRepoForUri(manager: RepositoryManager, uri: vscode.Uri): Repository | undefined {
+  return manager.findByUri(uri);
+}
+
+interface ScmResourceStateLike {
+  resourceUri: vscode.Uri;
+  vsgitGroup?: string;
+  vsgitChange?: FileChange;
+}
+
+function resourceStates(args: unknown[]): ScmResourceStateLike[] {
+  const states = args.length === 1 && Array.isArray(args[0]) ? args[0] : args;
+  return states
+    .filter((r): r is ScmResourceStateLike =>
+      typeof r === "object" && r !== null && "resourceUri" in r,
+    );
+}
+
+function groupResourceStates(group: unknown): ScmResourceStateLike[] {
+  if (
+    typeof group !== "object" ||
+    group === null ||
+    !("resourceStates" in group) ||
+    !Array.isArray((group as { resourceStates: unknown }).resourceStates)
+  ) {
+    return [];
+  }
+  return resourceStates((group as { resourceStates: unknown[] }).resourceStates);
+}
+
+function relativePaths(
+  manager: RepositoryManager,
+  repo: Repository,
+  uris: vscode.Uri[],
+): string[] {
+  return uris
+    .filter((uri) => manager.uriBelongsTo(repo, uri))
+    .map((uri) => manager.relativePath(repo, uri));
+}
+
+function resourceGroup(resourceState: unknown): string | undefined {
+  if (typeof resourceState !== "object" || resourceState === null) {
+    return undefined;
+  }
+  return (resourceState as { vsgitGroup?: string }).vsgitGroup;
+}
+
+function resourceChange(resourceState: unknown): FileChange | undefined {
+  if (typeof resourceState !== "object" || resourceState === null) {
+    return undefined;
+  }
+  return (resourceState as { vsgitChange?: FileChange }).vsgitChange;
+}
+
+function discardPathSets(
+  manager: RepositoryManager,
+  repo: Repository,
+  states: ScmResourceStateLike[],
+): { tracked: string[]; untracked: string[] } {
+  const tracked: string[] = [];
+  const untracked: string[] = [];
+  for (const state of states) {
+    if (!manager.uriBelongsTo(repo, state.resourceUri)) {
+      continue;
+    }
+    const rel = manager.relativePath(repo, state.resourceUri);
+    if (state.vsgitChange?.worktreeState === "untracked") {
+      untracked.push(rel);
+    } else {
+      tracked.push(rel);
+    }
+  }
+  return { tracked, untracked };
 }

@@ -3,6 +3,7 @@ import * as path from "node:path";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { Repository } from "../git/Repository";
 import { FileChange } from "../git/parsers/status";
+import { accessibleTreeItem } from "./treeAccessibility";
 
 export type StagingNode =
   | { type: "group"; group: "staged" | "unstaged" | "conflicted" }
@@ -12,8 +13,8 @@ export type StagingNode =
 /**
  * Staging view: two top-level groups (Staged / Unstaged Changes) listing the
  * files in the active repository. Mirrors VsGit's Staging view layout. The
- * "active" repository is the first discovered repo (multi-repo selection comes
- * in a later phase).
+ * active repository is selected from the Repositories view and falls back to
+ * the first available repo when nothing has been selected yet.
  */
 export class StagingProvider implements vscode.TreeDataProvider<StagingNode>, vscode.Disposable {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<
@@ -32,7 +33,7 @@ export class StagingProvider implements vscode.TreeDataProvider<StagingNode>, vs
   }
 
   get activeRepo(): Repository | undefined {
-    return this.manager.getAll()[0];
+    return this.manager.getActive();
   }
 
   getTreeItem(node: StagingNode): vscode.TreeItem {
@@ -58,12 +59,12 @@ export class StagingProvider implements vscode.TreeDataProvider<StagingNode>, vs
       const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.Expanded);
       item.contextValue = contextValue;
       item.iconPath = new vscode.ThemeIcon(icon);
-      return item;
+      return accessibleTreeItem(item, `${label}, group`);
     }
     if (node.type === "info") {
       const item = new vscode.TreeItem(node.label);
       item.description = "—";
-      return item;
+      return accessibleTreeItem(item, node.label);
     }
 
     const change = node.change;
@@ -94,7 +95,10 @@ export class StagingProvider implements vscode.TreeDataProvider<StagingNode>, vs
       title: "Open Diff",
       arguments: [node],
     };
-    return item;
+    return accessibleTreeItem(
+      item,
+      `${change.path}, ${describeState(change, node.group)}`,
+    );
   }
 
   getChildren(node?: StagingNode): StagingNode[] {
@@ -138,7 +142,10 @@ export class StagingProvider implements vscode.TreeDataProvider<StagingNode>, vs
   }
 }
 
-function describeState(change: FileChange, group: "staged" | "unstaged"): string {
+function describeState(
+  change: FileChange,
+  group: "staged" | "unstaged" | "conflicted",
+): string {
   if (change.conflicted) {
     return "conflicted";
   }

@@ -105,6 +105,157 @@ test('Git Graph column settings are contributed, sent, and rendered', () => {
   assert.ok(graphJs.includes('tb-columns'), 'graph.js wires the Columns toolbar button');
 });
 
+test('native SCM provider is registered and menu actions target resource groups', () => {
+  const pkg = JSON.parse(read('package.json'));
+  const extension = read('src/extension.ts');
+  const scmProvider = read('src/views/ScmProvider.ts');
+  const scmCommands = read('src/commands/scm.ts');
+  const resourceStateMenus = pkg.contributes?.menus?.['scm/resourceState/context'] ?? [];
+  const resourceGroupMenus = pkg.contributes?.menus?.['scm/resourceGroup/context'] ?? [];
+
+  assert.ok(extension.includes('new VsgitScmProvider(manager)'), 'SCM provider is activated');
+  assert.ok(scmProvider.includes('vscode.scm.createSourceControl('), 'SCM provider creates source controls');
+  assert.ok(scmProvider.includes('"index", "Staged Changes"'), 'SCM provider exposes staged group');
+  assert.ok(scmProvider.includes('"workingTree", "Changes"'), 'SCM provider exposes working tree group');
+  assert.ok(scmProvider.includes('"merge", "Merge Changes"'), 'SCM provider exposes merge group');
+  assert.ok(scmProvider.includes('vsgitChange: change'), 'SCM resources carry parsed status metadata');
+  assert.ok(scmProvider.includes('quickDiffProvider'), 'native SCM uses VsGit quick diff');
+  assert.ok(scmProvider.includes('new VsgitQuickDiffProvider(this.manager, repo.root)'), 'SCM provider reuses quick diff provider');
+  assert.ok(scmProvider.includes('acceptInputCommand'), 'native SCM input box can commit');
+  assert.ok(!extension.includes('vscode.scm.createSourceControl("vsgit", "VsGit")'), 'old empty SCM provider was removed');
+  assert.ok(scmCommands.includes('resourceGroup('), 'SCM commands inspect resource group metadata');
+  assert.ok(scmCommands.includes('resourceChange('), 'SCM commands inspect status metadata');
+  assert.ok(scmCommands.includes('discardPathSets('), 'SCM discard separates tracked and untracked paths');
+  assert.ok(scmCommands.includes('repo.discard(discard.tracked, discard.untracked)'), 'SCM discard cleans untracked paths');
+  assert.ok(scmCommands.includes('VSGIT_EMPTY_REF'), 'SCM diff can render deleted working-tree files');
+  assert.ok(scmCommands.includes('Index ↔ Working Tree'), 'SCM working-tree diffs compare index to working tree');
+  assert.ok(scmCommands.includes('manager.findByUri'), 'SCM commands resolve repos by URI containment');
+
+  assert.strictEqual(
+    resourceStateMenus.find((item) => item.command === 'vsgit.scm.stage')?.when,
+    'scmProvider == vsgit && scmResourceGroup != index',
+  );
+  assert.strictEqual(
+    resourceStateMenus.find((item) => item.command === 'vsgit.scm.unstage')?.when,
+    'scmProvider == vsgit && scmResourceGroup == index',
+  );
+  assert.strictEqual(
+    resourceStateMenus.find((item) => item.command === 'vsgit.scm.discard')?.when,
+    'scmProvider == vsgit && scmResourceGroup != index',
+  );
+  assert.strictEqual(
+    resourceGroupMenus.find((item) => item.command === 'vsgit.scm.stageAll')?.when,
+    'scmProvider == vsgit && scmResourceGroup != index',
+  );
+  assert.strictEqual(
+    resourceGroupMenus.find((item) => item.command === 'vsgit.scm.unstageAll')?.when,
+    'scmProvider == vsgit && scmResourceGroup == index',
+  );
+  assert.strictEqual(
+    resourceGroupMenus.find((item) => item.command === 'vsgit.scm.discardAll')?.when,
+    'scmProvider == vsgit && scmResourceGroup != index',
+  );
+});
+
+test('VsGit submenu is attached to the native Git SCM menus', () => {
+  const pkg = JSON.parse(read('package.json'));
+  const menus = pkg.contributes?.menus ?? {};
+  const submenus = pkg.contributes?.submenus ?? [];
+  const shared = read('src/commands/shared.ts');
+
+  // Parent submenu exists and is labelled "VsGit".
+  const repoSubmenu = submenus.find((s) => s.id === 'vsgit.repo');
+  assert.ok(repoSubmenu, 'vsgit.repo submenu is declared');
+  assert.strictEqual(repoSubmenu.label, 'VsGit', 'native submenu is labelled VsGit');
+
+  // The submenu has a non-empty body of repo actions.
+  const repoItems = menus['vsgit.repo'] ?? [];
+  assert.ok(repoItems.length > 0, 'vsgit.repo submenu has entries');
+  assert.ok(
+    repoItems.some((item) => item.submenu === 'vsgit.repo.pushPull'),
+    'vsgit.repo submenu surfaces push/pull actions',
+  );
+
+  // Attached to the native repository node (right-click the repo header).
+  const sourceControlMenu = menus['scm/sourceControl'] ?? [];
+  const repoNodeEntry = sourceControlMenu.find((item) => item.submenu === 'vsgit.repo');
+  assert.ok(repoNodeEntry, 'vsgit.repo is attached to scm/sourceControl');
+  assert.strictEqual(
+    repoNodeEntry.when,
+    'scmProvider == git',
+    'native repo submenu targets the built-in git provider',
+  );
+
+  // Attached to the native "Changes" group ellipsis (working tree only).
+  const resourceGroupMenus = menus['scm/resourceGroup/context'] ?? [];
+  const changesEntry = resourceGroupMenus.find((item) => item.submenu === 'vsgit.repo');
+  assert.ok(changesEntry, 'vsgit.repo is attached to scm/resourceGroup/context');
+  assert.strictEqual(
+    changesEntry.when,
+    'scmProvider == git && scmResourceGroup == workingTree',
+    'native group submenu targets the working-tree (Changes) group',
+  );
+
+  // resolveRepo can map a native SourceControl rootUri to a repository.
+  assert.ok(shared.includes('nativeScmRootUri'), 'resolveRepo extracts a native rootUri');
+  assert.ok(
+    shared.includes('manager.get(rootUri.fsPath) ?? manager.findByUri(rootUri)'),
+    'resolveRepo maps the native rootUri to a repository',
+  );
+});
+
+test('configured git path and command preview are wired through the shared executor', () => {
+  const executor = read('src/git/GitExecutor.ts');
+  const manager = read('src/git/RepositoryManager.ts');
+  const extension = read('src/extension.ts');
+  const contentProvider = read('src/git/GitContentProvider.ts');
+  const commandPreview = read('src/util/commandPreview.ts');
+
+  assert.ok(executor.includes('private gitPath: string = "git"'), 'GitExecutor stores the configured path');
+  assert.ok(executor.includes('spawn(this.gitPath, args'), 'GitExecutor spawns the configured path');
+  assert.ok(executor.includes('this.preview(args, options.cwd, this.gitPath)'), 'preview sees the executable path');
+  assert.ok(manager.includes('new GitExecutor(configuredGitPath(), shouldRunGitCommand)'), 'manager creates shared configured executor');
+  assert.ok(manager.includes('updateGitPathFromConfiguration()'), 'manager can update git path after configuration changes');
+  assert.ok(extension.includes('e.affectsConfiguration("vsgit.git.path")'), 'extension listens for git path changes');
+  assert.ok(extension.includes('manager.updateGitPathFromConfiguration()'), 'extension applies git path changes');
+  assert.ok(extension.includes('new GitContentProvider(manager.getGitExecutor())'), 'diff content provider uses shared executor');
+  assert.ok(contentProvider.includes('constructor(private readonly git: GitExecutor)'), 'content provider receives executor');
+  assert.ok(contentProvider.includes('export const VSGIT_EMPTY_REF'), 'content provider has explicit empty-side ref');
+  assert.ok(contentProvider.includes('vscode.Uri.from({'), 'content provider encodes virtual URI paths structurally');
+  assert.ok(commandPreview.includes('get<boolean>("showCommandPreview", false)'), 'preview setting is read');
+  assert.ok(commandPreview.includes('[gitPath || "git", ...args]'), 'preview renders configured executable');
+  assert.ok(commandPreview.includes('isReadOnlyGitCommand(args)'), 'background read-only commands are not previewed');
+});
+
+test('repository routing uses active repo and containment-aware URI lookup', () => {
+  const manager = read('src/git/RepositoryManager.ts');
+  const staging = read('src/views/StagingProvider.ts');
+  const sync = read('src/views/SynchronizeProvider.ts');
+  const reflog = read('src/views/ReflogProvider.ts');
+  const history = read('src/webviews/HistoryView.ts');
+  const graph = read('src/webviews/graph/GraphPanel.ts');
+  const quickDiff = read('src/git/QuickDiffProvider.ts');
+  const blame = read('src/decorations/BlameController.ts');
+  const compare = read('src/commands/compare.ts');
+
+  assert.ok(manager.includes('getActive(): Repository | undefined'), 'manager exposes active repo');
+  assert.ok(manager.includes('setActive(root: string): void'), 'manager can set active repo');
+  assert.ok(manager.includes('findByUri(uri: vscode.Uri): Repository | undefined'), 'manager resolves repo by URI');
+  assert.ok(manager.includes('sort((a, b) => b.root.length - a.root.length)'), 'nested repos prefer deepest root');
+  assert.ok(manager.includes('relativePath(repo: Repository, uri: vscode.Uri): string'), 'manager owns git-relative path conversion');
+  assert.ok(manager.includes('"--absolute-git-dir"'), 'manager resolves linked-worktree git dirs');
+  assert.ok(manager.includes('"--git-common-dir"'), 'manager resolves common git dirs for refs');
+  assert.ok(manager.includes('watchGitPath(root, watchPath)'), 'manager watches resolved git paths');
+  assert.ok(staging.includes('return this.manager.getActive();'), 'staging view uses active repo');
+  assert.ok(sync.includes('this.repo = this.manager.getActive();'), 'synchronize view uses active repo');
+  assert.ok(reflog.includes('this.repo = this.manager.getActive();'), 'reflog view uses active repo');
+  assert.ok(history.includes('repo ?? this.manager.getActive()'), 'history fallback uses active repo');
+  assert.ok(graph.includes('initialRepo ?? manager.getActive()'), 'graph fallback uses active repo');
+  assert.ok(quickDiff.includes('this.manager.findByUri(uri)'), 'quick diff uses containment lookup');
+  assert.ok(blame.includes('this.manager.findByUri(editor.document.uri)'), 'blame uses containment lookup');
+  assert.ok(compare.includes('manager.findByUri(uri)'), 'compare uses containment lookup');
+});
+
 test('Git Graph trace defaults to explicit toolbar control', () => {
   const graphJs = read('resources/graph.js');
 
@@ -167,8 +318,16 @@ test('Git Graph top bar buttons expose labels and table fills available width', 
   for (const id of buttonIds) {
     const button = graphPanel.match(new RegExp(`<button[^>]+id="${id}"[^>]+>`));
     assert.ok(button, `${id} exists`);
-    assert.ok(button[0].includes('data-label='), `${id} has data-label`);
     assert.ok(button[0].includes('aria-label='), `${id} has aria-label`);
+    if (id === 'tb-trace') {
+      // Trace shows a visible text label rather than the hover-only data-label.
+      assert.ok(
+        graphPanel.includes('<span class="tb-label">Trace</span>'),
+        'tb-trace has a visible text label',
+      );
+    } else {
+      assert.ok(button[0].includes('data-label='), `${id} has data-label`);
+    }
   }
 
   assert.ok(graphCss.includes('.tb-btn.icon-only[data-label]::after'), 'toolbar labels use CSS tooltip');
@@ -193,5 +352,54 @@ test('Git Graph trace keeps the graph overlay bright', () => {
   assert.ok(
     graphCss.includes('#graph-svg .graph-node:not(.dim)'),
     'active traced graph nodes are visually emphasized',
+  );
+});
+
+test('documentation library is the final sidebar view and has a full-panel command', () => {
+  const pkg = JSON.parse(read('package.json'));
+  const views = pkg.contributes?.views?.vsgit ?? [];
+  const documentation = views.find((view) => view.id === 'vsgit.documentation');
+  const extension = read('src/extension.ts');
+  const provider = read('src/webviews/documentation/DocumentationProvider.ts');
+  const client = read('resources/documentation.js');
+  const readme = read('README.md');
+  const hiddenCommands = new Set(
+    (pkg.contributes?.menus?.commandPalette ?? [])
+      .filter((entry) => entry.when === 'false')
+      .map((entry) => entry.command),
+  );
+  const operationCount = pkg.contributes.commands.length;
+  const paletteCount = operationCount - hiddenCommands.size;
+
+  assert.ok(documentation, 'documentation view is contributed');
+  assert.strictEqual(views.at(-1)?.id, 'vsgit.documentation', 'documentation is the bottom view');
+  assert.strictEqual(documentation.type, 'webview', 'documentation is a webview screen');
+  assert.ok(
+    pkg.contributes.commands.some((command) => command.command === 'vsgit.documentation.open'),
+    'full documentation panel command is contributed',
+  );
+  assert.ok(
+    extension.includes('DocumentationProvider.viewType'),
+    'documentation webview provider is registered',
+  );
+  assert.ok(
+    extension.includes('vscode.commands.registerCommand("vsgit.documentation.open"'),
+    'full documentation panel command is registered',
+  );
+  assert.ok(provider.includes('this.allowedCommands.has(message.command)'), 'run-command bridge validates command ids');
+  assert.ok(client.includes('data.operationCategories'), 'client renders the manifest-driven operation catalog');
+  assert.ok(client.includes('data.glossary'), 'client renders the Git glossary');
+  assert.ok(client.includes('data.components'), 'client renders extension components');
+  assert.ok(
+    readme.includes(`all **${operationCount} contributed operations**`),
+    'README operation count matches the manifest',
+  );
+  assert.ok(
+    readme.includes(`**${paletteCount} Command Palette operations**`),
+    'README palette count matches the manifest',
+  );
+  assert.ok(
+    readme.includes(`**${hiddenCommands.size} contextual actions**`),
+    'README contextual-action count matches the manifest',
   );
 });

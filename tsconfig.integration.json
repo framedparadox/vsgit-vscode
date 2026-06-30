@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "out-integration",
+    "rootDir": "src/test",
+    "sourceMap": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "types": ["node", "vscode", "mocha"]
+  },
+  "include": ["src/test/**/*.ts"],
+  "exclude": ["node_modules"]
+}

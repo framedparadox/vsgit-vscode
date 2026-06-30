@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { Repository } from "../git/Repository";
 import { RefInfo } from "../git/parsers/refs";
+import { accessibleTreeItem } from "./treeAccessibility";
 
 /**
  * The kinds of nodes the Repositories tree renders. Each TreeItem carries one
@@ -95,15 +96,28 @@ export class RepositoriesProvider
             : vscode.TreeItemCollapsibleState.Expanded,
         );
         const ab = this.abCache.get(node.repo.root);
+        const active = this.manager.getActive()?.root === node.repo.root;
         const abParts: string[] = [];
         if (ab?.ahead) abParts.push(`↑${ab.ahead}`);
         if (ab?.behind) abParts.push(`↓${ab.behind}`);
         const abStr = abParts.join(" ");
-        item.description = [node.repo.headName, abStr].filter(Boolean).join("  ");
-        item.iconPath = new vscode.ThemeIcon("repo");
+        item.description = [
+          active ? "active" : undefined,
+          node.repo.headName,
+          abStr,
+        ].filter(Boolean).join("  ");
+        item.iconPath = new vscode.ThemeIcon(active ? "repo-force-push" : "repo");
         item.contextValue = "vsgit.repo";
         item.tooltip = node.repo.root;
-        return item;
+        item.command = {
+          command: "vsgit.repositories.setActive",
+          title: "Set Active Repository",
+          arguments: [node],
+        };
+        return accessibleTreeItem(
+          item,
+          `${node.repo.name}, ${active ? "active " : ""}repository${node.repo.headName ? `, branch ${node.repo.headName}` : ""}${ab?.ahead ? `, ${ab.ahead} ahead` : ""}${ab?.behind ? `, ${ab.behind} behind` : ""}`,
+        );
       }
       case "group": {
         const item = new vscode.TreeItem(
@@ -115,7 +129,10 @@ export class RepositoriesProvider
           node.group === "localBranches" || node.group === "remoteBranches"
             ? "vsgit.branchesNode"
             : `vsgit.${node.group}Node`;
-        return item;
+        return accessibleTreeItem(
+          item,
+          `${GROUP_LABELS[node.group]}, group`,
+        );
       }
       case "branch": {
         const item = new vscode.TreeItem(node.ref.shortName);
@@ -134,43 +151,49 @@ export class RepositoriesProvider
             ? "vsgit.branch.local"
             : "vsgit.branch.remote";
         item.tooltip = node.ref.objectId;
-        return item;
+        return accessibleTreeItem(
+          item,
+          `${node.ref.shortName}, ${node.ref.kind === "localBranch" ? "local" : "remote"} branch${node.ref.isHead ? ", current HEAD" : ""}${node.ref.upstream ? `, tracks ${node.ref.upstream}` : ""}`,
+        );
       }
       case "tag": {
         const item = new vscode.TreeItem(node.ref.shortName);
         item.iconPath = new vscode.ThemeIcon("tag");
         item.description = node.ref.subject;
         item.contextValue = "vsgit.tag";
-        return item;
+        return accessibleTreeItem(item, `${node.ref.shortName}, tag`);
       }
       case "remote": {
         const item = new vscode.TreeItem(node.remoteName);
         item.iconPath = new vscode.ThemeIcon("cloud");
         item.contextValue = "vsgit.remote";
-        return item;
+        return accessibleTreeItem(item, `${node.remoteName}, remote`);
       }
       case "stash": {
         const item = new vscode.TreeItem(node.message || node.ref);
         item.iconPath = new vscode.ThemeIcon("archive");
         item.description = node.ref;
         item.contextValue = "vsgit.stash";
-        return item;
+        return accessibleTreeItem(
+          item,
+          `${node.message || node.ref}, stash ${node.ref}`,
+        );
       }
       case "submodule": {
         const item = new vscode.TreeItem(node.path);
         item.iconPath = new vscode.ThemeIcon("file-submodule");
         item.contextValue = "vsgit.submodule";
-        return item;
+        return accessibleTreeItem(item, `${node.path}, submodule`);
       }
       case "info": {
         const item = new vscode.TreeItem(node.label);
         item.description = "—";
-        return item;
+        return accessibleTreeItem(item, node.label);
       }
     }
   }
 
-  getChildren(node?: VsgitNode): VsgitNode[] {
+  async getChildren(node?: VsgitNode): Promise<VsgitNode[]> {
     if (!node) {
       const repos = this.manager.getAll();
       if (repos.length === 0) {
@@ -191,6 +214,13 @@ export class RepositoriesProvider
     }
 
     if (node.type === "group") {
+      if (node.group === "submodules") {
+        try {
+          await node.repo.ensureSubmodules();
+        } catch {
+          return [{ type: "info", label: "(unable to load submodules)" }];
+        }
+      }
       return this.groupChildren(node.repo, node.group);
     }
 

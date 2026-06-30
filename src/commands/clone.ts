@@ -1,6 +1,5 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
-import { GitExecutor } from "../git/GitExecutor";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { AskpassServer } from "../util/AskpassServer";
 import { safeRef, safeRemoteUrl } from "../git/argGuard";
@@ -15,7 +14,7 @@ export function registerCloneCommands(
   context: vscode.ExtensionContext,
   manager: RepositoryManager,
 ): void {
-  const git = new GitExecutor();
+  const git = manager.getGitExecutor();
   const shimPath = path.join(context.extensionPath, "resources", "askpass.js");
 
   context.subscriptions.push(

@@ -37,10 +37,10 @@ export function registerSubtreeCommands(
       await withProgress(
         manager,
         `Adding subtree from ${repository}`,
-        () => repo.subtreeAdd(prefix, repository, ref || undefined)
+        () => repo.subtreeAdd(prefix, repository, ref || undefined),
       );
       vscode.window.showInformationMessage(
-        `Subtree added at ${prefix} from ${repository}.`
+        `Subtree added at ${prefix} from ${repository}.`,
       );
     } catch (e) {
       vscode.window.showErrorMessage(`Failed to add subtree: ${errMsg(e)}`);
@@ -73,10 +73,10 @@ export function registerSubtreeCommands(
       await withProgress(
         manager,
         `Pulling subtree updates from ${repository}`,
-        () => repo.subtreePull(prefix, repository, ref || undefined)
+        () => repo.subtreePull(prefix, repository, ref || undefined),
       );
       vscode.window.showInformationMessage(
-        `Subtree ${prefix} updated from ${repository}.`
+        `Subtree ${prefix} updated from ${repository}.`,
       );
     } catch (e) {
       vscode.window.showErrorMessage(`Failed to pull subtree: ${errMsg(e)}`);
@@ -108,7 +108,7 @@ export function registerSubtreeCommands(
     const confirm = await vscode.window.showWarningMessage(
       `Push subtree changes from ${prefix} to ${repository}?`,
       { modal: true },
-      "Push"
+      "Push",
     );
     if (confirm !== "Push") return;
 
@@ -116,10 +116,10 @@ export function registerSubtreeCommands(
       await withProgress(
         manager,
         `Pushing subtree to ${repository}`,
-        () => repo.subtreePush(prefix, repository, ref || undefined)
+        () => repo.subtreePush(prefix, repository, ref || undefined),
       );
       vscode.window.showInformationMessage(
-        `Subtree ${prefix} pushed to ${repository}.`
+        `Subtree ${prefix} pushed to ${repository}.`,
       );
     } catch (e) {
       vscode.window.showErrorMessage(`Failed to push subtree: ${errMsg(e)}`);

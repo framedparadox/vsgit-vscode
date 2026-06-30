@@ -29,6 +29,25 @@ let collapsedGroups = (vscode.getState() || {}).commitCollapsedGroups || {};
 
 const el = (id) => document.getElementById(id);
 const post = (type, data) => vscode.postMessage({ type, data });
+const announce = (message) => {
+  const status = el('aria-status');
+  if (!status) return;
+  status.textContent = '';
+  requestAnimationFrame(() => { status.textContent = message; });
+};
+
+function makeKeyboardClickable(node, label, handler) {
+  node.tabIndex = 0;
+  node.setAttribute('role', 'button');
+  node.setAttribute('aria-label', label);
+  node.addEventListener('click', handler);
+  node.addEventListener('keydown', (event) => {
+    if (event.target !== node) return;
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    handler(event);
+  });
+}
 
 // Logical action name → codicon id, matching VS Code's SCM inline action icons
 // so add / discard / remove render as the native Source Control buttons.
@@ -76,6 +95,7 @@ function renderGroup(title, group, files) {
 
   const header = document.createElement('div');
   header.className = 'group-header';
+  header.setAttribute('aria-expanded', String(!collapsed));
 
   // Collapse chevron (▸ when collapsed, ▾ when expanded) — clicking the header
   // toggles the group, like the Source Control panel's section headers.
@@ -99,7 +119,11 @@ function renderGroup(title, group, files) {
     header.appendChild(groupAction('Unstage All Changes', 'remove', () => post('unstageAll')));
   }
   header.appendChild(count);
-  header.addEventListener('click', () => setGroupCollapsed(group, !wrap.classList.contains('collapsed')));
+  makeKeyboardClickable(
+    header,
+    `${title}, ${files.length} file${files.length === 1 ? '' : 's'}`,
+    () => setGroupCollapsed(group, !wrap.classList.contains('collapsed')),
+  );
   wrap.appendChild(header);
 
   const body = document.createElement('div');
@@ -151,14 +175,16 @@ function renderTreeLevel(parent, node, group, depth) {
     folder.innerHTML =
       '<span class="chev codicon codicon-chevron-right expanded"></span>' +
       '<span class="folder-name">' + escapeHtml(name) + '</span>';
+    folder.setAttribute('aria-expanded', 'true');
 
     const children = document.createElement('div');
     children.className = 'tree-children';
     renderTreeLevel(children, dir, group, depth + 1);
 
-    folder.addEventListener('click', () => {
+    makeKeyboardClickable(folder, `${name}, folder`, () => {
       const collapsed = children.classList.toggle('collapsed');
       folder.querySelector('.chev').classList.toggle('expanded', !collapsed);
+      folder.setAttribute('aria-expanded', String(!collapsed));
     });
     parent.appendChild(folder);
     parent.appendChild(children);
@@ -221,7 +247,11 @@ function renderFile(f, group, depth = 0, label = f.name) {
   }
   row.appendChild(actions);
 
-  row.addEventListener('click', () => post('openDiff', { path: f.path, group }));
+  makeKeyboardClickable(
+    row,
+    `${f.path}, ${self.CommitView.statusLabel(code)}, open diff`,
+    () => post('openDiff', { path: f.path, group }),
+  );
   return row;
 }
 
@@ -388,6 +418,13 @@ window.addEventListener('message', (event) => {
       cur.value = state.message;
     }
     render();
+    if (state.active) {
+      announce(
+        `${state.branch || 'Repository'}: ${(state.staged || []).length} staged, ${(state.unstaged || []).length} unstaged, ${(state.conflicted || []).length} conflicted.`,
+      );
+    } else {
+      announce('No Git repository is active.');
+    }
   } else if (m.type === 'amendMessage') {
     // Only fill in the previous commit's message if the user hasn't already
     // started typing one, so we never clobber an in-progress draft.
@@ -405,6 +442,7 @@ window.addEventListener('message', (event) => {
     preAmendMessage = '';
     lastAmendMessage = null;
     syncAdvancedBadge();
+    announce('Commit completed.');
   }
 });
 

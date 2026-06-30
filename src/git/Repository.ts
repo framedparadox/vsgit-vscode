@@ -55,6 +55,8 @@ export class Repository {
   stashes: StashInfo[] = [];
   submodules: SubmoduleInfo[] = [];
   headName: string | undefined;
+  private submodulesLoaded = false;
+  private submodulesInFlight: Promise<void> | undefined;
 
   constructor(
     readonly root: string,
@@ -1255,14 +1257,36 @@ export class Repository {
   }
 
   async refresh(): Promise<void> {
-    await Promise.all([
+    const tasks = [
       this.refreshRefs(),
       this.refreshStatus(),
       this.refreshRemotes(),
       this.refreshStashes(),
-      this.refreshSubmodules(),
       this.refreshHead(),
-    ]);
+    ];
+    // Submodule enumeration can recurse into nested repositories and is not
+    // needed for normal staging/commit workflows. Refresh it only after a view
+    // has requested submodule data at least once.
+    if (this.submodulesLoaded) {
+      tasks.push(this.refreshSubmodules());
+    }
+    await Promise.all(tasks);
+  }
+
+  async ensureSubmodules(): Promise<void> {
+    if (this.submodulesLoaded) {
+      return;
+    }
+    if (!this.submodulesInFlight) {
+      this.submodulesInFlight = this.refreshSubmodules()
+        .then(() => {
+          this.submodulesLoaded = true;
+        })
+        .finally(() => {
+          this.submodulesInFlight = undefined;
+        });
+    }
+    return this.submodulesInFlight;
   }
 
   private async refreshRefs(): Promise<void> {

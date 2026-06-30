@@ -2,7 +2,7 @@
 
 VsGit is a complete, power-user Git client built into VS Code. It drives the real
 `git` binary directly — no libgit2, no JavaScript reimplementation of git — and
-surfaces **170+ commands** across every Git workflow through dedicated tree
+surfaces **173 commands** across every Git workflow through dedicated tree
 views, rich webviews, an interactive commit graph, and native Source Control
 integration.
 
@@ -22,6 +22,7 @@ aliases, and `.gitignore` rules apply. Nothing is approximated.
 
 - [Why VsGit](#why-vsgit)
 - [Feature highlights](#feature-highlights)
+- [What's included and what's next](#whats-included-and-whats-next)
 - [Screenshots](#screenshots)
 - [Views & panels](#views--panels)
   - [Activity-bar container](#activity-bar-container)
@@ -34,6 +35,7 @@ aliases, and `.gitignore` rules apply. Nothing is approximated.
   - [Conflict resolution](#conflict-resolution)
   - [Reflog view](#reflog-view)
   - [Worktrees view](#worktrees-view)
+  - [Documentation library](#documentation-library)
 - [Native Source Control integration](#native-source-control-integration)
 - [Advanced operations](#advanced-operations)
 - [File & language icons](#file--language-icons)
@@ -61,7 +63,7 @@ VsGit fills that gap by driving the real `git` CLI:
 
 - **Authentic behaviour.** Every operation is a real `git` command, so results
   match your shell precisely — including hooks, credential helpers, and aliases.
-- **Breadth.** 170+ commands spanning the everyday flow and the long tail
+- **Breadth.** 173 commands spanning the everyday flow and the long tail
   (rebase, LFS, notes, bisect, subtree, archive, patch, Gerrit, maintenance).
 - **Multi-root aware.** Every view understands multi-folder workspaces and tracks
   a single "active repository" so the panels stay coherent.
@@ -91,8 +93,49 @@ VsGit fills that gap by driving the real `git` CLI:
 - 🔧 **Everything else** — interactive rebase, LFS, notes, bisect, subtree,
   archive, patch, Gerrit, submodules, maintenance, blame, tags, and a graphical
   git-config editor.
+- 📚 **Built-in documentation library** — a searchable bottom sidebar view and
+  full editor screen explaining every VsGit component, key Git terminology, and
+  all contributed operations with their purpose and entry point.
 - 🔒 **Hardened** — argv-only spawning, option-injection guards, and authenticated
   IPC for credential prompts and rebase/commit editing.
+
+## What's included and what's next
+
+### Added and available now
+
+- A **Documentation** view at the bottom of the VsGit sidebar.
+- A full-screen **VsGit: Open Documentation** command, also available from the
+  Documentation view title and its **Open Full Library** button.
+- Detailed component guides covering Repositories, Commit, Staging, Graph,
+  History, Compare, Synchronize, Conflicts, Reflog, Worktrees, native Source
+  Control integration, configuration, blame, and background services.
+- A searchable Git glossary with definitions, purpose, practical usage, and
+  cautions for destructive or history-rewriting concepts.
+- A manifest-driven catalog of all **173 contributed operations**. It clearly
+  separates the **72 Command Palette operations** from **101 contextual actions**
+  that require a selected file, ref, commit, resource group, or view item.
+- The existing Git client surface: multi-root repositories, staging and commit,
+  branch/tag/remote workflows, history and graph, synchronization, conflict
+  resolution, worktrees, LFS, Gerrit, notes, patch/archive, submodules,
+  subtrees, bisect, maintenance, config editing, and authenticated Git IPC.
+- Phase 10 integration and polish: keyboard and screen-reader semantics across
+  tree/webview surfaces, forced-colour support, concurrent/coalesced repository
+  discovery, lazy submodule loading, Extension Host tests, enforceable coverage,
+  audited development dependencies, CI release gates, and inspected VSIX output.
+
+### Pending future enhancements
+
+- Multi-platform Extension Host runs beyond the current macOS development and
+  Ubuntu CI coverage.
+- Larger synthetic-repository benchmarks and additional on-demand loading for
+  rarely used metadata.
+- Localization of the documentation library and command descriptions.
+- Current live workflow recordings for the Marketplace listing.
+- Signed release provenance and automated post-publish Marketplace smoke tests.
+
+The detailed engineering status remains in
+[docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md). Pending items above
+are plans, not claims of implemented behavior.
 
 ## Screenshots
 
@@ -110,8 +153,9 @@ graph toolbar; Authored Date and Committer are hidden by default.
 
 ![Sidebar views](docs/sidebar.png)
 
-The VsGit activity-bar container hosts the Repositories, Commit, and Staging
-trees, among others, and follows the active repository selection.
+The VsGit activity-bar container hosts Repositories, Commit, advanced Git views,
+and the Documentation library. Repository-aware views follow the active
+repository selection.
 
 ---
 
@@ -121,8 +165,9 @@ trees, among others, and follows the active repository selection.
 
 A dedicated **VsGit** container in the activity bar groups all of the extension's
 views. The core views (Repositories, Commit, Git Repositories) are always
-visible; the advanced views (Staging, Reflog, Synchronize, Worktrees, Conflicts,
-Compare) appear when `vsgit.showAdvancedViews` is enabled.
+visible; Documentation is always available at the bottom. The advanced views
+(Staging, Reflog, Synchronize, Worktrees, Conflicts, Compare) appear when
+`vsgit.showAdvancedViews` is enabled.
 
 ### Repositories view
 
@@ -220,6 +265,25 @@ A Source-Control-style commit panel that replaces the transient input box:
 
 - List, create, open, lock, unlock, remove, and prune linked worktrees.
 
+### Documentation library
+
+The **Documentation** view stays at the bottom of the VsGit sidebar and works
+without an active repository. It provides four searchable sections:
+
+- **Overview** — a safe daily workflow plus what was added and what remains
+  planned.
+- **Components** — what every VsGit view or service is, its purpose, and how to
+  use it.
+- **Git glossary** — key Git terminology with definitions, practical purpose,
+  usage guidance, and recovery/destructive-operation cautions.
+- **Operations** — all commands from the live extension manifest, grouped by
+  workflow. Palette commands can be launched directly; context-only actions
+  identify where their required selection is available.
+
+Choose **Open Full Library** inside the sidebar, use the view-title book action,
+or run **VsGit: Open Documentation** for the wider editor screen. Press `/` to
+focus search and `Escape` to clear it.
+
 ---
 
 ## Native Source Control integration
@@ -294,8 +358,10 @@ Explorer (colourful, language-specific icons for JS/TS/JSON/Python/etc.).
 | `⌘⇧G K` | `Ctrl+Shift+G K` | Cherry-Pick Commit |
 | `⌘⇧G ,` | `Ctrl+Shift+G ,` | Open Git Config Panel |
 
-All 170+ commands are also available from the Command Palette under the
-**Git (VsGit)** category.
+The Command Palette exposes **72** commands under the **VsGit** category. The
+other **101** contributed operations are intentionally context-only because they
+require a selected file, ref, commit, resource group, or view item. The
+Documentation library covers all **173** and identifies each entry point.
 
 ---
 
@@ -316,7 +382,8 @@ Or run it live in the **Extension Development Host**: open the folder in VS Code
 run `npm run watch`, then press `F5`.
 
 Once installed, click the **VsGit** icon in the activity bar, or run
-**Git (VsGit): Show Git Graph** from the Command Palette.
+**VsGit: Show Git Graph** from the Command Palette. Open **Documentation** at the
+bottom of the VsGit sidebar for the built-in reference.
 
 ---
 
@@ -395,12 +462,13 @@ src/
   commands/               one module per workflow (branch, stash, tag, lfs,
                           notes, bisect, subtree, rebase, gerrit, …)
   views/                  tree data providers + native Source Control bridge
-  webviews/               webview panels (Graph, History, Commit, Create Tag,
-                          pickers)
+  webviews/               webview panels (Graph, History, Commit, Documentation,
+                          Create Tag, pickers)
   services/               auto-fetch, file-system watcher, status bar
   util/                   IPC servers (askpass / editor) + helpers (html escape)
 resources/
   graph.js / graph.css    Git Graph panel client
+  documentation.js/.css  searchable documentation library client
   graphLayout.js          shared, unit-tested commit-graph layout (UMD)
   commit.js / commit.css  Commit webview client
   commitView.js           Commit view pure helpers (UMD, unit-tested)
@@ -426,6 +494,9 @@ Key design points:
   tested in Node and reused across the Commit and Graph webviews.
 - **Live refresh.** A file-system watcher plus `RepositoryManager.onDidChange`
   keep every view in sync after internal or external git changes.
+- **Measured, coalesced discovery.** Workspace roots are discovered concurrently;
+  overlapping scans share one in-flight operation, scan duration is recorded,
+  and submodule enumeration is deferred until its tree is opened.
 
 ## Security model
 
@@ -445,6 +516,9 @@ Key design points:
   bounded.
 - **Strict webview CSP.** Each webview runs under a Content-Security-Policy that
   only allows the extension's own nonce'd scripts and bundled styles/fonts.
+- **Workspace trust boundary.** The manifest disables VsGit in untrusted and
+  virtual workspaces because Git configuration and repository hooks execute from
+  a local checkout.
 
 ## Development & testing
 
@@ -454,12 +528,15 @@ npm run watch        # esbuild in watch mode; F5 launches the dev host
 npm run check-types  # tsc --noEmit
 npm run build        # production bundle into dist/
 npm test             # compile + run the unit-test suite
+npm run test:coverage     # enforce 80% lines/branches and 70% functions
+npm run test:integration  # launch a real VS Code Extension Host
+npm run package:verify    # build and inspect artifacts/vsgit-vscode.vsix
 ```
 
 ### Testing
 
-Tests run on Node's built-in test runner (`node --test`) — no VS Code instance
-required. They cover the pure logic that's most worth pinning down:
+Unit and contract tests run on Node's built-in test runner (`node --test`). They
+cover the pure logic that's most worth pinning down:
 
 - every output parser under `src/git/parsers/` (log, graph-log, status, refs,
   diff, blame, config, reflog, rebase-todo, worktree),
@@ -469,13 +546,22 @@ required. They cover the pure logic that's most worth pinning down:
 - the Seti filename→icon resolver,
 - the `GitExecutor` argv assembly and the `Repository` command builders,
 - the argument guards, the HTML-escape helper, and the IPC token comparison.
+- accessibility contracts for every tree provider and webview surface,
+- Phase 10 CI, coverage, performance, documentation, and packaging contracts.
 
 ```bash
-npm test     # 172 tests
+npm test     # 184 tests
 ```
 
-CI (GitHub Actions) runs type-check, build, the test suite, and packages the VSIX
-on every push and pull request.
+The Extension Host suite activates the real extension, verifies every
+contributed command, refreshes repository discovery, and opens Documentation.
+Native coverage currently exceeds the enforced 80% line, 80% branch, and 70%
+function thresholds.
+
+CI runs type-checking, unit/contract tests, coverage, a Linux Extension Host,
+dependency audit, production build, and VSIX inspection on every push and pull
+request. See [CONTRIBUTING.md](CONTRIBUTING.md) for development standards and
+[the Marketplace checklist](docs/MARKETPLACE_CHECKLIST.md) for the release gate.
 
 ---
 
@@ -484,12 +570,14 @@ on every push and pull request.
 - VS Code **1.85+**
 - `git` **2.20+** on `$PATH` (or set `vsgit.git.path`)
 - `git-lfs` for the LFS commands (optional)
+- A trusted local workspace (virtual and Restricted Mode workspaces are not
+  supported because VsGit executes the repository's Git configuration/hooks)
 
 ## FAQ & troubleshooting
 
 **VsGit can't find my repository.** VsGit discovers repos from your open
 workspace folders. Make sure the folder containing `.git` is open, or run
-**Git (VsGit): Refresh**.
+**VsGit: Refresh**.
 
 **Git isn't found / wrong version.** Set `vsgit.git.path` to the absolute path of
 your `git` binary, then reload the window.

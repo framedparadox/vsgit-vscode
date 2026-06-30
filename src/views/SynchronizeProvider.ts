@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { Repository } from "../git/Repository";
 import { Commit } from "../git/parsers/log";
+import { accessibleTreeItem } from "./treeAccessibility";
 
 export type SyncNode =
   | { type: "group"; repo: Repository; direction: "incoming" | "outgoing" }
@@ -52,7 +53,7 @@ export class SynchronizeProvider implements vscode.TreeDataProvider<SyncNode>, v
     if (node.type === "info") {
       const item = new vscode.TreeItem(node.label);
       item.description = "—";
-      return item;
+      return accessibleTreeItem(item, node.label);
     }
     if (node.type === "group") {
       const count =
@@ -66,7 +67,10 @@ export class SynchronizeProvider implements vscode.TreeDataProvider<SyncNode>, v
       item.iconPath = new vscode.ThemeIcon(
         node.direction === "incoming" ? "arrow-down" : "arrow-up",
       );
-      return item;
+      return accessibleTreeItem(
+        item,
+        `${node.direction}, ${count} commit${count === 1 ? "" : "s"}`,
+      );
     }
     const c = node.commit;
     const item = new vscode.TreeItem(c.subject);
@@ -74,7 +78,10 @@ export class SynchronizeProvider implements vscode.TreeDataProvider<SyncNode>, v
     item.iconPath = new vscode.ThemeIcon("git-commit");
     item.tooltip = `${c.sha}\n${c.authorName} <${c.authorEmail}>`;
     item.contextValue = "vsgit.syncCommit";
-    return item;
+    return accessibleTreeItem(
+      item,
+      `${c.subject}, ${node.direction}, commit ${c.shortSha}, by ${c.authorName}`,
+    );
   }
 
   getChildren(node?: SyncNode): SyncNode[] {

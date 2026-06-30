@@ -354,3 +354,52 @@ test('Git Graph trace keeps the graph overlay bright', () => {
     'active traced graph nodes are visually emphasized',
   );
 });
+
+test('documentation library is the final sidebar view and has a full-panel command', () => {
+  const pkg = JSON.parse(read('package.json'));
+  const views = pkg.contributes?.views?.vsgit ?? [];
+  const documentation = views.find((view) => view.id === 'vsgit.documentation');
+  const extension = read('src/extension.ts');
+  const provider = read('src/webviews/documentation/DocumentationProvider.ts');
+  const client = read('resources/documentation.js');
+  const readme = read('README.md');
+  const hiddenCommands = new Set(
+    (pkg.contributes?.menus?.commandPalette ?? [])
+      .filter((entry) => entry.when === 'false')
+      .map((entry) => entry.command),
+  );
+  const operationCount = pkg.contributes.commands.length;
+  const paletteCount = operationCount - hiddenCommands.size;
+
+  assert.ok(documentation, 'documentation view is contributed');
+  assert.strictEqual(views.at(-1)?.id, 'vsgit.documentation', 'documentation is the bottom view');
+  assert.strictEqual(documentation.type, 'webview', 'documentation is a webview screen');
+  assert.ok(
+    pkg.contributes.commands.some((command) => command.command === 'vsgit.documentation.open'),
+    'full documentation panel command is contributed',
+  );
+  assert.ok(
+    extension.includes('DocumentationProvider.viewType'),
+    'documentation webview provider is registered',
+  );
+  assert.ok(
+    extension.includes('vscode.commands.registerCommand("vsgit.documentation.open"'),
+    'full documentation panel command is registered',
+  );
+  assert.ok(provider.includes('this.allowedCommands.has(message.command)'), 'run-command bridge validates command ids');
+  assert.ok(client.includes('data.operationCategories'), 'client renders the manifest-driven operation catalog');
+  assert.ok(client.includes('data.glossary'), 'client renders the Git glossary');
+  assert.ok(client.includes('data.components'), 'client renders extension components');
+  assert.ok(
+    readme.includes(`all **${operationCount} contributed operations**`),
+    'README operation count matches the manifest',
+  );
+  assert.ok(
+    readme.includes(`**${paletteCount} Command Palette operations**`),
+    'README palette count matches the manifest',
+  );
+  assert.ok(
+    readme.includes(`**${hiddenCommands.size} contextual actions**`),
+    'README contextual-action count matches the manifest',
+  );
+});

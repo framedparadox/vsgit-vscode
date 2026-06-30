@@ -24,6 +24,10 @@ export function historyHtml(
   * { box-sizing: border-box; }
   body { margin: 0; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size);
     color: var(--vscode-foreground); background: var(--vscode-editor-background); }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  button:focus-visible, input:focus-visible, select:focus-visible, [role="button"]:focus-visible,
+  [role="option"]:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
   #toolbar { position: sticky; top: 0; z-index: 5; display: flex; gap: 6px; align-items: center; padding: 6px 8px;
     background: var(--vscode-sideBar-background); border-bottom: 1px solid var(--vscode-panel-border); }
   #toolbar input, #toolbar select, #toolbar button {
@@ -84,7 +88,8 @@ export function historyHtml(
     color: var(--vscode-descriptionForeground); margin-bottom: 4px; }
   #details .files-view-toggle { margin-left: auto; display: inline-flex; gap: 2px; }
   .fv-btn { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px;
-    border-radius: 4px; cursor: pointer; color: var(--vscode-icon-foreground, var(--vscode-foreground)); }
+    padding: 0; border: 0; background: transparent; border-radius: 4px; cursor: pointer;
+    color: var(--vscode-icon-foreground, var(--vscode-foreground)); }
   .fv-btn:hover { background: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
   .fv-btn.active { background: var(--vscode-inputOption-activeBackground, rgba(128,128,128,0.25)); }
   .fv-btn .codicon { font-size: 16px; line-height: 16px; color: currentColor; opacity: 0.85; }
@@ -108,21 +113,28 @@ export function historyHtml(
   .tree-folder .fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tree-children.collapsed { display: none; }
   .empty { padding: 16px; color: var(--vscode-descriptionForeground); }
+  @media (forced-colors: active) {
+    .commit-item, .file-row, .tree-folder, button { forced-color-adjust: auto; }
+    .commit-item.selected, [role="button"]:focus-visible, [role="option"]:focus-visible {
+      outline: 2px solid CanvasText; outline-offset: -2px;
+    }
+  }
 </style>
 </head>
 <body>
+  <div id="aria-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
   <div id="toolbar">
-    <input id="search" type="text" placeholder="Filter commits…" />
-    <select id="searchBy"><option value="message">Message</option><option value="author">Author</option></select>
+    <input id="search" type="text" placeholder="Filter commits…" aria-label="Filter commits" />
+    <select id="searchBy" aria-label="Filter field"><option value="message">Message</option><option value="author">Author</option></select>
     <label><input id="allBranches" type="checkbox" checked /> All branches</label>
     <button id="btnCompare" title="Compare Branches…">⇄ Compare</button>
     <button id="btnFilter" title="Filter by Branch…">⎇ Branch</button>
-    <button id="refresh" title="Refresh">↺</button>
+    <button id="refresh" title="Refresh" aria-label="Refresh history">↺</button>
   </div>
-  <div id="scopeBanner"><span id="scopeText"></span><button id="clearCompare">Clear</button></div>
+  <div id="scopeBanner" aria-live="polite"><span id="scopeText"></span><button id="clearCompare">Clear</button></div>
   <div id="layout">
-    <div id="list"><div class="empty">Loading…</div></div>
-    <div id="details"><div class="empty">Select a commit to see its details.</div></div>
+    <div id="list" role="listbox" aria-label="Commit history"><div class="empty">Loading…</div></div>
+    <div id="details" aria-live="polite"><div class="empty">Select a commit to see its details.</div></div>
   </div>
 <script nonce="${nonce}">
 const vscode = acquireVsCodeApi();
@@ -131,6 +143,18 @@ let commits = [], selected = null, hasMore = false, compareMode = null, filePath
 // toggle the Git Graph commit-details pane offers. Persisted across reloads.
 let fileViewMode = (vscode.getState() || {}).historyFileViewMode || 'tree';
 let detailsData = null; // { commit, files } — cached so the toggle re-renders.
+const announce = (message) => {
+  const status = document.getElementById('aria-status');
+  status.textContent = '';
+  requestAnimationFrame(() => { status.textContent = message; });
+};
+function keyboardClick(node, handler) {
+  node.addEventListener('keydown', (event) => {
+    if (event.target !== node || (event.key !== 'Enter' && event.key !== ' ')) return;
+    event.preventDefault();
+    handler(event);
+  });
+}
 
 const ICON_TREE = '<i class="codicon codicon-list-tree"></i>';
 const ICON_LIST = '<i class="codicon codicon-list-flat"></i>';
@@ -146,6 +170,10 @@ function render() {
     const item = document.createElement('div');
     item.className = 'commit-item' + (c.sha === selected ? ' selected' : '');
     item.dataset.sha = c.sha;
+    item.tabIndex = 0;
+    item.setAttribute('role', 'option');
+    item.setAttribute('aria-selected', String(c.sha === selected));
+    item.setAttribute('aria-label', c.subject + ', commit ' + c.shortSha + ', by ' + c.authorName);
     const refs = (c.refs || []).map((rf) => '<span class="ref ' + esc(rf.kind) + '">' + esc(rf.name) + '</span>').join('');
     item.innerHTML =
       '<div class="commit-bullet"></div>' +
@@ -157,6 +185,14 @@ function render() {
         '</div>' +
       '</div>';
     item.addEventListener('click', () => select(c.sha));
+    keyboardClick(item, () => select(c.sha));
+    item.addEventListener('keydown', (e) => {
+      if ((e.shiftKey && e.key === 'F10') || e.key === 'ContextMenu') {
+        e.preventDefault();
+        select(c.sha);
+        vscode.postMessage({ type: 'context', sha: c.sha });
+      }
+    });
     item.addEventListener('contextmenu', (e) => { e.preventDefault(); select(c.sha); vscode.postMessage({ type: 'context', sha: c.sha }); });
     frag.appendChild(item);
   });
@@ -174,7 +210,11 @@ function render() {
 
 function select(sha) {
   selected = sha;
-  document.querySelectorAll('.commit-item').forEach((el) => el.classList.toggle('selected', el.dataset.sha === sha));
+  document.querySelectorAll('.commit-item').forEach((el) => {
+    const isSelected = el.dataset.sha === sha;
+    el.classList.toggle('selected', isSelected);
+    el.setAttribute('aria-selected', String(isSelected));
+  });
   vscode.postMessage({ type: 'select', sha });
 }
 
@@ -194,8 +234,8 @@ function renderDetails(c, files) {
     '<div class="files-head">' +
       '<span>' + files.length + ' changed file' + (files.length === 1 ? '' : 's') + '</span>' +
       '<span class="files-view-toggle">' +
-        '<span id="fvTree" class="fv-btn" title="Tree View">' + ICON_TREE + '</span>' +
-        '<span id="fvList" class="fv-btn" title="List View">' + ICON_LIST + '</span>' +
+        '<button type="button" id="fvTree" class="fv-btn" title="Tree View" aria-label="Tree View">' + ICON_TREE + '</button>' +
+        '<button type="button" id="fvList" class="fv-btn" title="List View" aria-label="List View">' + ICON_LIST + '</button>' +
       '</span>' +
     '</div>' +
     '<div id="files"></div>';
@@ -203,6 +243,7 @@ function renderDetails(c, files) {
   document.getElementById('fvTree').addEventListener('click', () => setFileViewMode('tree'));
   document.getElementById('fvList').addEventListener('click', () => setFileViewMode('list'));
   renderFilePane(c.sha, files);
+  announce('Selected ' + c.subject + ', ' + files.length + ' changed file' + (files.length === 1 ? '' : 's') + '.');
 }
 
 function renderFilePane(sha, files) {
@@ -231,8 +272,12 @@ function makeFileRow(sha, f, label) {
   const code = String(f.status || 'M').charAt(0).toUpperCase();
   row.className = 'file-row ' + code;
   row.title = f.path;
+  row.tabIndex = 0;
+  row.setAttribute('role', 'button');
+  row.setAttribute('aria-label', f.path + ', status ' + code + ', open diff');
   row.innerHTML = '<span class="st">' + esc(code) + '</span><span class="fp">' + esc(label) + '</span>';
   row.addEventListener('click', () => vscode.postMessage({ type: 'openFile', sha, path: f.path }));
+  keyboardClick(row, () => vscode.postMessage({ type: 'openFile', sha, path: f.path }));
   return row;
 }
 
@@ -264,6 +309,10 @@ function renderTreeLevel(sha, node, parent, depth) {
     const dir = node.dirs.get(name);
     const folder = document.createElement('div');
     folder.className = 'tree-folder';
+    folder.tabIndex = 0;
+    folder.setAttribute('role', 'button');
+    folder.setAttribute('aria-label', name + ', folder');
+    folder.setAttribute('aria-expanded', 'true');
     folder.style.paddingLeft = (4 + depth * 14) + 'px';
     folder.innerHTML = '<span class="chev expanded">' + ICON_CHEVRON + '</span><span class="fname">' + esc(name) + '</span>';
     const children = document.createElement('div');
@@ -272,7 +321,9 @@ function renderTreeLevel(sha, node, parent, depth) {
     folder.addEventListener('click', () => {
       const collapsed = children.classList.toggle('collapsed');
       folder.querySelector('.chev').classList.toggle('expanded', !collapsed);
+      folder.setAttribute('aria-expanded', String(!collapsed));
     });
+    keyboardClick(folder, () => folder.click());
     parent.appendChild(folder);
     parent.appendChild(children);
   });
@@ -338,6 +389,7 @@ window.addEventListener('message', (e) => {
     filePath = m.filePath || null;
     applyCompareBanner();
     render();
+    announce(commits.length + ' commit' + (commits.length === 1 ? '' : 's') + ' loaded.');
   } else if (m.type === 'details') {
     renderDetails(m.commit, m.files);
   }

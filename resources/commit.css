@@ -9,6 +9,26 @@ body {
   background-color: var(--vscode-sideBar-background);
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+button:focus-visible,
+[role="button"]:focus-visible,
+textarea:focus-visible,
+input:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
+
 .empty {
   padding: 16px 12px;
   color: var(--vscode-descriptionForeground);
@@ -139,6 +159,21 @@ body {
 }
 .split-caret .codicon { font-size: 14px; }
 .split-button .primary:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 2px; }
+
+@media (forced-colors: active) {
+  .file-row,
+  .tree-folder,
+  .group-header,
+  button {
+    forced-color-adjust: auto;
+  }
+
+  .file-row:focus-visible,
+  .tree-folder:focus-visible,
+  .group-header:focus-visible {
+    outline: 2px solid CanvasText;
+  }
+}
 
 /* Dropdown menu of commit actions — drops down below the split button. */
 .commit-menu {

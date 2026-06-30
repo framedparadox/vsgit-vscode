@@ -14,6 +14,10 @@ export function configHtml(nonce: string, cspSource: string): string {
 <style nonce="${nonce}">
   body { margin: 0; padding: 12px; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size);
     color: var(--vscode-foreground); background: var(--vscode-editor-background); }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  button:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder); outline-offset: 2px; }
   h2 { margin: 0 0 8px; font-size: 1.1em; }
   .scope { margin-bottom: 12px; display: flex; flex-wrap: wrap; gap: 4px; }
   .scope button { font-family: inherit; padding: 4px 10px; border: 1px solid var(--vscode-panel-border);
@@ -30,7 +34,7 @@ export function configHtml(nonce: string, cspSource: string): string {
     background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, transparent); padding: 3px 5px; border-radius: 2px; width: 80px; }
   select { font-family: inherit; color: var(--vscode-input-foreground);
     background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, transparent); padding: 3px 5px; border-radius: 2px; }
-  .del { cursor: pointer; color: var(--vscode-descriptionForeground); }
+  .del { cursor: pointer; color: var(--vscode-descriptionForeground); border: 0; background: transparent; }
   .del:hover { color: var(--vscode-errorForeground); }
   #add { margin-top: 12px; display: flex; gap: 6px; }
   #add input { flex: 1; }
@@ -49,16 +53,20 @@ export function configHtml(nonce: string, cspSource: string): string {
   .tab-content { display: none; }
   .tab-content.active { display: block; }
   .dim-cell { color: var(--vscode-descriptionForeground); }
+  @media (forced-colors: active) {
+    button, input, select, table { forced-color-adjust: auto; }
+  }
 </style>
 </head>
 <body>
+  <div id="aria-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
   <h2>Git Config</h2>
-  <div class="scope">
-    <button data-scope="local" class="active">Local (repo)</button>
-    <button data-scope="global">Global (user)</button>
-    <button data-scope="system">System</button>
-    <button data-scope="remotes">Remotes</button>
-    <button data-scope="extension">Extension Settings</button>
+  <div class="scope" role="tablist" aria-label="Configuration scope">
+    <button type="button" role="tab" aria-selected="true" data-scope="local" class="active">Local (repo)</button>
+    <button type="button" role="tab" aria-selected="false" data-scope="global">Global (user)</button>
+    <button type="button" role="tab" aria-selected="false" data-scope="system">System</button>
+    <button type="button" role="tab" aria-selected="false" data-scope="remotes">Remotes</button>
+    <button type="button" role="tab" aria-selected="false" data-scope="extension">Extension Settings</button>
   </div>
 
   <!-- Git config tabs (local/global/system) -->
@@ -69,8 +77,8 @@ export function configHtml(nonce: string, cspSource: string): string {
       <tbody id="rows"></tbody>
     </table>
     <div id="add">
-      <input id="newKey" placeholder="section.key" />
-      <input id="newVal" placeholder="value" />
+      <input id="newKey" placeholder="section.key" aria-label="Configuration key" />
+      <input id="newVal" placeholder="value" aria-label="Configuration value" />
       <button id="addBtn">Add</button>
     </div>
   </div>
@@ -82,8 +90,8 @@ export function configHtml(nonce: string, cspSource: string): string {
       <tbody id="remotes-rows"></tbody>
     </table>
     <div id="remotes-add-form">
-      <input id="remoteName" placeholder="Remote name (e.g. origin)" />
-      <input id="remoteUrl" placeholder="URL" />
+      <input id="remoteName" placeholder="Remote name (e.g. origin)" aria-label="Remote name" />
+      <input id="remoteUrl" placeholder="URL" aria-label="Remote URL" />
       <button id="remoteAddBtn" class="action-btn">Add Remote</button>
     </div>
   </div>
@@ -93,30 +101,30 @@ export function configHtml(nonce: string, cspSource: string): string {
     <div class="section-title">Refresh</div>
     <div class="setting-row">
       <div class="setting-label"><strong>Auto Refresh</strong><small>Refresh views when repository state changes outside VS Code</small></div>
-      <input type="checkbox" id="ext-autoRefresh" />
+      <input type="checkbox" id="ext-autoRefresh" aria-label="Auto Refresh" />
     </div>
     <div class="section-title">Auto Fetch</div>
     <div class="setting-row">
       <div class="setting-label"><strong>Enable Auto Fetch</strong><small>Automatically fetch remotes in the background</small></div>
-      <input type="checkbox" id="ext-autoFetch.enabled" />
+      <input type="checkbox" id="ext-autoFetch.enabled" aria-label="Enable Auto Fetch" />
     </div>
     <div class="setting-row">
       <div class="setting-label"><strong>Fetch Interval (minutes)</strong><small>How often to auto-fetch</small></div>
-      <input type="number" id="ext-autoFetch.intervalMinutes" min="1" max="60" />
+      <input type="number" id="ext-autoFetch.intervalMinutes" min="1" max="60" aria-label="Fetch Interval in minutes" />
     </div>
     <div class="setting-row">
       <div class="setting-label"><strong>Incoming Commit Notifications</strong><small>Notify when auto-fetch finds new commits</small></div>
-      <input type="checkbox" id="ext-autoFetch.notify" />
+      <input type="checkbox" id="ext-autoFetch.notify" aria-label="Incoming Commit Notifications" />
     </div>
     <div class="section-title">Safety</div>
     <div class="setting-row">
       <div class="setting-label"><strong>Confirm Destructive Actions</strong><small>Show confirmation for hard reset, force push, etc.</small></div>
-      <input type="checkbox" id="ext-confirmDestructiveActions" />
+      <input type="checkbox" id="ext-confirmDestructiveActions" aria-label="Confirm Destructive Actions" />
     </div>
     <div class="section-title">Pull</div>
     <div class="setting-row">
       <div class="setting-label"><strong>Default Pull Mode</strong><small>Strategy used when pulling</small></div>
-      <select id="ext-defaultPullMode">
+      <select id="ext-defaultPullMode" aria-label="Default Pull Mode">
         <option value="merge">Merge</option>
         <option value="rebase">Rebase</option>
       </select>
@@ -128,6 +136,11 @@ const vscode = acquireVsCodeApi();
 let scope = 'local';
 let entries = [];
 let remotes = [];
+const announce = (message) => {
+  const status = document.getElementById('aria-status');
+  status.textContent = '';
+  requestAnimationFrame(() => { status.textContent = message; });
+};
 
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
@@ -135,7 +148,11 @@ function isGitScope(s) { return s === 'local' || s === 'global' || s === 'system
 function editable() { return scope !== 'system'; }
 
 function showTab(s) {
-  document.querySelectorAll('.scope button').forEach(b => b.classList.toggle('active', b.dataset.scope === s));
+  document.querySelectorAll('.scope button').forEach(b => {
+    const active = b.dataset.scope === s;
+    b.classList.toggle('active', active);
+    b.setAttribute('aria-selected', String(active));
+  });
   document.getElementById('tab-gitconfig').classList.toggle('active', isGitScope(s));
   document.getElementById('tab-remotes').classList.toggle('active', s === 'remotes');
   document.getElementById('tab-extension').classList.toggle('active', s === 'extension');
@@ -155,7 +172,7 @@ function render() {
       '<td>' + (editable()
         ? '<input data-i="' + i + '" value="' + esc(e.value) + '" />'
         : esc(e.value)) + '</td>' +
-      '<td>' + (editable() ? '<span class="del" data-del="' + i + '">✕</span>' : '') + '</td>';
+      '<td>' + (editable() ? '<button type="button" class="del" data-del="' + i + '" aria-label="Delete ' + esc(e.key) + '">✕</button>' : '') + '</td>';
     tbody.appendChild(tr);
   });
   tbody.querySelectorAll('input[data-i]').forEach(inp =>
@@ -179,7 +196,7 @@ function renderRemotes() {
       '<td class="key">' + esc(r.name) + '</td>' +
       '<td>' + esc(r.fetchUrl || '') + '</td>' +
       '<td>' + esc(r.pushUrl || '') + '</td>' +
-      '<td><span class="del" data-remove="' + esc(r.name) + '">✕</span></td>';
+      '<td><button type="button" class="del" data-remove="' + esc(r.name) + '" aria-label="Remove remote ' + esc(r.name) + '">✕</button></td>';
     tbody.appendChild(tr);
   });
   tbody.querySelectorAll('[data-remove]').forEach(el =>
@@ -261,9 +278,18 @@ document.getElementById('ext-defaultPullMode').addEventListener('change', (e) =>
 
 window.addEventListener('message', (e) => {
   const msg = e.data;
-  if (msg.type === 'entries') { scope = msg.scope; entries = msg.entries; render(); }
-  else if (msg.type === 'remotes') { remotes = msg.remotes || []; renderRemotes(); }
-  else if (msg.type === 'extensionSettings') { renderExtensionSettings(msg.settings || {}); }
+  if (msg.type === 'entries') {
+    scope = msg.scope; entries = msg.entries; render();
+    announce(entries.length + ' configuration entr' + (entries.length === 1 ? 'y' : 'ies') + ' loaded for ' + scope + ' scope.');
+  }
+  else if (msg.type === 'remotes') {
+    remotes = msg.remotes || []; renderRemotes();
+    announce(remotes.length + ' remote' + (remotes.length === 1 ? '' : 's') + ' loaded.');
+  }
+  else if (msg.type === 'extensionSettings') {
+    renderExtensionSettings(msg.settings || {});
+    announce('Extension settings loaded.');
+  }
 });
 
 vscode.postMessage({ type: 'load', scope });

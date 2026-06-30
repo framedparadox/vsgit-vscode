@@ -8,6 +8,27 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+button:focus-visible,
+input:focus-visible,
+[role="button"]:focus-visible,
+[role="combobox"]:focus-visible,
+tr.commit-row:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
 body {
   font-family: var(--vscode-font-family);
   font-size: var(--vscode-font-size);
@@ -172,7 +193,16 @@ body {
   user-select: none;
   margin-right: 10px;
 }
-#showRemoteBranchesControl input { display: none; }
+#showRemoteBranchesControl input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+#showRemoteBranchesControl:focus-within .customCheckbox {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
 .customCheckbox {
   display: inline-block;
   width: 14px;
@@ -757,6 +787,26 @@ tr.cdv-row > td.cdv-cell {
   line-height: 1;
 }
 .modal-close:hover { background-color: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)); }
+
+@media (forced-colors: active) {
+  .graph-line,
+  .graph-node,
+  .commit-row,
+  .file-row,
+  .tree-folder-row,
+  .tb-btn,
+  .dropdownCurrentValue {
+    forced-color-adjust: auto;
+  }
+
+  tr.commit-row.selected,
+  tr.commit-row:focus-visible,
+  .file-row:focus-visible,
+  .tree-folder-row:focus-visible {
+    outline: 2px solid CanvasText;
+    outline-offset: -2px;
+  }
+}
 .modal-body {
   display: flex;
   flex-direction: column;

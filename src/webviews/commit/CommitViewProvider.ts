@@ -285,6 +285,7 @@ export class CommitViewProvider
   <title>Commit</title>
 </head>
 <body>
+  <div id="aria-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
   <div id="empty" class="empty">No Git repository is active.</div>
   <div id="root" style="display:none">
     <div id="message-box">

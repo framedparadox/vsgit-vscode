@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { Repository } from "../git/Repository";
 import { ReflogEntry } from "../git/parsers/reflog";
+import { accessibleTreeItem } from "./treeAccessibility";
 
 export type ReflogNode =
   | { type: "entry"; repo: Repository; entry: ReflogEntry }
@@ -52,7 +53,7 @@ export class ReflogProvider implements vscode.TreeDataProvider<ReflogNode>, vsco
     if (node.type === "info") {
       const item = new vscode.TreeItem(node.label);
       item.description = "—";
-      return item;
+      return accessibleTreeItem(item, node.label);
     }
     const e = node.entry;
     const item = new vscode.TreeItem(
@@ -62,7 +63,10 @@ export class ReflogProvider implements vscode.TreeDataProvider<ReflogNode>, vsco
     item.iconPath = new vscode.ThemeIcon(actionIcon(e.action));
     item.contextValue = "vsgit.reflogEntry";
     item.tooltip = `${e.sha}\n${new Date(e.date * 1000).toLocaleString()}`;
-    return item;
+    return accessibleTreeItem(
+      item,
+      `${e.selector}, ${e.action}${e.message ? `, ${e.message}` : ""}, commit ${e.shortSha}`,
+    );
   }
 
   getChildren(node?: ReflogNode): ReflogNode[] {

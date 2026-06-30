@@ -56,6 +56,7 @@ function laneColor(idx) { return CONFIG.palette[idx % CONFIG.palette.length]; }
 let graphData = null;       // full payload from the host
 let layoutRows = [];        // output of buildLayout
 let selectedSha = null;
+let lastAnnouncedCommitCount = -1;  // avoid re-announcing the same count on refresh
 let compareSha = null;      // 2nd commit for CTRL/CMD-click comparison
 let findMatches = [];
 let findIndex = -1;
@@ -147,6 +148,23 @@ function paintToolbarIcons() {
 function alterClass(elem, className, enable) { elem.classList.toggle(className, enable); }
 function formatCommaSeparatedList(vals) { return vals.length ? vals.join(', ') : ''; }
 const CLASS_SELECTED = 'selected';
+function announce(message) {
+  const status = document.getElementById('aria-status');
+  if (!status) return;
+  status.textContent = '';
+  requestAnimationFrame(() => { status.textContent = message; });
+}
+function makeKeyboardClickable(node, label, handler) {
+  node.tabIndex = 0;
+  node.setAttribute('role', 'button');
+  node.setAttribute('aria-label', label);
+  node.addEventListener('click', handler);
+  node.addEventListener('keydown', (event) => {
+    if (event.target !== node || (event.key !== 'Enter' && event.key !== ' ')) return;
+    event.preventDefault();
+    handler(event);
+  });
+}
 
 class Dropdown {
   constructor(id, showInfo, multipleAllowed, dropdownType, changeCallback) {
@@ -168,6 +186,7 @@ class Dropdown {
     this.filterInput = filter.appendChild(document.createElement('input'));
     this.filterInput.className = 'dropdownFilterInput';
     this.filterInput.placeholder = 'Filter ' + dropdownType + '...';
+    this.filterInput.setAttribute('aria-label', 'Filter ' + dropdownType);
     this.optionsElem = this.menuElem.appendChild(document.createElement('div'));
     this.optionsElem.className = 'dropdownOptions';
     this.noResultsElem = this.menuElem.appendChild(document.createElement('div'));
@@ -175,6 +194,11 @@ class Dropdown {
     this.noResultsElem.innerHTML = 'No results found.';
     this.currentValueElem = this.elem.appendChild(document.createElement('div'));
     this.currentValueElem.className = 'dropdownCurrentValue';
+    this.currentValueElem.tabIndex = 0;
+    this.currentValueElem.setAttribute('role', 'combobox');
+    this.currentValueElem.setAttribute('aria-haspopup', 'listbox');
+    this.currentValueElem.setAttribute('aria-expanded', 'false');
+    this.optionsElem.setAttribute('role', 'listbox');
     alterClass(this.elem, 'multi', multipleAllowed);
     this.elem.appendChild(this.menuElem);
 
@@ -184,6 +208,7 @@ class Dropdown {
         this.dropdownVisible = !this.dropdownVisible;
         if (this.dropdownVisible) { this.filterInput.value = ''; this.filter(); }
         this.elem.classList.toggle('dropdownOpen');
+        this.currentValueElem.setAttribute('aria-expanded', String(this.dropdownVisible));
         if (this.dropdownVisible) this.filterInput.focus();
       } else if (this.dropdownVisible) {
         if (e.target.closest('.dropdown') !== this.elem) {
@@ -198,6 +223,54 @@ class Dropdown {
     }, true);
     document.addEventListener('contextmenu', () => this.close(), true);
     this.filterInput.addEventListener('keyup', () => this.filter());
+    this.filterInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        this.close();
+        this.currentValueElem.focus();
+      } else if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        const first = Array.from(this.optionsElem.children).find((option) => option.style.display !== 'none');
+        if (first) first.focus();
+      }
+    });
+    this.optionsElem.addEventListener('keydown', (event) => {
+      const option = event.target.closest('.dropdownOption');
+      if (!option) return;
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        this.onOptionClick(Number(option.dataset.id));
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        this.close();
+        this.currentValueElem.focus();
+        return;
+      }
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+      event.preventDefault();
+      const visible = Array.from(this.optionsElem.children).filter((entry) => entry.style.display !== 'none');
+      const index = visible.indexOf(option);
+      const next = event.key === 'ArrowDown'
+        ? visible[(index + 1) % visible.length]
+        : visible[(index - 1 + visible.length) % visible.length];
+      if (next) next.focus();
+    });
+    this.currentValueElem.addEventListener('keydown', (event) => {
+      if (!['Enter', ' ', 'ArrowDown', 'Escape'].includes(event.key)) return;
+      event.preventDefault();
+      if (event.key === 'Escape') {
+        this.close();
+        return;
+      }
+      this.dropdownVisible = true;
+      this.elem.classList.add('dropdownOpen');
+      this.currentValueElem.setAttribute('aria-expanded', 'true');
+      this.filterInput.value = '';
+      this.filter();
+      this.filterInput.focus();
+    });
   }
 
   setOptions(options, optionsSelected) {
@@ -219,6 +292,7 @@ class Dropdown {
   close() {
     this.elem.classList.remove('dropdownOpen');
     this.dropdownVisible = false;
+    this.currentValueElem.setAttribute('aria-expanded', 'false');
     this.clearDoubleClickTimeout();
   }
 
@@ -230,7 +304,7 @@ class Dropdown {
     let html = '';
     for (let i = 0; i < this.options.length; i++) {
       const escapedName = esc(this.options[i].name);
-      html += '<div class="dropdownOption' + (this.optionsSelected[i] ? ' ' + CLASS_SELECTED : '') + '" data-id="' + i + '" title="' + escapedName + '">' +
+      html += '<div class="dropdownOption' + (this.optionsSelected[i] ? ' ' + CLASS_SELECTED : '') + '" role="option" tabindex="-1" aria-selected="' + String(this.optionsSelected[i]) + '" data-id="' + i + '" title="' + escapedName + '">' +
         (this.multipleAllowed && this.optionsSelected[i] ? '<div class="dropdownOptionMultiSelected">' + SVG_ICONS.check + '</div>' : '') +
         escapedName +
         (this.showInfo ? '<div class="dropdownOptionInfo" title="' + esc(this.options[i].value) + '">' + SVG_ICONS.info + '</div>' : '') +
@@ -741,6 +815,8 @@ function renderTable(rows) {
     const tr = document.createElement('tr');
     tr.className = 'commit-row' + (commit.kind === 'uncommitted' ? ' uncommitted' : '');
     tr.dataset.sha = commit.sha;
+    tr.tabIndex = 0;
+    tr.setAttribute('aria-label', `${commit.message}, ${commit.kind === 'uncommitted' ? 'uncommitted changes' : `commit ${commit.shortSha}, by ${commit.author || 'unknown author'}`}`);
     if (commit.sha === selectedSha) tr.classList.add('selected');
 
     // Column order mirrors VsGit / EGit history: Graph | Description | Author |
@@ -795,6 +871,18 @@ function renderTable(rows) {
     tr.appendChild(tdId);
 
     tr.addEventListener('click', (e) => selectCommit(commit, tr, e));
+    tr.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        selectCommit(commit, tr, e);
+      } else if ((e.shiftKey && e.key === 'F10') || e.key === 'ContextMenu') {
+        e.preventDefault();
+        if (commit.kind !== 'uncommitted') {
+          const rect = tr.getBoundingClientRect();
+          showCommitMenu(rect.left + 24, rect.top + Math.min(rect.height, 24), commit);
+        }
+      }
+    });
     tr.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       if (commit.kind === 'uncommitted') return;
@@ -1028,9 +1116,9 @@ function openExpandedRow(commit, tr) {
     '<div id="cdvHeader">' +
       '<span id="cdvHeaderTitle">' + title + '</span>' +
       '<span class="cdvHeaderSpacer"></span>' +
-      '<div id="cdvViewTree" class="cdvHeaderBtn cdvViewBtn" title="Tree View">' + SVG_ICONS.fileTree + '</div>' +
-      '<div id="cdvViewList" class="cdvHeaderBtn cdvViewBtn" title="List View">' + SVG_ICONS.fileList + '</div>' +
-      '<div id="cdvClose" class="cdvHeaderBtn" title="Close">' + SVG_ICONS.close + '</div>' +
+      '<button type="button" id="cdvViewTree" class="cdvHeaderBtn cdvViewBtn" title="Tree View" aria-label="Tree View">' + SVG_ICONS.fileTree + '</button>' +
+      '<button type="button" id="cdvViewList" class="cdvHeaderBtn cdvViewBtn" title="List View" aria-label="List View">' + SVG_ICONS.fileList + '</button>' +
+      '<button type="button" id="cdvClose" class="cdvHeaderBtn" title="Close" aria-label="Close commit details">' + SVG_ICONS.close + '</button>' +
     '</div>' +
     '<div id="cdvBody">' +
       '<div id="cdvSummary"></div>' +
@@ -1235,7 +1323,9 @@ function makeFileRow(f, onOpen, label) {
   fileRow.appendChild(ext);
   fileRow.appendChild(p);
   fileRow.appendChild(change);
-  if (onOpen) fileRow.addEventListener('click', () => onOpen(f));
+  if (onOpen) {
+    makeKeyboardClickable(fileRow, `${f.path}, ${CDV_STATUS_LABELS[code] || 'Modified'}, open diff`, () => onOpen(f));
+  }
   return fileRow;
 }
 
@@ -1281,13 +1371,15 @@ function renderTreeLevel(node, parent, onOpen, depth) {
     fname.textContent = name;
     folderRow.appendChild(chev);
     folderRow.appendChild(fname);
+    folderRow.setAttribute('aria-expanded', 'true');
     const childrenWrap = document.createElement('div');
     childrenWrap.className = 'tree-children';
     renderTreeLevel(dir, childrenWrap, onOpen, depth + 1);
-    folderRow.addEventListener('click', (e) => {
+    makeKeyboardClickable(folderRow, `${name}, folder`, (e) => {
       e.stopPropagation();
       const collapsed = childrenWrap.classList.toggle('collapsed');
       chev.classList.toggle('expanded', !collapsed);
+      folderRow.setAttribute('aria-expanded', String(!collapsed));
     });
     parent.appendChild(folderRow);
     parent.appendChild(childrenWrap);
@@ -1317,11 +1409,12 @@ function buildMenu(items) {
       const el = document.createElement('div');
       el.className = 'context-menu-item';
       el.textContent = it.label;
-      el.addEventListener('click', (e) => {
+      makeKeyboardClickable(el, it.label, (e) => {
         e.stopPropagation();
         menu.classList.remove('visible');
         it.action();
       });
+      el.setAttribute('role', 'menuitem');
       menu.appendChild(el);
     }
   });
@@ -1334,6 +1427,7 @@ function placeMenu(menu, x, y) {
   const r = menu.getBoundingClientRect();
   if (r.right > window.innerWidth) menu.style.left = Math.max(0, window.innerWidth - r.width - 4) + 'px';
   if (r.bottom > window.innerHeight) menu.style.top = Math.max(0, window.innerHeight - r.height - 4) + 'px';
+  menu.querySelector('[role="menuitem"]')?.focus();
 }
 function showCommitMenu(x, y, commit) {
   const sha = commit.sha;
@@ -1586,6 +1680,7 @@ window.addEventListener('message', (event) => {
       document.getElementById('loading').style.display = 'none';
       document.getElementById('empty-state').style.display = 'block';
       document.getElementById('graph-body').innerHTML = '';
+      announce('No Git repository is active.');
       break;
     case 'graphData': {
       graphData = msg.data;
@@ -1621,8 +1716,12 @@ window.addEventListener('message', (event) => {
         }
       }
       applyTrace();
-      document.getElementById('commit-count').textContent =
-        graphData.commits.filter((c) => c.kind !== 'uncommitted').length + ' commits';
+      const commitCount = graphData.commits.filter((c) => c.kind !== 'uncommitted').length;
+      document.getElementById('commit-count').textContent = commitCount + ' commits';
+      if (commitCount !== lastAnnouncedCommitCount) {
+        lastAnnouncedCommitCount = commitCount;
+        announce(`${commitCount} commits loaded.`);
+      }
       break;
     }
     case 'files':

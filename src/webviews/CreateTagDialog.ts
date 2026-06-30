@@ -175,13 +175,19 @@ function createTagHtml(nonce: string, cspSource: string, shaLabel: string): stri
     background: var(--vscode-button-secondaryBackground);
     color: var(--vscode-button-secondaryForeground);
   }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  button:focus-visible, input:focus-visible, textarea:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder); outline-offset: 2px;
+  }
+  @media (forced-colors: active) { button, input, textarea, form { forced-color-adjust: auto; } }
 </style>
 </head>
 <body>
   <div class="backdrop">
-    <form id="form" autocomplete="off">
+    <form id="form" autocomplete="off" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
       <header>
-        <h1>Create Tag</h1>
+        <h1 id="dialog-title">Create Tag</h1>
         <button type="button" class="close" id="close" title="Close" aria-label="Close">&times;</button>
       </header>
       <main>
@@ -218,6 +224,7 @@ function createTagHtml(nonce: string, cspSource: string, shaLabel: string): stri
         <button type="button" id="cancel">Cancel</button>
         <button type="submit" id="create">Create Tag</button>
       </footer>
+      <div id="aria-status" class="sr-only" role="status" aria-live="assertive" aria-atomic="true"></div>
     </form>
   </div>
 <script nonce="${nonce}">
@@ -245,6 +252,7 @@ form.addEventListener('submit', (event) => {
   const message = messageInput.value.trim();
   if (!name) return;
   if (signInput.checked && !message) {
+    document.getElementById('aria-status').textContent = 'A message is required for a signed tag.';
     messageInput.focus();
     return;
   }

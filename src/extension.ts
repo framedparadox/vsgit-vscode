@@ -47,6 +47,7 @@ import { GraphStatusBarService } from "./services/GraphStatusBarService";
 import { registerAutoFetchCommands } from "./commands/autoFetch";
 import { registerCommitOpsCommands } from "./commands/commitOps";
 import { VsgitScmProvider } from "./views/ScmProvider";
+import { DocumentationProvider } from "./webviews/documentation/DocumentationProvider";
 
 export async function activate(
   context: vscode.ExtensionContext,
@@ -135,6 +136,23 @@ export async function activate(
     vscode.window.registerWebviewViewProvider(
       CommitViewProvider.viewType,
       commitProvider,
+    ),
+  );
+
+  // Searchable reference library: always available as the bottom sidebar view,
+  // with a command that opens the same content in a full editor panel.
+  const documentationProvider = new DocumentationProvider(
+    context.extensionUri,
+    context.extension.packageJSON,
+  );
+  context.subscriptions.push(
+    documentationProvider,
+    vscode.window.registerWebviewViewProvider(
+      DocumentationProvider.viewType,
+      documentationProvider,
+    ),
+    vscode.commands.registerCommand("vsgit.documentation.open", () =>
+      documentationProvider.openPanel(),
     ),
   );
 

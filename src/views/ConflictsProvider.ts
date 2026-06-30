@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { Repository } from "../git/Repository";
 import { FileChange } from "../git/parsers/status";
+import { accessibleTreeItem } from "./treeAccessibility";
 
 export type ConflictNode =
   | { type: "conflictRepo"; repo: Repository }
@@ -36,7 +37,10 @@ export class ConflictsProvider implements vscode.TreeDataProvider<ConflictNode>,
       );
       item.iconPath = new vscode.ThemeIcon("warning");
       item.contextValue = "vsgit.conflictRepo";
-      return item;
+      return accessibleTreeItem(
+        item,
+        `${label}, repository with conflicts`,
+      );
     }
 
     const item = new vscode.TreeItem(node.change.path);
@@ -49,7 +53,10 @@ export class ConflictsProvider implements vscode.TreeDataProvider<ConflictNode>,
       arguments: [node],
     };
     item.tooltip = node.change.path;
-    return item;
+    return accessibleTreeItem(
+      item,
+      `${node.change.path}, ${conflictDescription(node.change)}, conflicted file`,
+    );
   }
 
   getChildren(node?: ConflictNode): ConflictNode[] {

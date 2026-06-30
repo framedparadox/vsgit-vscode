@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Added
+- A **Documentation** webview at the bottom of the VsGit sidebar, plus a
+  full-screen **VsGit: Open Documentation** panel.
+- A searchable component guide and Git glossary with definitions, purpose, and
+  practical usage guidance.
+- A manifest-driven catalog covering all contributed operations and
+  distinguishing Command Palette entries from context-only actions.
+- Extension Host integration tests for activation, complete command
+  registration, repository refresh, and the full Documentation panel.
+- Native Node coverage gates (80% lines, 80% branches, 70% functions), published
+  in CI alongside the verified VSIX artifact.
+- Contributor guidance and a repeatable Marketplace release checklist.
+
 ### Fixed
 - **History graph rendering**: commit lanes now draw as continuous lines. The
   per-row `<canvas>` renderer drew pass-through branches in half-row segments, so
@@ -24,6 +37,15 @@
   prior draft if Amend is unchecked again untouched. The view's pure helpers
   (status labels, file-tree grouping, escaping) were extracted into a
   unit-tested module (`resources/commitView.js`).
+- All tree providers now expose complete screen-reader labels. Custom webview
+  rows, folders, menus, pickers, and rebase controls support keyboard operation,
+  visible focus, live announcements, and forced-colour mode.
+- Repository discovery now runs workspace probes concurrently, coalesces
+  overlapping scans, records scan duration, and loads submodule metadata only
+  when requested.
+- CI and tag publishing now enforce type checks, unit tests, coverage,
+  Extension Host integration, dependency audit, and inspection of the exact
+  packaged VSIX.
 
 ### Security
 - The askpass and editor IPC servers now require a per-session token (passed to
@@ -35,15 +57,22 @@
   values beginning with `-` (option injection) and the `ext::`/`fd::` remote
   transports, applied across the webview-reachable git operations and the diff
   content provider.
+- Declared untrusted and virtual workspaces unsupported because VsGit requires a
+  local checkout and executes repository Git configuration and hooks.
+- Updated development tooling and pinned audited transitive test dependencies;
+  `npm audit --audit-level=high` reports no vulnerabilities.
 
 ### Internal
 - Extracted `parseWorktreeList` and the graph-log line parser into dedicated,
   unit-tested parser modules. Test suite grows from 36 to 60 cases.
+- Added accessibility, Phase 10 contract, packaging, and integration coverage;
+  the Node suite now contains 184 passing tests.
 
 ### Docs
 - Rewrote the README with a detailed feature reference, settings table,
   architecture and security sections, and illustrated `docs/` diagrams of the
   Git Graph panel and the activity-bar trees.
+- Added `CONTRIBUTING.md` and `docs/MARKETPLACE_CHECKLIST.md`.
 
 ## [0.1.0] - 2026-06-01
 

@@ -2,10 +2,16 @@
 src/**
 out/**
 out-test/**
+out-integration/**
 node_modules/**
 esbuild.js
 tsconfig.json
 tsconfig.test.json
+tsconfig.integration.json
+.vscode-test.*
+scripts/**
+artifacts/**
+CONTRIBUTING.md
 **/*.map
 **/*.ts
 .gitignore

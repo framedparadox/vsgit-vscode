@@ -873,6 +873,7 @@ export class GraphPanel {
   <title>VsGit Graph</title>
 </head>
 <body>
+  <div id="aria-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
   <div id="shell">
     <!-- ── top control bar (vscode-git-graph layout) ──────────────────
          LEFT: Repo dropdown, Branches (multi-select) dropdown, Show Remote
@@ -881,7 +882,7 @@ export class GraphPanel {
     <div id="toolbar">
       <span id="repoControl"><span class="ctrl-label">Repo: </span><div id="repoDropdown" class="dropdown"></div></span>
       <span id="branchControl"><span class="ctrl-label">Branches: </span><div id="branchDropdown" class="dropdown"></div></span>
-      <label id="showRemoteBranchesControl"><input type="checkbox" id="showRemoteBranchesCheckbox" tabindex="-1"><span class="customCheckbox"></span>Show Remote Branches</label>
+      <label id="showRemoteBranchesControl"><input type="checkbox" id="showRemoteBranchesCheckbox"><span class="customCheckbox" aria-hidden="true"></span>Show Remote Branches</label>
       <button class="tb-btn after-control" id="tb-trace" title="Trace flow: ancestors / descendants / off" aria-label="Trace"><span class="tb-ico" data-icon="trace"></span><span class="tb-label">Trace</span></button>
       <span class="tb-spacer"></span>
       <span id="commit-count"></span>
@@ -925,7 +926,7 @@ export class GraphPanel {
            uniform coordinate space anchored to the table's left edge; ref pills +
            message text live in the Description column, and the abbreviated commit
            hash (Commit) is the LAST column. -->
-      <table id="graph-table">
+      <table id="graph-table" aria-label="Git commit graph">
         <colgroup>
           <col id="col-graph">
           <col id="col-desc">
@@ -959,12 +960,12 @@ export class GraphPanel {
     <button id="find-close" title="Close (Esc)">✕</button>
   </div>
 
-  <div id="context-menu" class="context-menu"></div>
+  <div id="context-menu" class="context-menu" role="menu" aria-label="Commit actions"></div>
 
   <div id="create-tag-modal" class="modal-backdrop" hidden>
-    <form id="create-tag-form" class="modal" autocomplete="off">
+    <form id="create-tag-form" class="modal" autocomplete="off" role="dialog" aria-modal="true" aria-labelledby="create-tag-title">
       <div class="modal-header">
-        <h2>Create Tag</h2>
+        <h2 id="create-tag-title">Create Tag</h2>
         <button type="button" class="modal-close" id="create-tag-close" title="Close" aria-label="Close">&times;</button>
       </div>
       <div class="modal-body">

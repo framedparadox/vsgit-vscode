@@ -18,6 +18,9 @@ export class RepositoryManager implements vscode.Disposable {
   private readonly watchers = new Map<string, fs.FSWatcher[]>();
   private readonly git = new GitExecutor(configuredGitPath(), shouldRunGitCommand);
   private activeRoot: string | undefined;
+  private scanInFlight: Promise<void> | undefined;
+  private lastScanDurationMs = 0;
+  private lastScanFolderCount = 0;
 
   private readonly _onDidChange = new vscode.EventEmitter<void>();
   /** Fires whenever the set of repos or any repo's state may have changed. */
@@ -79,21 +82,55 @@ export class RepositoryManager implements vscode.Disposable {
     this.git.setGitPath(configuredGitPath());
   }
 
-  /** Scan workspace folders for repositories and refresh everything. */
-  async scan(): Promise<void> {
+  /**
+   * Scan workspace folders for repositories and refresh everything.
+   *
+   * Workspace roots are discovered concurrently. Repeated activation/config
+   * events share the same in-flight scan instead of spawning duplicate git
+   * processes against every folder.
+   */
+  scan(): Promise<void> {
+    if (this.scanInFlight) {
+      return this.scanInFlight;
+    }
+    this.scanInFlight = this.performScan().finally(() => {
+      this.scanInFlight = undefined;
+    });
+    return this.scanInFlight;
+  }
+
+  getPerformanceSnapshot(): {
+    lastScanDurationMs: number;
+    workspaceFolderCount: number;
+    repositoryCount: number;
+  } {
+    return {
+      lastScanDurationMs: this.lastScanDurationMs,
+      workspaceFolderCount: this.lastScanFolderCount,
+      repositoryCount: this.repositories.size,
+    };
+  }
+
+  private async performScan(): Promise<void> {
+    const startedAt = performance.now();
     const folders = vscode.workspace.workspaceFolders ?? [];
     const found = new Set<string>();
+    this.lastScanFolderCount = folders.length;
 
-    for (const folder of folders) {
-      const root = await this.discoverRoot(folder.uri.fsPath);
+    const discoveredRoots = await Promise.all(
+      folders.map((folder) => this.discoverRoot(folder.uri.fsPath)),
+    );
+    const newRoots: string[] = [];
+    for (const root of discoveredRoots) {
       if (root) {
         found.add(root);
         if (!this.repositories.has(root)) {
           this.repositories.set(root, new Repository(root, this.git));
-          await this.watch(root);
+          newRoots.push(root);
         }
       }
     }
+    await Promise.all(newRoots.map((root) => this.watch(root)));
 
     // Drop repositories no longer present.
     for (const root of [...this.repositories.keys()]) {
@@ -108,6 +145,7 @@ export class RepositoryManager implements vscode.Disposable {
     }
 
     await this.refreshAll();
+    this.lastScanDurationMs = performance.now() - startedAt;
   }
 
   async refreshAll(): Promise<void> {

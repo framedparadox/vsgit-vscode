@@ -3,6 +3,7 @@ import * as path from "node:path";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { Repository } from "../git/Repository";
 import { FileChange } from "../git/parsers/status";
+import { accessibleTreeItem } from "./treeAccessibility";
 
 export type StagingNode =
   | { type: "group"; group: "staged" | "unstaged" | "conflicted" }
@@ -58,12 +59,12 @@ export class StagingProvider implements vscode.TreeDataProvider<StagingNode>, vs
       const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.Expanded);
       item.contextValue = contextValue;
       item.iconPath = new vscode.ThemeIcon(icon);
-      return item;
+      return accessibleTreeItem(item, `${label}, group`);
     }
     if (node.type === "info") {
       const item = new vscode.TreeItem(node.label);
       item.description = "—";
-      return item;
+      return accessibleTreeItem(item, node.label);
     }
 
     const change = node.change;
@@ -94,7 +95,10 @@ export class StagingProvider implements vscode.TreeDataProvider<StagingNode>, vs
       title: "Open Diff",
       arguments: [node],
     };
-    return item;
+    return accessibleTreeItem(
+      item,
+      `${change.path}, ${describeState(change, node.group)}`,
+    );
   }
 
   getChildren(node?: StagingNode): StagingNode[] {
@@ -138,7 +142,10 @@ export class StagingProvider implements vscode.TreeDataProvider<StagingNode>, vs
   }
 }
 
-function describeState(change: FileChange, group: "staged" | "unstaged"): string {
+function describeState(
+  change: FileChange,
+  group: "staged" | "unstaged" | "conflicted",
+): string {
   if (change.conflicted) {
     return "conflicted";
   }

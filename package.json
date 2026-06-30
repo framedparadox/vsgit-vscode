@@ -2,9 +2,10 @@
   "name": "vsgit-vscode",
   "displayName": "VsGit",
   "description": "VsGit-style Git client for VS Code: Repositories, Staging, History, Graph, Compare, Worktrees, LFS, Gerrit, and more.",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "publisher": "framedparadox",
   "license": "MIT",
+  "icon": "resources/icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/framedparadox/vsgit-vscode.git"
@@ -39,6 +40,16 @@
   "activationEvents": [
     "onStartupFinished"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "VsGit executes the repository's Git configuration and hooks. Trust the workspace before enabling Git operations."
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "VsGit requires a local filesystem checkout and an installed Git executable."
+    }
+  },
   "main": "./dist/extension.js",
   "contributes": {
     "viewsContainers": {
@@ -106,6 +117,13 @@
           "name": "Compare",
           "icon": "$(git-compare)",
           "when": "vsgit.advancedViews"
+        },
+        {
+          "id": "vsgit.documentation",
+          "name": "Documentation",
+          "type": "webview",
+          "icon": "$(book)",
+          "visibility": "visible"
         }
       ]
     },
@@ -827,6 +845,12 @@
         "title": "Show Git Graph",
         "category": "VsGit",
         "icon": "$(git-branch)"
+      },
+      {
+        "command": "vsgit.documentation.open",
+        "title": "Open Documentation",
+        "category": "VsGit",
+        "icon": "$(book)"
       },
       {
         "command": "vsgit.autoFetch.fetchNow",
@@ -1807,6 +1831,11 @@
           "command": "vsgit.compare.clear",
           "when": "view == vsgit.compare",
           "group": "navigation@3"
+        },
+        {
+          "command": "vsgit.documentation.open",
+          "when": "view == vsgit.documentation",
+          "group": "navigation@1"
         }
       ],
       "view/item/context": [
@@ -3192,13 +3221,27 @@
     "compile": "tsc -p ./",
     "check-types": "tsc --noEmit",
     "test": "node --test \"out-test/**/*.test.js\" \"resources/**/*.test.js\"",
-    "pretest": "tsc -p ./tsconfig.test.json"
+    "pretest": "tsc -p ./tsconfig.test.json",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-exclude=\"**/*.test.js\" --test-coverage-lines=80 --test-coverage-branches=80 --test-coverage-functions=70 \"out-test/**/*.test.js\" \"resources/**/*.test.js\"",
+    "pretest:coverage": "tsc -p ./tsconfig.test.json",
+    "compile:integration": "tsc -p ./tsconfig.integration.json",
+    "test:integration": "npm run build && npm run compile:integration && vscode-test",
+    "package:vsix": "npm run build && node -e \"require('fs').mkdirSync('artifacts',{recursive:true})\" && vsce package --no-dependencies --out artifacts/vsgit-vscode.vsix",
+    "package:verify": "npm run package:vsix && node scripts/verify-vsix.mjs artifacts/vsgit-vscode.vsix",
+    "verify": "npm run check-types && npm test && npm run test:coverage && npm run build"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
     "@vscode/codicons": "^0.0.45",
-    "esbuild": "^0.20.0",
+    "@vscode/test-cli": "^0.0.11",
+    "@vscode/test-electron": "^3.0.0",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.28.1",
     "typescript": "^5.4.0"
+  },
+  "overrides": {
+    "diff": "8.0.3",
+    "serialize-javascript": "7.0.5"
   }
 }

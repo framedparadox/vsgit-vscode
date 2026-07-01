@@ -5,9 +5,13 @@ out-test/
 *.vsix
 .DS_Store
 graphify-out/*
-docs/codex-plan.md
-.vscode/launch.json
-.vscode/tasks.json
+.vscode/*
 .claude/settings.json
 .gitignore
 CLAUDE.md
+archive/G*
+out-integration/*
+.vscode-test/*
+docs/codex-plan.md
+docs/MARKETPLACE_CHECKLIST.md
+.vscodeignore

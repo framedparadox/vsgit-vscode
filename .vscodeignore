@@ -1,13 +1,19 @@
 .vscode/**
+.vscode-test/**
+.vscode-test.mjs
 src/**
 out/**
 out-test/**
+out-integration/**
 node_modules/**
+archive/**
+artifacts/**
+scripts/**
 esbuild.js
-tsconfig.json
-tsconfig.test.json
+tsconfig*.json
 **/*.map
 **/*.ts
+**/*.test.js
 .gitignore
 
 # Local tooling / dev files — not part of the published extension

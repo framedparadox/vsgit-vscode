@@ -1,7 +1,7 @@
 # Git (VsGit) Extension - Implementation Plan
 
 ## Overview
-Transform the git-vscode extension into a comprehensive VsGit-style Git client for VS Code, incorporating features from vscode-gitlens, vscode-git-graph, and eclipse-vsgit.
+Transform the git-vscode extension into a comprehensive Git client for VS Code, incorporating features from vscode-gitlens, vscode-git-graph, and eclipse-vsgit.
 
 ## Phase 1: Explorer Context Menu (Team Menu) ✅ COMPLETE
 

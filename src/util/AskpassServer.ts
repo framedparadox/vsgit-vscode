@@ -2,9 +2,8 @@ import * as net from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as fs from "node:fs";
-import * as crypto from "node:crypto";
 import * as vscode from "vscode";
-import { safeEqual } from "./token";
+import { makeNonce, makeToken, safeEqual } from "./token";
 
 /**
  * IPC server the askpass shim connects back to. For each prompt git issues
@@ -13,19 +12,38 @@ import { safeEqual } from "./token";
  */
 export class AskpassServer implements vscode.Disposable {
   readonly sockPath: string;
+  readonly ready: Promise<void>;
   private readonly server: net.Server;
+  private readonly sockets = new Set<net.Socket>();
   /**
    * Per-session secret. The socket/pipe name is enumerable by other local
    * processes, so the name alone is not a credential — the shim must echo this
    * token (passed only via the child's environment) or the connection is
    * rejected, preventing a local process from phishing the user's credentials.
    */
-  private readonly token = crypto.randomBytes(32).toString("hex");
+  private readonly token = makeToken();
 
   constructor() {
     this.sockPath = AskpassServer.makeSocketPath();
     this.server = net.createServer((socket) => this.onConnection(socket));
-    this.server.listen(this.sockPath);
+    // Consume late server errors instead of letting them become uncaught
+    // exceptions in the extension host.
+    this.server.on("error", () => undefined);
+    this.ready = new Promise((resolve, reject) => {
+      const onInitialError = (error: Error) => reject(error);
+      this.server.once("error", onInitialError);
+      this.server.listen(this.sockPath, () => {
+        this.server.off("error", onInitialError);
+        try {
+          // The token authenticates requests; filesystem permissions also keep
+          // other local users from connecting on POSIX systems.
+          if (process.platform !== "win32") fs.chmodSync(this.sockPath, 0o600);
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      });
+    });
   }
 
   /** Env vars that route git credential prompts back here via the shim. */
@@ -40,6 +58,8 @@ export class AskpassServer implements vscode.Disposable {
   }
 
   private onConnection(socket: net.Socket): void {
+    this.sockets.add(socket);
+    socket.once("close", () => this.sockets.delete(socket));
     let buf = "";
     socket.on("data", (chunk) => {
       buf += chunk.toString("utf8");
@@ -90,7 +110,7 @@ export class AskpassServer implements vscode.Disposable {
   }
 
   private static makeSocketPath(): string {
-    const id = crypto.randomBytes(8).toString("hex");
+    const id = makeNonce();
     if (process.platform === "win32") {
       return `\\\\.\\pipe\\vsgit-askpass-${id}`;
     }
@@ -98,7 +118,9 @@ export class AskpassServer implements vscode.Disposable {
   }
 
   dispose(): void {
-    this.server.close();
+    for (const socket of this.sockets) socket.destroy();
+    this.sockets.clear();
+    if (this.server.listening) this.server.close();
     if (process.platform !== "win32") {
       try {
         fs.unlinkSync(this.sockPath);

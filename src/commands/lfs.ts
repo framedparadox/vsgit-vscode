@@ -132,7 +132,12 @@ export function registerLfsCommands(
     });
     if (!selected) return;
 
-    const isOwner = selected.lock.owner.name === "you"; // Simplified check
+    // A lock's owner.name is the LFS user display name (typically user.name),
+    // never the literal "you". Compare against the configured identity so we
+    // don't force-unlock warnings on the user's own locks.
+    const userName = (await repo.configuredUserName()).trim();
+    const isOwner =
+      userName !== "" && selected.lock.owner.name.trim() === userName;
     let force = false;
     if (!isOwner) {
       force = await confirmDestructiveAction({

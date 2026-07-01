@@ -1,7 +1,7 @@
 {
   "name": "vsgit-vscode",
   "displayName": "VsGit",
-  "description": "VsGit-style Git client for VS Code: Repositories, Staging, History, Graph, Compare, Worktrees, LFS, Gerrit, and more.",
+  "description": "GIT client for VS Code: Repositories, Staging, History, Graph, Compare, Worktrees, LFS, Gerrit, and more.",
   "version": "0.0.6",
   "publisher": "framedparadox",
   "license": "MIT",
@@ -3070,6 +3070,7 @@
           "type": "number",
           "default": 3,
           "minimum": 1,
+          "maximum": 60,
           "description": "Interval (minutes) between automatic fetches."
         },
         "vsgit.autoFetch.notify": {
@@ -3221,10 +3222,11 @@
     "compile": "tsc -p ./",
     "check-types": "tsc --noEmit",
     "test": "node --test \"out-test/**/*.test.js\" \"resources/**/*.test.js\"",
-    "pretest": "tsc -p ./tsconfig.test.json",
+    "clean:test-output": "node -e \"require('fs').rmSync('out-test',{recursive:true,force:true})\"",
+    "pretest": "npm run clean:test-output && tsc -p ./tsconfig.test.json",
     "test:coverage": "node --test --experimental-test-coverage --test-coverage-exclude=\"**/*.test.js\" --test-coverage-lines=80 --test-coverage-branches=80 --test-coverage-functions=70 \"out-test/**/*.test.js\" \"resources/**/*.test.js\"",
-    "pretest:coverage": "tsc -p ./tsconfig.test.json",
-    "compile:integration": "tsc -p ./tsconfig.integration.json",
+    "pretest:coverage": "npm run clean:test-output && tsc -p ./tsconfig.test.json",
+    "compile:integration": "node -e \"require('fs').rmSync('out-integration',{recursive:true,force:true})\" && tsc -p ./tsconfig.integration.json",
     "test:integration": "npm run build && npm run compile:integration && vscode-test",
     "package:vsix": "npm run build && node -e \"require('fs').mkdirSync('artifacts',{recursive:true})\" && vsce package --no-dependencies --out artifacts/vsgit-vscode.vsix",
     "package:verify": "npm run package:vsix && node scripts/verify-vsix.mjs artifacts/vsgit-vscode.vsix",

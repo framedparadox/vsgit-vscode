@@ -62,7 +62,6 @@ export function registerGerritCommands(
 async function installCommitMsgHook(repo: Repository): Promise<void> {
   const fs = await import("node:fs/promises");
   const path = await import("node:path");
-  const hookPath = path.join(repo.root, ".git", "hooks", "commit-msg");
   // Minimal Change-Id hook: appends a stable Change-Id derived from a random id
   // if one is not already present. (Production setups fetch Gerrit's official
   // hook; this keeps us dependency-free.)
@@ -74,7 +73,21 @@ id=$(git hash-object "$MSG" 2>/dev/null | cut -c1-40)
 printf '\\nChange-Id: I%s\\n' "$id" >> "$MSG"
 `;
   try {
-    await fs.writeFile(hookPath, hook, { mode: 0o755 });
+    const hookPath = await repo.gitPath("hooks/commit-msg");
+    // Never overwrite or follow an existing hook/symlink. Hooks are executable
+    // project security boundaries; replacing one silently can destroy custom
+    // policy or write through a malicious symlink.
+    try {
+      await fs.lstat(hookPath);
+      vscode.window.showWarningMessage(
+        `A commit-msg hook already exists at ${hookPath}; it was not replaced.`,
+      );
+      return;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+    await fs.mkdir(path.dirname(hookPath), { recursive: true });
+    await fs.writeFile(hookPath, hook, { mode: 0o755, flag: "wx" });
     vscode.window.showInformationMessage(
       "Installed Gerrit Change-Id commit-msg hook.",
     );

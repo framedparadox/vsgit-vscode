@@ -21,6 +21,7 @@ const entries = unzip(["-Z1", vsixPath])
   .filter(Boolean);
 const entrySet = new Set(entries);
 const required = [
+  "extension.vsixmanifest",
   "extension/package.json",
   "extension/dist/extension.js",
   "extension/readme.md",
@@ -72,6 +73,21 @@ if (packagedManifest.version !== rootManifest.version) {
   throw new Error(
     `Packaged version ${packagedManifest.version} does not match ${rootManifest.version}`,
   );
+}
+
+// This verifier is the stable release gate; packaging with `--pre-release`
+// must never produce an artifact that passes it accidentally.
+const vsixManifest = unzip(["-p", vsixPath, "extension.vsixmanifest"]);
+const preReleaseProperty = vsixManifest
+  .match(/<Property\b[^>]*>/gi)
+  ?.find(
+    (property) =>
+      /\bId\s*=\s*["']Microsoft\.VisualStudio\.Code\.PreRelease["']/i.test(
+        property,
+      ) && /\bValue\s*=\s*["']true["']/i.test(property),
+  );
+if (preReleaseProperty) {
+  throw new Error("VSIX is marked as a pre-release extension.");
 }
 
 const sizeMiB = statSync(vsixPath).size / (1024 * 1024);

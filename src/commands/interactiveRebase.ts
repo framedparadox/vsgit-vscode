@@ -12,6 +12,7 @@ import {
   RebaseTodoItem,
 } from "../git/parsers/rebaseTodo";
 import { resolveRepo, withProgress, errMsg } from "./shared";
+import { makeNonce } from "../util/token";
 
 /**
  * Interactive rebase: start `git rebase -i <onto>` with our editor shim wired
@@ -90,6 +91,7 @@ async function runInteractiveRebase(
 
   const server = new EditorServer(handler);
   try {
+    await server.ready;
     const ok = await withProgress(manager, `Interactive rebase onto ${onto}`, () =>
       repo.rebase(onto, { interactive: true, env: server.editorEnv(shimPath) }),
     );
@@ -170,7 +172,11 @@ function showWebview<T>(
       viewType,
       title,
       vscode.ViewColumn.Active,
-      { enableScripts: true, retainContextWhenHidden: true },
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [],
+      },
     );
     let settled = false;
     const done = (v: T | undefined) => {
@@ -183,13 +189,4 @@ function showWebview<T>(
     wire(panel, done);
     panel.onDidDispose(() => done(undefined));
   });
-}
-
-function makeNonce(): string {
-  let text = "";
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  for (let i = 0; i < 32; i++) {
-    text += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return text;
 }

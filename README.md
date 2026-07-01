@@ -370,7 +370,7 @@ Documentation library covers all **173** and identifies each entry point.
 VsGit isn't published to the Marketplace yet; build and install it from source.
 
 ```bash
-git clone https://github.com/ajaykontham/git-vscode
+git clone https://github.com/framedparadox/git-vscode
 cd git-vscode
 npm install
 npm run build                 # bundle the extension into dist/
@@ -465,7 +465,9 @@ src/
   webviews/               webview panels (Graph, History, Commit, Documentation,
                           Create Tag, pickers)
   services/               auto-fetch, file-system watcher, status bar
-  util/                   IPC servers (askpass / editor) + helpers (html escape)
+  util/                   IPC servers (askpass / editor), credential/editor
+                          plumbing, and shared helpers (HTML escaping, crypto
+                          token/nonce generation, command preview, confirmation)
 resources/
   graph.js / graph.css    Git Graph panel client
   documentation.js/.css  searchable documentation library client
@@ -502,20 +504,40 @@ Key design points:
 
 - **No shell.** Git is spawned with an argv array, so shell metacharacters
   (`;`, `|`, `$()`, backticks) are inert.
-- **Option-injection guards.** Refs, SHAs, branch names, and remote URLs coming
-  from webview messages or rendered commit data are validated by `safeRef` /
-  `safeRemoteUrl`: values beginning with `-` (which git would parse as options)
-  are rejected, as are the `ext::` / `fd::` remote-helper transports that can run
-  arbitrary commands.
+- **Option-injection guards.** Refs, SHAs, branch names, paths, and remote URLs
+  coming from webview messages or rendered commit data are validated by
+  `safeRef` / `safeRemoteUrl`: values beginning with `-` (which git would parse
+  as options) are rejected, as are the `ext::` / `fd::` remote-helper transports
+  that can run arbitrary commands. Commands without a `--` separator (e.g.
+  `git worktree`, `git config`) keep flags before positional data so untrusted
+  values can never land in option position.
+- **Bounded git output.** `GitExecutor` caps the combined stdout/stderr it
+  retains (64 MB by default) so a malformed or hostile repository cannot exhaust
+  the extension host, and escalates a timed-out child from `SIGTERM` to
+  `SIGKILL` if it ignores the first signal.
 - **Authenticated IPC.** Credential prompts (`GIT_ASKPASS`) and rebase/commit
   editing run over a unix socket / named pipe whose name is enumerable by other
-  local processes. Each session generates a random token, passed to the shim only
-  via its environment; the server rejects any connection that doesn't echo it —
-  preventing local credential phishing or edit injection. Credential prompts are
-  masked unless they explicitly ask for a username, and the IPC read buffers are
-  bounded.
+  local processes. Each session generates a random 256-bit token, passed to the
+  shim only via its environment; the server rejects any connection that doesn't
+  echo it (compared in constant time) — preventing local credential phishing or
+  edit injection. On POSIX systems the socket file is additionally created with
+  `0600` permissions, callers wait for the server to be listening before git is
+  spawned, and the IPC read buffers are bounded. Credential prompts are masked
+  unless they explicitly ask for a username.
+- **Secret redaction.** Remote URLs are stripped of embedded user-info and
+  common secret query parameters (`token`, `password`, `access_token`, `auth`)
+  before they appear in clone progress, command previews, or the config editor,
+  so credentials in a URL are never echoed back to the UI.
+- **Validated webview messages.** The Git-config editor treats every inbound
+  `postMessage` as untrusted: scope, key, value, and extension-setting fields are
+  type- and range-checked against an allow-list before any `git config` write or
+  `workspace.update`, so a crafted message cannot mutate arbitrary settings.
+- **Hardened hook installation.** Installing the Gerrit `Change-Id` hook refuses
+  to overwrite or follow an existing hook or symlink (`O_EXCL` create), so it
+  cannot clobber custom policy or be redirected through a malicious link.
 - **Strict webview CSP.** Each webview runs under a Content-Security-Policy that
-  only allows the extension's own nonce'd scripts and bundled styles/fonts.
+  only allows the extension's own crypto-random nonce'd scripts and bundled
+  styles/fonts.
 - **Workspace trust boundary.** The manifest disables VsGit in untrusted and
   virtual workspaces because Git configuration and repository hooks execute from
   a local checkout.
@@ -550,7 +572,7 @@ cover the pure logic that's most worth pinning down:
 - Phase 10 CI, coverage, performance, documentation, and packaging contracts.
 
 ```bash
-npm test     # 184 tests
+npm test     # 189 tests
 ```
 
 The Extension Host suite activates the real extension, verifies every

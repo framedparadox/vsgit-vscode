@@ -660,10 +660,29 @@ test("subtree add/pull/push: reject ext:: repository and option-like ref", async
     "https://github.com/o/r.git",
     "v1",
   ]);
-  // No ref => defaults to master.
+  // No ref => resolve the remote's default branch via `ls-remote --symref`.
   git.calls = [];
+  git.nextStdout = "ref: refs/heads/main\tHEAD\n";
   await repo.subtreePull("lib/x", "https://github.com/o/r.git");
   assert.deepStrictEqual(git.calls[0].args, [
+    "ls-remote",
+    "--symref",
+    "https://github.com/o/r.git",
+    "HEAD",
+  ]);
+  assert.deepStrictEqual(git.calls[1].args, [
+    "subtree",
+    "pull",
+    "--prefix",
+    "lib/x",
+    "https://github.com/o/r.git",
+    "main",
+  ]);
+  // Remote HEAD unreadable => fall back to the historical "master" default.
+  git.calls = [];
+  git.nextStdout = "";
+  await repo.subtreePull("lib/x", "https://github.com/o/r.git");
+  assert.deepStrictEqual(git.calls[1].args, [
     "subtree",
     "pull",
     "--prefix",
@@ -814,4 +833,42 @@ test("path-only operations are unguarded by safeRef (use -- separator)", async (
   git.calls = [];
   await repo.moveFile("--old", "--new");
   assert.deepStrictEqual(git.calls[0].args, ["mv", "--", "--old", "--new"]);
+});
+
+test("reference-picker helpers guard refs and keep executor access encapsulated", async () => {
+  const { repo, git } = makeRepo();
+  await assertRejectsBeforeGit(
+    git,
+    () => repo.resolveRevision("--evil"),
+    "resolve revision",
+  );
+  git.nextStdout = "abc123\n";
+  assert.strictEqual(await repo.resolveRevision("HEAD"), "abc123");
+  assert.deepStrictEqual(git.calls.at(-1)?.args, [
+    "rev-parse",
+    "--verify",
+    "--end-of-options",
+    "HEAD",
+  ]);
+
+  git.nextStdout = "Subject\n";
+  assert.strictEqual(await repo.commitSubject("abc123"), "Subject");
+  assert.deepStrictEqual(git.calls.at(-1)?.args, [
+    "log",
+    "-1",
+    "--format=%s",
+    "--end-of-options",
+    "abc123",
+  ]);
+
+  git.nextStdout = "/repo/common/hooks/commit-msg\n";
+  assert.strictEqual(
+    await repo.gitPath("hooks/commit-msg"),
+    "/repo/common/hooks/commit-msg",
+  );
+  assert.deepStrictEqual(git.calls.at(-1)?.args, [
+    "rev-parse",
+    "--git-path",
+    "hooks/commit-msg",
+  ]);
 });

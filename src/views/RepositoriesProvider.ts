@@ -45,6 +45,8 @@ export class RepositoriesProvider
   private readonly subscription: vscode.Disposable;
 
   private abCache = new Map<string, { ahead: number; behind: number }>();
+  private refreshGeneration = 0;
+  private disposed = false;
 
   /**
    * `flat` mode renders only the list of repositories (no expandable Local
@@ -60,29 +62,37 @@ export class RepositoriesProvider
   }
 
   dispose(): void {
+    this.disposed = true;
+    this.refreshGeneration += 1;
+    this.abCache.clear();
     this.subscription.dispose();
     this._onDidChangeTreeData.dispose();
   }
 
   private refresh(): void {
+    const generation = ++this.refreshGeneration;
     const repos = this.manager.getAll();
-    Promise.all(
+    const liveRoots = new Set(repos.map((repo) => repo.root));
+    for (const root of this.abCache.keys()) {
+      if (!liveRoots.has(root)) this.abCache.delete(root);
+    }
+    void Promise.all(
       repos.map(async (repo) => {
         try {
           const ab = await repo.aheadBehind();
-          if (ab) {
-            this.abCache.set(repo.root, ab);
-          } else {
-            this.abCache.delete(repo.root);
-          }
+          return { root: repo.root, ab };
         } catch {
-          this.abCache.delete(repo.root);
+          return { root: repo.root, ab: undefined };
         }
       }),
-    ).then(() => {
-      this._onDidChangeTreeData.fire(undefined);
-    }).catch(() => {
-      this._onDidChangeTreeData.fire(undefined);
+    ).then((results) => {
+      if (!this.disposed && generation === this.refreshGeneration) {
+        for (const { root, ab } of results) {
+          if (ab) this.abCache.set(root, ab);
+          else this.abCache.delete(root);
+        }
+        this._onDidChangeTreeData.fire(undefined);
+      }
     });
   }
 

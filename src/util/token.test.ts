@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { safeEqual, makeToken } from "./token";
+import { safeEqual, makeNonce, makeToken } from "./token";
 
 test("safeEqual is true only for identical strings", () => {
   assert.strictEqual(safeEqual("abc123", "abc123"), true);
@@ -17,5 +17,12 @@ test("makeToken returns a fresh 256-bit hex token each call", () => {
   const a = makeToken();
   const b = makeToken();
   assert.match(a, /^[0-9a-f]{64}$/);
+  assert.notStrictEqual(a, b);
+});
+
+test("makeNonce returns a fresh 128-bit hex nonce each call", () => {
+  const a = makeNonce();
+  const b = makeNonce();
+  assert.match(a, /^[0-9a-f]{32}$/);
   assert.notStrictEqual(a, b);
 });

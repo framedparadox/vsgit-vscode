@@ -8,6 +8,8 @@
  *
  * All styling uses VS Code theme variables so it matches the active color theme.
  */
+import { ESC_SCRIPT } from "../util/html";
+
 export function historyHtml(
   nonce: string,
   cspSource: string,
@@ -355,7 +357,7 @@ function applyCompareBanner() {
   }
 }
 
-function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch])); }
+${ESC_SCRIPT}
 function fmtDate(unix) {
   if (!unix) return '';
   const dt = new Date(unix * 1000);

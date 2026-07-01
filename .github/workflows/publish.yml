@@ -85,31 +85,40 @@ jobs:
       - name: Type-check
         run: npm run check-types
 
-      - name: Test
-        run: npm test
+      - name: Unit tests and coverage thresholds
+        run: |
+          npm test
+          npm run test:coverage
 
-      # `vsce package` runs the `vscode:prepublish` script (npm run build), so
-      # the production esbuild bundle is produced as part of packaging. The
-      # --pre-release flag (when set) is embedded into the .vsix here.
+      - name: Extension Host integration tests
+        run: xvfb-run -a npm run test:integration
+
+      - name: Audit development dependencies
+        run: npm audit --audit-level=high
+
+      # Package once, inspect that exact artifact, and then publish it unchanged.
       - name: Package extension
         run: |
+          npm run build
+          mkdir -p artifacts
           FLAG=""
           if [ "${{ steps.meta.outputs.prerelease }}" = "true" ]; then
             FLAG="--pre-release"
           fi
-          npx --yes @vscode/vsce package $FLAG --out "git-vscode-${GITHUB_REF_NAME}.vsix"
+          npx --yes @vscode/vsce package --no-dependencies $FLAG --out "artifacts/git-vscode-${GITHUB_REF_NAME}.vsix"
+          node scripts/verify-vsix.mjs "artifacts/git-vscode-${GITHUB_REF_NAME}.vsix"
 
       # Publish the exact .vsix built above. The pre-release marking is already
       # baked in, so --pre-release must NOT be repeated here (vsce rejects it
       # together with --packagePath).
       - name: Publish to VS Code Marketplace
-        run: npx --yes @vscode/vsce publish --packagePath "git-vscode-${GITHUB_REF_NAME}.vsix"
+        run: npx --yes @vscode/vsce publish --packagePath "artifacts/git-vscode-${GITHUB_REF_NAME}.vsix"
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: git-vscode-${{ github.ref_name }}.vsix
+          files: artifacts/git-vscode-${{ github.ref_name }}.vsix
           generate_release_notes: true
           prerelease: ${{ steps.meta.outputs.prerelease == 'true' }}

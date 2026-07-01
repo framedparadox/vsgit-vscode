@@ -53,3 +53,19 @@ export function safeRemoteUrl(url: string, label = "remote URL"): string {
   }
   return url;
 }
+
+/**
+ * Redact URL user-info and common secret query parameters before displaying a
+ * remote in command previews, progress messages, or webviews.
+ */
+export function redactRemoteUrl(url: string): string {
+  return url
+    .replace(
+      /^([a-z][a-z0-9+.-]*:\/\/)[^/@\s]+@/i,
+      "$1***@",
+    )
+    .replace(
+      /([?&](?:access_token|auth|password|token)=)[^&#\s]*/gi,
+      "$1***",
+    );
+}

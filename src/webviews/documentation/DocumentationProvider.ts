@@ -4,6 +4,7 @@ import {
   DocumentationData,
   DocumentationManifest,
 } from "./documentationContent";
+import { makeNonce } from "../../util/token";
 
 /**
  * Hosts the same documentation library in the bottom sidebar view and in a
@@ -127,7 +128,7 @@ export class DocumentationProvider
     webview: vscode.Webview,
     mode: "sidebar" | "panel",
   ): string {
-    const nonce = getNonce();
+    const nonce = makeNonce();
     const cssUri = webview.asWebviewUri(
       vscode.Uri.joinPath(
         this.extensionUri,
@@ -205,14 +206,4 @@ export class DocumentationProvider
     for (const disposable of this.panelDisposables) disposable.dispose();
     this.panelDisposables = [];
   }
-}
-
-function getNonce(): string {
-  const alphabet =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let value = "";
-  for (let index = 0; index < 32; index++) {
-    value += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
-  }
-  return value;
 }

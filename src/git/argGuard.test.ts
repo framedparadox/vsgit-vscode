@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { isOptionLike, safeRef, safeRemoteUrl } from "./argGuard";
+import {
+  isOptionLike,
+  redactRemoteUrl,
+  safeRef,
+  safeRemoteUrl,
+} from "./argGuard";
 import { GitError } from "./GitError";
 
 // ---------------------------------------------------------------------------
@@ -255,4 +260,19 @@ test("safeRemoteUrl: default label is 'remote URL'", () => {
 test("safeRemoteUrl: option-like check runs before the transport check", () => {
   // "-ext::x" is option-like; either rejection is acceptable, but it must throw.
   assert.throws(() => safeRemoteUrl("-ext::x"), GitError);
+});
+
+test("redactRemoteUrl removes embedded credentials from display text", () => {
+  assert.strictEqual(
+    redactRemoteUrl("https://user:secret@example.com/repo.git"),
+    "https://***@example.com/repo.git",
+  );
+  assert.strictEqual(
+    redactRemoteUrl("https://example.com/repo.git?access_token=secret&x=1"),
+    "https://example.com/repo.git?access_token=***&x=1",
+  );
+  assert.strictEqual(
+    redactRemoteUrl("git@example.com:owner/repo.git"),
+    "git@example.com:owner/repo.git",
+  );
 });

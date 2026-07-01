@@ -7,6 +7,8 @@
  *   - Each leaf: icon · name · shortSha · subject (dimmed)
  *   - Keyboard navigation, double-click or Enter to confirm
  */
+import { ESC_SCRIPT } from "../util/html";
+
 export function refPickerHtml(nonce: string, _cspSource: string): string {
   return /* html */ `<!DOCTYPE html>
 <html lang="en">
@@ -377,10 +379,7 @@ document.getElementById('btnCancel').addEventListener('click', () => {
 });
 
 // ── Utilities ──────────────────────────────────────────────────────────────
-function esc(s) {
-  return String(s || '')
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+${ESC_SCRIPT}
 </script>
 </body>
 </html>`;

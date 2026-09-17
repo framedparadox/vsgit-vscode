@@ -2,7 +2,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { AskpassServer } from "../util/AskpassServer";
-import { safeRef, safeRemoteUrl } from "../git/argGuard";
+import { redactRemoteUrl, safeRef, safeRemoteUrl } from "../git/argGuard";
 import { errMsg } from "./shared";
 
 /**
@@ -74,8 +74,14 @@ export function registerCloneCommands(
 
       const askpass = new AskpassServer();
       try {
+        await askpass.ready;
+        const displayUrl = redactRemoteUrl(safeUrl);
         await vscode.window.withProgress(
-          { location: vscode.ProgressLocation.Notification, title: `Cloning ${url}`, cancellable: false },
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: `Cloning ${displayUrl}`,
+            cancellable: false,
+          },
           () => git.run(args, { cwd: dest, env: askpass.env(shimPath) }),
         );
         await manager.scan();
@@ -84,7 +90,7 @@ export function registerCloneCommands(
           "Open Folder",
         );
         if (open === "Open Folder") {
-          const name = url.replace(/\.git$/, "").split(/[\\/]/).pop() || "repo";
+          const name = safeUrl.replace(/\.git$/, "").split(/[\\/]/).pop() || "repo";
           const target = vscode.Uri.file(path.join(dest, name));
           await vscode.commands.executeCommand("vscode.openFolder", target, {
             forceNewWindow: false,

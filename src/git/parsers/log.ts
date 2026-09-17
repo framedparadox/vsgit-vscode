@@ -32,8 +32,11 @@ export interface Commit {
 export const LOG_FORMAT =
   "%H\x1f%P\x1f%an\x1f%ae\x1f%at\x1f%cn\x1f%ct\x1f%D\x1f%s\x1f%b\x1e";
 
-function classifyRef(raw: string): CommitRef | undefined {
-  let name = raw.trim();
+function classifyRef(
+  raw: string,
+  remoteNames: ReadonlySet<string>,
+): CommitRef | undefined {
+  const name = raw.trim();
   if (name === "") {
     return undefined;
   }
@@ -47,14 +50,25 @@ function classifyRef(raw: string): CommitRef | undefined {
   if (name.startsWith("tag: ")) {
     return { name: name.slice("tag: ".length), kind: "tag" };
   }
-  if (name.includes("/")) {
+  // A slash alone doesn't imply a remote — local branches are commonly named
+  // `feature/x`. Only classify as remote when the first segment is an actual
+  // configured remote; otherwise treat it as a local branch.
+  const slash = name.indexOf("/");
+  if (slash > 0 && remoteNames.has(name.slice(0, slash))) {
     return { name, kind: "remoteBranch" };
   }
   return { name, kind: "localBranch" };
 }
 
-/** Parse `git log --format=LOG_FORMAT`. */
-export function parseLog(output: string): Commit[] {
+/**
+ * Parse `git log --format=LOG_FORMAT`.
+ *
+ * `remoteNames` distinguishes remote-tracking refs (e.g. `origin/main`) from
+ * local branches that merely contain a slash (e.g. `feature/login`). When
+ * omitted, no ref is treated as remote.
+ */
+export function parseLog(output: string, remoteNames: Iterable<string> = []): Commit[] {
+  const remotes = new Set(remoteNames);
   const commits: Commit[] = [];
   for (const record of output.split("\x1e")) {
     if (record.trim() === "") {
@@ -69,7 +83,7 @@ export function parseLog(output: string): Commit[] {
     }
     const refs = (refNames ?? "")
       .split(",")
-      .map(classifyRef)
+      .map((ref) => classifyRef(ref, remotes))
       .filter((r): r is CommitRef => r !== undefined);
     commits.push({
       sha,

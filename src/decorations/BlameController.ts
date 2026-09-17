@@ -8,12 +8,17 @@ import { BlameLine } from "../git/parsers/blame";
  * Toggled per-editor; recomputed when the active editor or selection changes.
  */
 export class BlameController implements vscode.Disposable {
+  private static readonly MAX_CACHE_ENTRIES = 20;
+
   private readonly decorationType: vscode.TextEditorDecorationType;
   private readonly disposables: vscode.Disposable[] = [];
-  private enabled = false;
+  private enabled: boolean;
   private cache = new Map<string, BlameLine[]>();
 
   constructor(private readonly manager: RepositoryManager) {
+    this.enabled = vscode.workspace
+      .getConfiguration("vsgit")
+      .get<boolean>("blame.enabledByDefault", false);
     this.decorationType = vscode.window.createTextEditorDecorationType({
       after: {
         color: new vscode.ThemeColor("editorCodeLens.foreground"),
@@ -34,6 +39,11 @@ export class BlameController implements vscode.Disposable {
 
   toggle(): void {
     this.enabled = !this.enabled;
+    if (!this.enabled) {
+      // Blame arrays scale with file length; release them immediately when the
+      // feature is disabled instead of retaining every file visited so far.
+      this.cache.clear();
+    }
     void this.refresh();
     vscode.window.setStatusBarMessage(
       `Inline blame ${this.enabled ? "on" : "off"}`,
@@ -56,7 +66,11 @@ export class BlameController implements vscode.Disposable {
 
   private async loadBlame(editor: vscode.TextEditor): Promise<void> {
     const fsPath = editor.document.uri.fsPath;
-    if (this.cache.has(fsPath)) {
+    const cached = this.cache.get(fsPath);
+    if (cached) {
+      // Promote on access so the map acts as a small LRU cache.
+      this.cache.delete(fsPath);
+      this.cache.set(fsPath, cached);
       return;
     }
     const repo = this.manager.findByUri(editor.document.uri);
@@ -64,10 +78,26 @@ export class BlameController implements vscode.Disposable {
       return;
     }
     const rel = this.manager.relativePath(repo, editor.document.uri);
+    const documentVersion = editor.document.version;
     try {
-      this.cache.set(fsPath, await repo.blame(rel));
+      const blame = await repo.blame(rel);
+      if (this.enabled && editor.document.version === documentVersion) {
+        this.cacheBlame(fsPath, blame);
+      }
     } catch {
-      this.cache.set(fsPath, []);
+      if (this.enabled && editor.document.version === documentVersion) {
+        this.cacheBlame(fsPath, []);
+      }
+    }
+  }
+
+  private cacheBlame(fsPath: string, blame: BlameLine[]): void {
+    this.cache.delete(fsPath);
+    this.cache.set(fsPath, blame);
+    while (this.cache.size > BlameController.MAX_CACHE_ENTRIES) {
+      const oldest = this.cache.keys().next().value as string | undefined;
+      if (!oldest) break;
+      this.cache.delete(oldest);
     }
   }
 
@@ -96,6 +126,7 @@ export class BlameController implements vscode.Disposable {
   }
 
   dispose(): void {
+    this.cache.clear();
     this.decorationType.dispose();
     this.disposables.forEach((d) => d.dispose());
   }

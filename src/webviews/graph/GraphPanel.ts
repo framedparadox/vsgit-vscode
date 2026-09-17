@@ -4,6 +4,7 @@ import { Repository } from "../../git/Repository";
 import { RepositoryManager } from "../../git/RepositoryManager";
 import { GitContentProvider } from "../../git/GitContentProvider";
 import { confirmDestructiveAction } from "../../util/confirmation";
+import { makeNonce } from "../../util/token";
 
 type RefType = "head" | "localBranch" | "remoteBranch" | "tag" | "stash";
 
@@ -54,6 +55,7 @@ export class GraphPanel {
   private activeRepo: Repository | undefined;
 
   private branchFilters: string[] = [];
+  private refreshGeneration = 0;
   /** A refresh requested while the panel was hidden; replayed when it reveals. */
   private pendingRefresh = false;
 
@@ -168,9 +170,12 @@ export class GraphPanel {
 
   // ─── data ────────────────────────────────────────────────────────────────
   private async refresh(): Promise<void> {
+    const generation = ++this.refreshGeneration;
     const repo = this.resolveActiveRepo();
     if (!repo) {
-      await this.panel.webview.postMessage({ type: "empty" });
+      if (generation === this.refreshGeneration) {
+        await this.panel.webview.postMessage({ type: "empty" });
+      }
       return;
     }
     try {
@@ -205,11 +210,13 @@ export class GraphPanel {
         return { ...c, refs, kind: "commit" as const };
       });
 
-      // Attach stash badges to their base commit (first cut of stash topology).
+      // Index commits once; repeated Array.find calls made stash decoration
+      // O(commits × stashes) on large graphs.
+      const commitsBySha = new Map(commits.map((commit) => [commit.sha, commit]));
       for (const stash of repo.stashes) {
         const target =
-          commits.find((c) => c.sha === stash.baseObjectId) ??
-          commits.find((c) => c.sha === stash.objectId);
+          (stash.baseObjectId ? commitsBySha.get(stash.baseObjectId) : undefined) ??
+          (stash.objectId ? commitsBySha.get(stash.objectId) : undefined);
         if (target) target.refs.push({ name: stash.ref, type: "stash" });
       }
 
@@ -236,6 +243,14 @@ export class GraphPanel {
         repo.inProgressOperation().catch(() => undefined),
       ]);
 
+      // A repo switch or watcher refresh may have completed a newer request.
+      // Never let this older result replace the current graph.
+      if (
+        generation !== this.refreshGeneration ||
+        this.activeRepo?.root !== repo.root
+      ) {
+        return;
+      }
       await this.panel.webview.postMessage({
         type: "graphData",
         data: {
@@ -253,7 +268,9 @@ export class GraphPanel {
         },
       });
     } catch (error) {
-      vscode.window.showErrorMessage(`Failed to load graph: ${error}`);
+      if (generation === this.refreshGeneration) {
+        vscode.window.showErrorMessage(`Failed to load graph: ${error}`);
+      }
     }
   }
 
@@ -833,7 +850,7 @@ export class GraphPanel {
 
   // ─── html ────────────────────────────────────────────────────────────────────
   private getHtmlForWebview(): string {
-    const nonce = getNonce();
+    const nonce = makeNonce();
     const webview = this.panel.webview;
     const cssUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, "resources", "graph.css"),
@@ -1013,6 +1030,7 @@ export class GraphPanel {
   }
 
   public dispose() {
+    this.refreshGeneration += 1;
     GraphPanel.currentPanel = undefined;
     this.panel.dispose();
     while (this.disposables.length) {
@@ -1020,13 +1038,4 @@ export class GraphPanel {
       if (d) d.dispose();
     }
   }
-}
-
-function getNonce() {
-  let text = "";
-  const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  for (let i = 0; i < 32; i++) {
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
-  }
-  return text;
 }

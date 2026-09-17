@@ -6,6 +6,7 @@ import { historyHtml } from "./historyHtml";
 import { GitContentProvider } from "../git/GitContentProvider";
 import { Commit } from "../git/parsers/log";
 import { confirmDestructiveAction, DestructiveOperations } from "../util/confirmation";
+import { makeNonce } from "../util/token";
 
 /**
  * Manages the History webview panel: a commit graph for the active repository
@@ -30,6 +31,8 @@ export class HistoryView implements vscode.Disposable {
   private repo: Repository | undefined;
   private readonly disposables: vscode.Disposable[] = [];
   private commitsBySha = new Map<string, Commit>();
+  private queryGeneration = 0;
+  private queryInFlight = false;
   private state: HistoryState = {
     loadedCommits: [],
     hasMore: true,
@@ -52,6 +55,8 @@ export class HistoryView implements vscode.Disposable {
   }
 
   dispose(): void {
+    this.queryGeneration += 1;
+    this.commitsBySha.clear();
     this.panel?.dispose();
     this.panel = undefined;
     for (const d of this.disposables) d.dispose();
@@ -109,8 +114,6 @@ export class HistoryView implements vscode.Disposable {
   }
 
   private async reload(): Promise<void> {
-    this.state.loadedCommits = [];
-    this.state.hasMore = true;
     await this.handleQuery({
       reset: true,
       branch: this.state.currentBranch,
@@ -196,18 +199,27 @@ export class HistoryView implements vscode.Disposable {
     since?: string;
     until?: string;
   }): Promise<void> {
-    if (!this.repo) {
+    const repo = this.repo;
+    if (!repo) {
       return;
     }
+    if (!opts.reset && this.queryInFlight) {
+      return;
+    }
+    const generation = opts.reset
+      ? ++this.queryGeneration
+      : this.queryGeneration;
     if (opts.reset) {
       this.state.loadedCommits = [];
       this.state.hasMore = true;
+      this.commitsBySha.clear();
       this.state.currentBranch = opts.branch;
       this.state.filters.search = opts.search;
       this.state.filters.searchBy = opts.searchBy;
       this.state.filters.since = opts.since;
       this.state.filters.until = opts.until;
     }
+    this.queryInFlight = true;
     try {
       const config = vscode.workspace.getConfiguration("vsgit");
       const pageSize = Math.max(1, config.get<number>("graph.pageSize", 200));
@@ -238,7 +250,7 @@ export class HistoryView implements vscode.Disposable {
         revRange = opts.branch;
       }
 
-      const commits = await this.repo.log({
+      const commits = await repo.log({
         all: opts.branch === "all" && !this.state.compareMode,
         limit,
         skip: this.state.loadedCommits.length,
@@ -250,12 +262,17 @@ export class HistoryView implements vscode.Disposable {
         until: opts.until,
         order: sortOrder,
       });
-      
+
+      // A repository refresh or filter change may finish a newer query first.
+      // Discard this result rather than mixing two histories in one panel.
+      if (generation !== this.queryGeneration || repo !== this.repo) {
+        return;
+      }
       this.state.loadedCommits.push(...commits);
       this.state.hasMore =
         this.state.loadedCommits.length < maxCommits && commits.length === limit;
       
-      for (const c of this.state.loadedCommits) {
+      for (const c of commits) {
         this.commitsBySha.set(c.sha, c);
       }
       
@@ -268,9 +285,15 @@ export class HistoryView implements vscode.Disposable {
         compareMode: this.state.compareMode,
       });
     } catch (e) {
-      vscode.window.showErrorMessage(
-        `History query failed: ${e instanceof Error ? e.message : String(e)}`,
-      );
+      if (generation === this.queryGeneration && repo === this.repo) {
+        vscode.window.showErrorMessage(
+          `History query failed: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    } finally {
+      if (generation === this.queryGeneration) {
+        this.queryInFlight = false;
+      }
     }
   }
 
@@ -290,8 +313,6 @@ export class HistoryView implements vscode.Disposable {
 
   private async handleBranchFilter(branch: string): Promise<void> {
     this.state.currentBranch = branch;
-    this.state.loadedCommits = [];
-    this.state.hasMore = true;
     await this.handleQuery({
       reset: true,
       branch,
@@ -307,8 +328,6 @@ export class HistoryView implements vscode.Disposable {
       return;
     }
     this.state.compareMode = { ref1, ref2 };
-    this.state.loadedCommits = [];
-    this.state.hasMore = true;
     await this.handleQuery({
       reset: true,
       branch: "all",
@@ -523,13 +542,4 @@ export class HistoryView implements vscode.Disposable {
       }
     }
   }
-}
-
-function makeNonce(): string {
-  let text = "";
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  for (let i = 0; i < 32; i++) {
-    text += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return text;
 }

@@ -35,10 +35,19 @@ export class VsgitFileDecorationProvider
         next.set(abs, effectiveState(change));
       }
     }
-    // Fire for the union of old and new keys so cleared files refresh too.
-    const changed = new Set<string>([...this.states.keys(), ...next.keys()]);
+    // Notify VS Code only for additions, removals, and state transitions. The
+    // previous union invalidated every decorated file after every Git refresh.
+    const changed = new Set<string>();
+    for (const [file, state] of this.states) {
+      if (next.get(file) !== state) changed.add(file);
+    }
+    for (const [file, state] of next) {
+      if (this.states.get(file) !== state) changed.add(file);
+    }
     this.states = next;
-    this._onDidChange.fire([...changed].map((p) => vscode.Uri.file(p)));
+    if (changed.size > 0) {
+      this._onDidChange.fire([...changed].map((p) => vscode.Uri.file(p)));
+    }
   }
 
   provideFileDecoration(uri: vscode.Uri): vscode.FileDecoration | undefined {
@@ -50,6 +59,7 @@ export class VsgitFileDecorationProvider
   }
 
   dispose(): void {
+    this.states.clear();
     this.sub.dispose();
     this._onDidChange.dispose();
   }

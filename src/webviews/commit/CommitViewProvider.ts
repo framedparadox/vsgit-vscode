@@ -4,6 +4,7 @@ import { RepositoryManager } from "../../git/RepositoryManager";
 import { Repository } from "../../git/Repository";
 import { StagingProvider, StagingNode } from "../../views/StagingProvider";
 import { FileChange } from "../../git/parsers/status";
+import { makeNonce } from "../../util/token";
 
 /**
  * Commit view: a webview replacing the transient commit input box with a proper
@@ -249,7 +250,7 @@ export class CommitViewProvider
   }
 
   private getHtml(webview: vscode.Webview): string {
-    const nonce = getNonce();
+    const nonce = makeNonce();
     const cssUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, "resources", "commit.css"),
     );
@@ -378,14 +379,4 @@ function toFileDto(change: FileChange): FileDto {
       : (change.indexState ?? change.worktreeState ?? "modified"),
     conflicted: change.conflicted,
   };
-}
-
-function getNonce(): string {
-  let text = "";
-  const possible =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  for (let i = 0; i < 32; i++) {
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
-  }
-  return text;
 }

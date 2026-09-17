@@ -18,3 +18,8 @@ export function safeEqual(a: string, b: string): boolean {
 export function makeToken(): string {
   return crypto.randomBytes(32).toString("hex");
 }
+
+/** A cryptographically random 128-bit nonce for a single webview document. */
+export function makeNonce(): string {
+  return crypto.randomBytes(16).toString("hex");
+}

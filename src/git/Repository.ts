@@ -551,24 +551,45 @@ export class Repository {
 
   // --- Git Subtree --------------------------------------------------------
 
+  /**
+   * Resolve the branch to use when a subtree ref isn't specified: the remote's
+   * own default branch (via `HEAD`) rather than a hardcoded name. Falls back to
+   * "master" only if the remote's HEAD can't be read (e.g. offline), preserving
+   * the historical behaviour for that edge case.
+   */
+  private async defaultSubtreeRef(repository: string): Promise<string> {
+    try {
+      const out = await this.git.stdout(
+        ["ls-remote", "--symref", safeRemoteUrl(repository, "repository"), "HEAD"],
+        { cwd: this.root },
+      );
+      // Line looks like: "ref: refs/heads/main\tHEAD"
+      const match = out.match(/^ref:\s+refs\/heads\/(\S+)\s+HEAD$/m);
+      if (match) return match[1];
+    } catch {
+      // Fall through to the historical default.
+    }
+    return "master";
+  }
+
   /** Add subtree from external repository. */
   async subtreeAdd(prefix: string, repository: string, ref?: string): Promise<void> {
-    const args = ["subtree", "add", "--prefix", prefix, safeRemoteUrl(repository, "repository")];
-    args.push(ref ? safeRef(ref) : "master");
+    const resolvedRef = ref ? safeRef(ref) : await this.defaultSubtreeRef(repository);
+    const args = ["subtree", "add", "--prefix", prefix, safeRemoteUrl(repository, "repository"), resolvedRef];
     await this.git.run(args, { cwd: this.root });
   }
 
   /** Pull subtree updates from external repository. */
   async subtreePull(prefix: string, repository: string, ref?: string): Promise<void> {
-    const args = ["subtree", "pull", "--prefix", prefix, safeRemoteUrl(repository, "repository")];
-    args.push(ref ? safeRef(ref) : "master");
+    const resolvedRef = ref ? safeRef(ref) : await this.defaultSubtreeRef(repository);
+    const args = ["subtree", "pull", "--prefix", prefix, safeRemoteUrl(repository, "repository"), resolvedRef];
     await this.git.run(args, { cwd: this.root });
   }
 
   /** Push subtree changes to external repository. */
   async subtreePush(prefix: string, repository: string, ref?: string): Promise<void> {
-    const args = ["subtree", "push", "--prefix", prefix, safeRemoteUrl(repository, "repository")];
-    args.push(ref ? safeRef(ref) : "master");
+    const resolvedRef = ref ? safeRef(ref) : await this.defaultSubtreeRef(repository);
+    const args = ["subtree", "push", "--prefix", prefix, safeRemoteUrl(repository, "repository"), resolvedRef];
     await this.git.run(args, { cwd: this.root });
   }
 
@@ -626,6 +647,23 @@ export class Repository {
       return parseConfigListZ(out);
     } catch {
       return [];
+    }
+  }
+
+  /**
+   * Effective `user.name` for this repository (local overriding global/system),
+   * or an empty string when unset. Used to tell whether the current user owns a
+   * resource such as an LFS lock.
+   */
+  async configuredUserName(): Promise<string> {
+    try {
+      return (
+        await this.git.stdout(["config", "--get", "user.name"], {
+          cwd: this.root,
+        })
+      ).trim();
+    } catch {
+      return "";
     }
   }
 
@@ -737,6 +775,47 @@ export class Repository {
     return parseReflog(out);
   }
 
+  /** Resolve a ref/object name without exposing the repository's executor. */
+  async resolveRevision(ref: string): Promise<string> {
+    return (
+      await this.git.stdout(
+        ["rev-parse", "--verify", "--end-of-options", safeRef(ref)],
+        { cwd: this.root },
+      )
+    ).trim();
+  }
+
+  /** Read a commit subject for reference-picker metadata. */
+  async commitSubject(ref: string): Promise<string> {
+    return (
+      await this.git.stdout(
+        ["log", "-1", "--format=%s", "--end-of-options", safeRef(ref)],
+        { cwd: this.root },
+      )
+    ).trim();
+  }
+
+  /** Absolute path to this worktree's Git administrative directory. */
+  async gitDirectory(): Promise<string> {
+    const gitDir = (
+      await this.git.stdout(["rev-parse", "--absolute-git-dir"], {
+        cwd: this.root,
+      })
+    ).trim();
+    return path.isAbsolute(gitDir) ? gitDir : path.resolve(this.root, gitDir);
+  }
+
+  /** Resolve a path inside the actual Git dir, including linked worktrees. */
+  async gitPath(relativePath: string): Promise<string> {
+    const value = (
+      await this.git.stdout(
+        ["rev-parse", "--git-path", safeRef(relativePath, "Git path")],
+        { cwd: this.root },
+      )
+    ).trim();
+    return path.isAbsolute(value) ? value : path.resolve(this.root, value);
+  }
+
   // --- Blame --------------------------------------------------------------
 
   /** Per-line blame for a working-tree file (relative path). */
@@ -774,16 +853,11 @@ export class Repository {
   async inProgressOperation(): Promise<
     "rebase" | "merge" | "cherry-pick" | "revert" | undefined
   > {
-    const gitDir = await this.git
-      .stdout(["rev-parse", "--git-dir"], { cwd: this.root })
-      .then((s) => s.trim())
-      .catch(() => ".git");
+    const gitDir = await this.gitDirectory().catch(() =>
+      path.join(this.root, ".git"),
+    );
     const fs = await import("node:fs");
-    const path = await import("node:path");
-    const abs = path.isAbsolute(gitDir)
-      ? gitDir
-      : path.join(this.root, gitDir);
-    const exists = (p: string) => fs.existsSync(path.join(abs, p));
+    const exists = (p: string) => fs.existsSync(path.join(gitDir, p));
     if (exists("rebase-merge") || exists("rebase-apply")) {
       return "rebase";
     }
@@ -862,7 +936,7 @@ export class Repository {
       args.push("--follow", "--", options.file);
     }
     const out = await this.git.stdout(args, { cwd: this.root });
-    return parseLog(out);
+    return parseLog(out, this.remotes.map((r) => r.name));
   }
 
   /**

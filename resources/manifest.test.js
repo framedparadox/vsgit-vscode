@@ -227,6 +227,55 @@ test('configured git path and command preview are wired through the shared execu
   assert.ok(commandPreview.includes('isReadOnlyGitCommand(args)'), 'background read-only commands are not previewed');
 });
 
+test('security and lifecycle boundaries remain hardened', () => {
+  const executor = read('src/git/GitExecutor.ts');
+  const manager = read('src/git/RepositoryManager.ts');
+  const autoFetch = read('src/services/AutoFetchService.ts');
+  const blame = read('src/decorations/BlameController.ts');
+  const decorations = read('src/decorations/FileDecorations.ts');
+  const history = read('src/webviews/HistoryView.ts');
+  const graph = read('src/webviews/graph/GraphPanel.ts');
+  const config = read('src/commands/config.ts');
+  const gerrit = read('src/commands/gerrit.ts');
+  const askpass = read('src/util/AskpassServer.ts');
+  const editorServer = read('src/util/EditorServer.ts');
+  const nonceHosts = [
+    'src/commands/config.ts',
+    'src/commands/interactiveRebase.ts',
+    'src/webviews/CommitPickerView.ts',
+    'src/webviews/CreateTagDialog.ts',
+    'src/webviews/HistoryView.ts',
+    'src/webviews/RefPickerView.ts',
+    'src/webviews/commit/CommitViewProvider.ts',
+    'src/webviews/documentation/DocumentationProvider.ts',
+    'src/webviews/graph/GraphPanel.ts',
+  ].map(read);
+
+  assert.ok(executor.includes('DEFAULT_MAX_OUTPUT_BYTES'), 'Git output is bounded');
+  assert.ok(executor.includes('Buffer.concat(chunks)'), 'Git output avoids repeated string growth');
+  assert.ok(manager.includes('runRefreshLoop()'), 'repository refreshes are coalesced');
+  assert.ok(manager.includes('runScanLoop()'), 'repository scans replay mid-scan changes');
+  assert.ok(autoFetch.includes('fetchInFlight'), 'auto-fetch sweeps cannot overlap');
+  assert.ok(blame.includes('MAX_CACHE_ENTRIES'), 'blame cache is bounded');
+  assert.ok(history.includes('queryGeneration'), 'stale history queries are discarded');
+  assert.ok(decorations.includes('if (changed.size > 0)'), 'unchanged file decorations are not invalidated');
+  assert.ok(graph.includes('const commitsBySha = new Map'), 'stash decoration uses indexed commits');
+  assert.strictEqual(
+    (graph.match(/await this\.renameBranch\(/g) ?? []).length,
+    1,
+    'Graph rename executes once',
+  );
+  assert.ok(config.includes('validatedExtensionSetting'), 'config writes use an allowlist');
+  assert.ok(config.includes('localResourceRoots: []'), 'config webview has no filesystem roots');
+  assert.ok(gerrit.includes('flag: "wx"'), 'Gerrit hook installation cannot overwrite files');
+  assert.ok(gerrit.includes('fs.lstat(hookPath)'), 'Gerrit hook installation checks existing paths');
+  assert.ok(askpass.includes('readonly ready: Promise<void>'), 'askpass waits for its socket');
+  assert.ok(editorServer.includes('readonly ready: Promise<void>'), 'editor waits for its socket');
+  assert.ok(askpass.includes('0o600') && editorServer.includes('0o600'), 'IPC sockets are owner-only');
+  assert.ok(nonceHosts.every((source) => source.includes('makeNonce')), 'webviews use shared secure nonces');
+  assert.ok(nonceHosts.every((source) => !source.includes('Math.random')), 'webview nonces never use Math.random');
+});
+
 test('repository routing uses active repo and containment-aware URI lookup', () => {
   const manager = read('src/git/RepositoryManager.ts');
   const staging = read('src/views/StagingProvider.ts');
@@ -247,8 +296,8 @@ test('repository routing uses active repo and containment-aware URI lookup', () 
   assert.ok(manager.includes('"--git-common-dir"'), 'manager resolves common git dirs for refs');
   assert.ok(manager.includes('watchGitPath(root, watchPath)'), 'manager watches resolved git paths');
   assert.ok(staging.includes('return this.manager.getActive();'), 'staging view uses active repo');
-  assert.ok(sync.includes('this.repo = this.manager.getActive();'), 'synchronize view uses active repo');
-  assert.ok(reflog.includes('this.repo = this.manager.getActive();'), 'reflog view uses active repo');
+  assert.ok(sync.includes('const repo = this.manager.getActive();'), 'synchronize view uses active repo');
+  assert.ok(reflog.includes('const repo = this.manager.getActive();'), 'reflog view uses active repo');
   assert.ok(history.includes('repo ?? this.manager.getActive()'), 'history fallback uses active repo');
   assert.ok(graph.includes('initialRepo ?? manager.getActive()'), 'graph fallback uses active repo');
   assert.ok(quickDiff.includes('this.manager.findByUri(uri)'), 'quick diff uses containment lookup');

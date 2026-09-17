@@ -29,8 +29,8 @@ export function registerSubtreeCommands(
     if (!repository) return;
 
     const ref = await vscode.window.showInputBox({
-      prompt: "Enter branch/tag to add (leave empty for master)",
-      placeHolder: "master",
+      prompt: "Enter branch/tag to add (leave empty for the remote's default branch)",
+      placeHolder: "remote default (e.g. main)",
     });
 
     try {
@@ -65,8 +65,8 @@ export function registerSubtreeCommands(
     if (!repository) return;
 
     const ref = await vscode.window.showInputBox({
-      prompt: "Enter branch/tag to pull (leave empty for master)",
-      placeHolder: "master",
+      prompt: "Enter branch/tag to pull (leave empty for the remote's default branch)",
+      placeHolder: "remote default (e.g. main)",
     });
 
     try {
@@ -101,8 +101,8 @@ export function registerSubtreeCommands(
     if (!repository) return;
 
     const ref = await vscode.window.showInputBox({
-      prompt: "Enter branch to push to (leave empty for master)",
-      placeHolder: "master",
+      prompt: "Enter branch to push to (leave empty for the remote's default branch)",
+      placeHolder: "remote default (e.g. main)",
     });
 
     const confirm = await vscode.window.showWarningMessage(

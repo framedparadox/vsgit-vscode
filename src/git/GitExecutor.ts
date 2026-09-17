@@ -18,6 +18,12 @@ export interface GitRunOptions {
   okCodes?: number[];
   /** Kill the process if it hasn't exited after this many milliseconds. */
   timeoutMs?: number;
+  /**
+   * Maximum combined stdout/stderr retained in memory. Git commands can read
+   * repository-controlled data, so bounding output prevents a malformed or
+   * unexpectedly large repository from exhausting the extension host.
+   */
+  maxOutputBytes?: number;
 }
 
 export interface GitResult {
@@ -32,6 +38,9 @@ export class GitCommandCancelled extends Error {
     this.name = "GitCommandCancelled";
   }
 }
+
+const DEFAULT_MAX_OUTPUT_BYTES = 64 * 1024 * 1024;
+const FORCE_KILL_DELAY_MS = 1_000;
 
 /**
  * Thin wrapper around spawning the `git` binary. Every higher-level operation
@@ -70,7 +79,7 @@ export class GitExecutor {
     return result;
   }
 
-  /** Convenience: run and return trimmed stdout. */
+  /** Convenience: run and return stdout without altering parser delimiters. */
   async stdout(args: string[], options: GitRunOptions): Promise<string> {
     return (await this.run(args, options)).stdout;
   }
@@ -82,35 +91,100 @@ export class GitExecutor {
         env: { ...process.env, ...options.env },
       });
 
-      let stdout = "";
-      let stderr = "";
-      child.stdout.on("data", (d) => (stdout += d.toString()));
-      child.stderr.on("data", (d) => (stderr += d.toString()));
-
+      const stdoutChunks: Buffer[] = [];
+      const stderrChunks: Buffer[] = [];
+      const maxOutputBytes = Math.max(
+        1,
+        options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES,
+      );
+      let outputBytes = 0;
+      let outputExceeded = false;
       let timedOut = false;
+      let settled = false;
+      let forceKillTimer: NodeJS.Timeout | undefined;
       const timer = options.timeoutMs
         ? setTimeout(() => {
             timedOut = true;
-            child.kill();
+            terminate();
           }, options.timeoutMs)
         : undefined;
+      timer?.unref();
 
-      child.on("error", (err) => {
+      const output = (chunks: Buffer[]): string =>
+        Buffer.concat(chunks).toString("utf8");
+      const clearTimers = () => {
         if (timer) clearTimeout(timer);
-        reject(err);
+        if (forceKillTimer) clearTimeout(forceKillTimer);
+      };
+      const terminate = () => {
+        child.kill();
+        if (!forceKillTimer) {
+          forceKillTimer = setTimeout(() => child.kill("SIGKILL"), FORCE_KILL_DELAY_MS);
+          forceKillTimer.unref();
+        }
+      };
+      const capture = (chunks: Buffer[], data: Buffer | string) => {
+        if (outputExceeded) {
+          return;
+        }
+        const chunk = Buffer.isBuffer(data) ? data : Buffer.from(data);
+        outputBytes += chunk.length;
+        if (outputBytes > maxOutputBytes) {
+          outputExceeded = true;
+          terminate();
+          return;
+        }
+        chunks.push(chunk);
+      };
+
+      child.stdout.on("data", (data) => capture(stdoutChunks, data));
+      child.stderr.on("data", (data) => capture(stderrChunks, data));
+      // A child that exits before consuming stdin can emit EPIPE. The process
+      // close event remains the authoritative result and prevents an unhandled
+      // stream error from crashing the extension host.
+      child.stdin.on("error", () => undefined);
+
+      child.on("error", (error) => {
+        if (settled) return;
+        settled = true;
+        clearTimers();
+        reject(error);
       });
       child.on("close", (code) => {
-        if (timer) clearTimeout(timer);
+        if (settled) return;
+        settled = true;
+        clearTimers();
+        const stdout = output(stdoutChunks);
+        const stderr = output(stderrChunks);
         if (timedOut) {
-          reject(new GitError(`git ${args[0] ?? ""} timed out after ${options.timeoutMs}ms`, -1, stderr, stdout, args));
+          reject(
+            new GitError(
+              `git ${args[0] ?? ""} timed out after ${options.timeoutMs}ms`,
+              -1,
+              stderr,
+              stdout,
+              args,
+            ),
+          );
+          return;
+        }
+        if (outputExceeded) {
+          reject(
+            new GitError(
+              `git ${args[0] ?? ""} exceeded the ${maxOutputBytes}-byte output limit`,
+              -1,
+              stderr,
+              stdout,
+              args,
+            ),
+          );
           return;
         }
         resolve({ stdout, stderr, exitCode: code ?? -1 });
       });
 
       if (options.stdin !== undefined) {
-        child.stdin.write(options.stdin);
-        child.stdin.end();
+        child.stdin.end(options.stdin);
       }
     });
   }

@@ -24,7 +24,7 @@ test("parses a single commit with refs", () => {
     "Fix the thing",       // %s subject
     "Body line one\nBody line two", // %b body
   ]);
-  const commits = parseLog(out);
+  const commits = parseLog(out, ["origin"]);
   assert.equal(commits.length, 1);
   const c = commits[0];
   assert.equal(c.sha, "abc123def456");
@@ -39,6 +39,27 @@ test("parses a single commit with refs", () => {
     { name: "v1", kind: "tag" },
     { name: "origin/main", kind: "remoteBranch" },
   ]);
+});
+
+test("slashed ref is a local branch unless its prefix is a known remote", () => {
+  const out = record([
+    "sha1", "", "A", "a@x", "1", "A", "1",
+    "feature/login, origin/main, release/1.2", // %D refs
+    "s", "",
+  ]);
+  // "origin" is a remote; "feature" and "release" are not.
+  const c = parseLog(out, ["origin"])[0];
+  assert.deepEqual(c.refs, [
+    { name: "feature/login", kind: "localBranch" },
+    { name: "origin/main", kind: "remoteBranch" },
+    { name: "release/1.2", kind: "localBranch" },
+  ]);
+  // With no known remotes, even "origin/main" is treated as local.
+  const noRemotes = parseLog(out)[0];
+  assert.deepEqual(
+    noRemotes.refs.map((r) => r.kind),
+    ["localBranch", "localBranch", "localBranch"],
+  );
 });
 
 test("root commit has no parents and no refs", () => {

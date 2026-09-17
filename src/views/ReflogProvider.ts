@@ -21,12 +21,15 @@ export class ReflogProvider implements vscode.TreeDataProvider<ReflogNode>, vsco
 
   private entries: ReflogEntry[] = [];
   private repo: Repository | undefined;
+  private refreshGeneration = 0;
 
   constructor(private readonly manager: RepositoryManager) {
     this.subscription = manager.onDidChange(() => void this.refresh());
   }
 
   dispose(): void {
+    this.refreshGeneration += 1;
+    this.entries = [];
     this.subscription.dispose();
     this._onDidChangeTreeData.dispose();
   }
@@ -36,16 +39,19 @@ export class ReflogProvider implements vscode.TreeDataProvider<ReflogNode>, vsco
   }
 
   async refresh(): Promise<void> {
-    this.repo = this.manager.getActive();
-    if (this.repo) {
+    const generation = ++this.refreshGeneration;
+    const repo = this.manager.getActive();
+    let entries: ReflogEntry[] = [];
+    if (repo) {
       try {
-        this.entries = await this.repo.reflog("HEAD");
+        entries = await repo.reflog("HEAD");
       } catch {
-        this.entries = [];
+        entries = [];
       }
-    } else {
-      this.entries = [];
     }
+    if (generation !== this.refreshGeneration) return;
+    this.repo = repo;
+    this.entries = entries;
     this._onDidChangeTreeData.fire(undefined);
   }
 

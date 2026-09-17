@@ -1,5 +1,58 @@
 # Changelog
 
+## [v0.0.7] - 2026-06-30
+
+### Security
+
+- Bound retained Git subprocess output (64 MB default, with `SIGTERM`→`SIGKILL`
+  escalation on timeout), use cryptographically random webview nonces, restrict
+  no-resource webviews from local file roots, validate config webview writes
+  against an explicit allowlist, and redact credentials (URL user-info and
+  `token`/`password`/`access_token`/`auth` query parameters) from displayed
+  remote URLs.
+- Hardened askpass/editor IPC startup: callers wait for the server to be
+  listening before git is spawned, sockets are created `0600` on POSIX and
+  tracked for deterministic disposal, and the per-session token is compared in
+  constant time. Made Gerrit hook installation refuse existing files and
+  symlinks (`O_EXCL` create).
+
+### Fixed
+
+- **Local branches with a slash in their name** (e.g. `feature/login`,
+  `release/1.2`) were classified as remote-tracking branches by the log parser.
+  Refs are now checked against the repository's actual configured remotes.
+- **Git LFS unlock** always warned that a file was "locked by someone else"
+  because ownership was compared against the literal string `"you"`. It now
+  compares the lock owner against the repository's configured `user.name`.
+- **Subtree add/pull/push** appended a hardcoded `master` when no ref was given,
+  which fails on repositories whose default branch is `main` (or anything else).
+  The remote's actual default branch is now resolved via
+  `git ls-remote --symref … HEAD`, falling back to `master` only when the remote
+  HEAD is unreadable.
+- Clean compiled test output before every run so deleted tests cannot continue
+  passing from stale JavaScript.
+- Restored Extension Host configuration, release documentation, and the complete
+  CI/publish verification gates.
+- Prevented stale History/Graph queries and duplicate background fetch/refresh
+  work from racing newer state.
+
+### Performance
+
+- Bounded the inline-blame cache (20-entry LRU), release cached history/blame
+  data promptly, invalidate only changed file decorations, and index Graph
+  commits before attaching stash labels.
+
+### Internal
+
+- Unified the client-side HTML-escaping helper across all webview templates into
+  a single shared `ESC_SCRIPT` definition, which also fixed inconsistent handling
+  of nullish values (some copies rendered `"undefined"`/`"null"` as literal text).
+- Scoped `.gitignore` to ignore only the intended local-only docs rather than the
+  whole `docs/` folder, so newly added documentation is no longer silently
+  untracked.
+- Unit suite grows to 189 passing tests, adding coverage for slash-named branch
+  classification and the resolved subtree default branch.
+
 ## [v0.0.5] - 2026-06-01
 
 ### Added

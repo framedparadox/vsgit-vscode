@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import { escapeHtml } from "../util/html";
+import { makeNonce } from "../util/token";
 
 export interface CreateTagDialogResult {
   name: string;
@@ -10,7 +12,7 @@ export interface CreateTagDialogResult {
 }
 
 export async function showCreateTagDialog(
-  extensionUri: vscode.Uri,
+  _extensionUri: vscode.Uri,
   shaLabel = "HEAD",
 ): Promise<CreateTagDialogResult | undefined> {
   const panel = vscode.window.createWebviewPanel(
@@ -19,10 +21,10 @@ export async function showCreateTagDialog(
     vscode.ViewColumn.Active,
     {
       enableScripts: true,
-      localResourceRoots: [extensionUri],
+      localResourceRoots: [],
     },
   );
-  panel.webview.html = createTagHtml(getNonce(), panel.webview.cspSource, shaLabel);
+  panel.webview.html = createTagHtml(makeNonce(), panel.webview.cspSource, shaLabel);
 
   return new Promise((resolve) => {
     let settled = false;
@@ -278,21 +280,4 @@ nameInput.focus();
 </script>
 </body>
 </html>`;
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-function getNonce(): string {
-  const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let text = "";
-  for (let i = 0; i < 32; i++) {
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
-  }
-  return text;
 }

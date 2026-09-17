@@ -19,6 +19,10 @@ export class RepositoryManager implements vscode.Disposable {
   private readonly git = new GitExecutor(configuredGitPath(), shouldRunGitCommand);
   private activeRoot: string | undefined;
   private scanInFlight: Promise<void> | undefined;
+  private scanPending = false;
+  private refreshInFlight: Promise<void> | undefined;
+  private refreshPending = false;
+  private disposed = false;
   private lastScanDurationMs = 0;
   private lastScanFolderCount = 0;
 
@@ -90,13 +94,30 @@ export class RepositoryManager implements vscode.Disposable {
    * processes against every folder.
    */
   scan(): Promise<void> {
-    if (this.scanInFlight) {
-      return this.scanInFlight;
+    if (this.disposed) {
+      return Promise.resolve();
     }
-    this.scanInFlight = this.performScan().finally(() => {
-      this.scanInFlight = undefined;
-    });
+    this.scanPending = true;
+    if (!this.scanInFlight) {
+      const scan = this.runScanLoop().finally(() => {
+        if (this.scanInFlight === scan) {
+          this.scanInFlight = undefined;
+        }
+      });
+      this.scanInFlight = scan;
+    }
     return this.scanInFlight;
+  }
+
+  /**
+   * Coalesce scan requests, but replay one request that arrived mid-scan. This
+   * prevents duplicate discovery processes without losing a workspace change.
+   */
+  private async runScanLoop(): Promise<void> {
+    while (this.scanPending && !this.disposed) {
+      this.scanPending = false;
+      await this.performScan();
+    }
   }
 
   getPerformanceSnapshot(): {
@@ -148,7 +169,34 @@ export class RepositoryManager implements vscode.Disposable {
     this.lastScanDurationMs = performance.now() - startedAt;
   }
 
-  async refreshAll(): Promise<void> {
+  refreshAll(): Promise<void> {
+    if (this.disposed) {
+      return Promise.resolve();
+    }
+    this.refreshPending = true;
+    if (!this.refreshInFlight) {
+      const refresh = this.runRefreshLoop().finally(() => {
+        if (this.refreshInFlight === refresh) {
+          this.refreshInFlight = undefined;
+        }
+      });
+      this.refreshInFlight = refresh;
+    }
+    return this.refreshInFlight;
+  }
+
+  /**
+   * Collapse watcher/UI bursts into one refresh plus at most one follow-up.
+   * Callers share the same promise, avoiding overlapping status/log processes.
+   */
+  private async runRefreshLoop(): Promise<void> {
+    while (this.refreshPending && !this.disposed) {
+      this.refreshPending = false;
+      await this.performRefresh();
+    }
+  }
+
+  private async performRefresh(): Promise<void> {
     await Promise.all(
       this.getAll().map((repo) =>
         repo.refresh().catch((err) => {
@@ -156,7 +204,9 @@ export class RepositoryManager implements vscode.Disposable {
         }),
       ),
     );
-    this._onDidChange.fire();
+    if (!this.disposed) {
+      this._onDidChange.fire();
+    }
   }
 
   private async discoverRoot(start: string): Promise<string | undefined> {
@@ -201,7 +251,7 @@ export class RepositoryManager implements vscode.Disposable {
 
   /** Debounce bursts of filesystem events into a single refresh. */
   private scheduleRefresh(): void {
-    if (!this.autoRefreshEnabled()) {
+    if (this.disposed || !this.autoRefreshEnabled()) {
       return;
     }
     if (this.refreshTimer) {
@@ -214,6 +264,9 @@ export class RepositoryManager implements vscode.Disposable {
   }
 
   dispose(): void {
+    this.disposed = true;
+    this.scanPending = false;
+    this.refreshPending = false;
     for (const watchers of this.watchers.values()) {
       for (const watcher of watchers) {
         watcher.close();
@@ -223,6 +276,7 @@ export class RepositoryManager implements vscode.Disposable {
     this._onDidChange.dispose();
     if (this.refreshTimer) {
       clearTimeout(this.refreshTimer);
+      this.refreshTimer = undefined;
     }
   }
 

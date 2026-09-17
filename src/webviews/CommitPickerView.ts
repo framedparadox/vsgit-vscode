@@ -1,8 +1,8 @@
-import * as crypto from "node:crypto";
 import * as vscode from "vscode";
 import { Repository } from "../git/Repository";
 import type { Commit } from "../git/parsers/log";
 import { commitPickerHtml } from "./commitPickerHtml";
+import { makeNonce } from "../util/token";
 
 /**
  * Opens the "Select a Commit" webview panel and resolves with the selected
@@ -28,7 +28,7 @@ export class CommitPickerView {
         },
       );
 
-      const nonce = crypto.randomBytes(16).toString("hex");
+      const nonce = makeNonce();
       const codiconCssUri = panel.webview.asWebviewUri(
         vscode.Uri.joinPath(extensionUri, "resources", "codicon.css"),
       );

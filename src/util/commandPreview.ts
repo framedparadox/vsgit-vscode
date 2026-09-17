@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { redactRemoteUrl } from "../git/argGuard";
 
 export async function shouldRunGitCommand(
   args: string[],
@@ -15,7 +16,10 @@ export async function shouldRunGitCommand(
     return true;
   }
 
-  const command = [gitPath || "git", ...args].map(quoteArg).join(" ");
+  const command = [gitPath || "git", ...args]
+    .map(redactRemoteUrl)
+    .map(quoteArg)
+    .join(" ");
   const result = await vscode.window.showWarningMessage(
     `Run this Git command?\n\n${command}\n\nWorking directory:\n${cwd}`,
     { modal: true },

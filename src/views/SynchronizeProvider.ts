@@ -24,28 +24,38 @@ export class SynchronizeProvider implements vscode.TreeDataProvider<SyncNode>, v
   private incoming: Commit[] = [];
   private outgoing: Commit[] = [];
   private hasUpstream = false;
+  private refreshGeneration = 0;
 
   constructor(private readonly manager: RepositoryManager) {
     this.subscription = manager.onDidChange(() => void this.refresh());
   }
 
   dispose(): void {
+    this.refreshGeneration += 1;
+    this.incoming = [];
+    this.outgoing = [];
     this.subscription.dispose();
     this._onDidChangeTreeData.dispose();
   }
 
   async refresh(): Promise<void> {
-    this.repo = this.manager.getActive();
-    if (this.repo) {
-      const ab = await this.repo.aheadBehind();
-      this.hasUpstream = ab !== undefined;
-      this.incoming = await this.repo.syncCommits("incoming");
-      this.outgoing = await this.repo.syncCommits("outgoing");
-    } else {
-      this.hasUpstream = false;
-      this.incoming = [];
-      this.outgoing = [];
+    const generation = ++this.refreshGeneration;
+    const repo = this.manager.getActive();
+    let ab: { ahead: number; behind: number } | undefined;
+    let incoming: Commit[] = [];
+    let outgoing: Commit[] = [];
+    if (repo) {
+      [ab, incoming, outgoing] = await Promise.all([
+        repo.aheadBehind(),
+        repo.syncCommits("incoming"),
+        repo.syncCommits("outgoing"),
+      ]);
     }
+    if (generation !== this.refreshGeneration) return;
+    this.repo = repo;
+    this.hasUpstream = ab !== undefined;
+    this.incoming = incoming;
+    this.outgoing = outgoing;
     this._onDidChangeTreeData.fire(undefined);
   }
 

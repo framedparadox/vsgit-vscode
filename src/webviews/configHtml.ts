@@ -4,6 +4,8 @@
  * messages the extension translates into `git config` calls.
  * Also supports Remotes and Extension Settings tabs.
  */
+import { ESC_SCRIPT } from "../util/html";
+
 export function configHtml(nonce: string, cspSource: string): string {
   return /* html */ `<!DOCTYPE html>
 <html lang="en">
@@ -142,7 +144,7 @@ const announce = (message) => {
   requestAnimationFrame(() => { status.textContent = message; });
 };
 
-function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+${ESC_SCRIPT}
 
 function isGitScope(s) { return s === 'local' || s === 'global' || s === 'system'; }
 function editable() { return scope !== 'system'; }

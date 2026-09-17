@@ -21,10 +21,18 @@ const socket = net.connect(sockPath, () => {
   // The token authenticates us to the extension's IPC server.
   socket.write(JSON.stringify({ prompt, token }) + "\n");
 });
+socket.setTimeout(5 * 60 * 1000, () => {
+  socket.destroy();
+  process.exit(1);
+});
 
 let buf = "";
 socket.on("data", (chunk) => {
   buf += chunk.toString("utf8");
+  if (buf.length > 64 * 1024) {
+    socket.destroy();
+    process.exit(1);
+  }
   const nl = buf.indexOf("\n");
   if (nl === -1) {
     return;

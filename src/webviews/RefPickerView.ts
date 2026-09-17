@@ -1,10 +1,10 @@
-import * as crypto from "node:crypto";
 import * as path from "node:path";
 import * as fs from "node:fs";
 import * as vscode from "vscode";
 import { Repository } from "../git/Repository";
 import { isOptionLike } from "../git/argGuard";
 import { refPickerHtml } from "./refPickerHtml";
+import { makeNonce } from "../util/token";
 
 interface RefEntry {
   ref: string;
@@ -43,7 +43,7 @@ export class RefPickerView {
         },
       );
 
-      const nonce = crypto.randomBytes(16).toString("hex");
+      const nonce = makeNonce();
       panel.webview.html = refPickerHtml(nonce, panel.webview.cspSource);
 
       let resolved = false;
@@ -62,14 +62,23 @@ export class RefPickerView {
       });
 
       // Build and send groups asynchronously
-      void buildGroups(repo, opts).then((groups) => {
-        void panel.webview.postMessage({
-          command: "load",
-          groups,
-          title:    opts.title,
-          subtitle: opts.subtitle,
+      void buildGroups(repo, opts)
+        .then((groups) => {
+          void panel.webview.postMessage({
+            command: "load",
+            groups,
+            title: opts.title,
+            subtitle: opts.subtitle,
+          });
+        })
+        .catch(() => {
+          void panel.webview.postMessage({
+            command: "load",
+            groups: [],
+            title: opts.title,
+            subtitle: opts.subtitle,
+          });
         });
-      });
     });
   }
 }
@@ -208,16 +217,21 @@ async function resolveSpecialRefs(repo: Repository): Promise<RefEntry[]> {
   return items;
 }
 
-async function resolveRef(repo: Repository, name: string): Promise<string | undefined> {
+async function resolveRef(
+  repo: Repository,
+  name: string,
+  visited = new Set<string>(),
+): Promise<string | undefined> {
   // `name` can be a symref target read from a ref file (see below), i.e. it
   // originates from repository contents. Reject anything git would parse as an
   // option so it cannot smuggle a flag into `rev-parse --verify`.
-  if (isOptionLike(name)) return undefined;
+  if (isOptionLike(name) || visited.has(name) || visited.size >= 16) {
+    return undefined;
+  }
+  const nextVisited = new Set(visited).add(name);
   // First try git rev-parse to handle both symbolic and packed refs
   try {
-    const out = await (repo as unknown as { git: { stdout: (args: string[], opts?: object) => Promise<string> } })
-      .git.stdout(["rev-parse", "--verify", "--end-of-options", name], { cwd: repo.root });
-    return out.trim() || undefined;
+    return (await repo.resolveRevision(name)) || undefined;
   } catch {
     // Try reading the file directly for special refs. A crafted symref target
     // (e.g. "ref: ../../etc/passwd") must not escape the git dir, so resolve
@@ -233,7 +247,7 @@ async function resolveRef(repo: Repository, name: string): Promise<string | unde
       // Handle symrefs like "ref: refs/heads/main"
       if (content.startsWith("ref: ")) {
         const target = content.slice(5).trim();
-        return resolveRef(repo, target);
+        return resolveRef(repo, target, nextVisited);
       }
       return content || undefined;
     }
@@ -244,9 +258,7 @@ async function resolveRef(repo: Repository, name: string): Promise<string | unde
 async function resolveSubject(repo: Repository, sha: string): Promise<string> {
   if (isOptionLike(sha)) return "";
   try {
-    const out = await (repo as unknown as { git: { stdout: (args: string[], opts?: object) => Promise<string> } })
-      .git.stdout(["log", "-1", "--format=%s", "--end-of-options", sha], { cwd: repo.root });
-    return out.trim();
+    return await repo.commitSubject(sha);
   } catch {
     return "";
   }
@@ -254,10 +266,7 @@ async function resolveSubject(repo: Repository, sha: string): Promise<string> {
 
 async function getGitDir(repo: Repository): Promise<string> {
   try {
-    const out = await (repo as unknown as { git: { stdout: (args: string[], opts?: object) => Promise<string> } })
-      .git.stdout(["rev-parse", "--git-dir"], { cwd: repo.root });
-    const rel = out.trim();
-    return path.isAbsolute(rel) ? rel : path.join(repo.root, rel);
+    return await repo.gitDirectory();
   } catch {
     return path.join(repo.root, ".git");
   }

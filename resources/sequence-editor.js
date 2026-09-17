@@ -30,10 +30,18 @@ const socket = net.connect(sockPath, () => {
   const req = JSON.stringify({ kind, token, content_b64: Buffer.from(content, "utf8").toString("base64") });
   socket.write(req + "\n");
 });
+socket.setTimeout(30 * 60 * 1000, () => {
+  socket.destroy();
+  process.exit(1);
+});
 
 let buf = "";
 socket.on("data", (chunk) => {
   buf += chunk.toString("utf8");
+  if (buf.length > 16 * 1024 * 1024) {
+    socket.destroy();
+    process.exit(1);
+  }
   const nl = buf.indexOf("\n");
   if (nl === -1) {
     return;

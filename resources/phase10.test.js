@@ -15,6 +15,16 @@ test('Phase 10 verification scripts enforce coverage, integration, audit, and pa
   assert.ok(pkg.scripts['test:coverage'].includes('--test-coverage-functions=70'));
   assert.ok(pkg.scripts['test:integration'].includes('vscode-test'));
   assert.ok(pkg.scripts['package:verify'].includes('verify-vsix.mjs'));
+  assert.ok(pkg.scripts.pretest.includes('clean:test-output'));
+
+  const vsixVerifier = read('scripts/verify-vsix.mjs');
+  assert.ok(vsixVerifier.includes('Microsoft\\.VisualStudio\\.Code\\.PreRelease'));
+  assert.ok(vsixVerifier.includes('VSIX is marked as a pre-release extension.'));
+
+  const testConfig = JSON.parse(read('tsconfig.test.json'));
+  for (const source of testConfig.include.filter((entry) => !entry.includes('*'))) {
+    assert.ok(fs.existsSync(path.join(root, source)), `test input exists: ${source}`);
+  }
 
   const integrationConfig = read('.vscode-test.mjs');
   const integrationTest = read('src/test/extension.integration.test.ts');

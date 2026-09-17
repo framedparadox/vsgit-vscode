@@ -8,6 +8,8 @@
  *   - Keyboard navigation (↑/↓/Enter), double-click to confirm
  *   - Posts { command:"pick", sha } back to the extension on confirm
  */
+import { ESC_SCRIPT } from "../util/html";
+
 export function commitPickerHtml(
   nonce: string,
   cspSource: string,
@@ -524,11 +526,7 @@ function cell(text, cls) {
   return td;
 }
 
-function esc(s) {
-  return String(s)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;');
-}
+${ESC_SCRIPT}
 
 function relDate(unix) {
   if (!unix) return '';

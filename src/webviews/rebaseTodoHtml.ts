@@ -3,6 +3,8 @@
  * commit list in; the user picks an action per row and reorders rows, then
  * Start sends the final ordered list back.
  */
+import { ESC_SCRIPT } from "../util/html";
+
 export function rebaseTodoHtml(nonce: string, cspSource: string): string {
   return /* html */ `<!DOCTYPE html>
 <html lang="en">
@@ -94,7 +96,7 @@ function move(i, d) {
   announce('Moved commit to position ' + (j + 1) + ' of ' + items.length + '.');
 }
 
-function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+${ESC_SCRIPT}
 
 document.getElementById('start').addEventListener('click', () => vscode.postMessage({ type: 'start', items }));
 document.getElementById('cancel').addEventListener('click', () => vscode.postMessage({ type: 'cancel' }));

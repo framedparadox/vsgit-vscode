@@ -20,6 +20,7 @@ export class Credentials {
   ): Promise<T> {
     const server = new AskpassServer();
     try {
+      await server.ready;
       return await fn(server.env(this.shimPath));
     } finally {
       server.dispose();

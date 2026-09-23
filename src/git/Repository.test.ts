@@ -28,6 +28,8 @@ class FakeGitExecutor extends GitExecutor {
   calls: RecordedCall[] = [];
   /** Canned stdout for `run`/`stdout`. Empty string => parsers yield []. */
   nextStdout = "";
+  /** When set, `run` throws GitError for matching argv (used to test fallbacks). */
+  throwFor: ((args: string[]) => boolean) | undefined;
 
   constructor() {
     super("git-not-actually-run");
@@ -35,6 +37,9 @@ class FakeGitExecutor extends GitExecutor {
 
   override async run(args: string[], options: GitRunOptions): Promise<GitResult> {
     this.calls.push({ args, options });
+    if (this.throwFor?.(args)) {
+      throw new GitError("failed", 1, "pathspec did not match", "", args);
+    }
     return { stdout: this.nextStdout, stderr: "", exitCode: 0 };
   }
 
@@ -524,6 +529,55 @@ test("diffFiles: rejects either option-like ref", async () => {
   ]);
 });
 
+test("mergeBase: rejects option-like refs; trims sha; undefined on failure", async () => {
+  const { repo, git } = makeRepo();
+  await assertRejectsBeforeGit(git, () => repo.mergeBase("-x", "HEAD"), "ref1=-x");
+  await assertRejectsBeforeGit(git, () => repo.mergeBase("HEAD", "-x"), "ref2=-x");
+  git.calls = [];
+  git.nextStdout = "abc123\n";
+  assert.strictEqual(await repo.mergeBase("HEAD", "MERGE_HEAD"), "abc123");
+  assert.deepStrictEqual(git.calls[0].args, ["merge-base", "HEAD", "MERGE_HEAD"]);
+  // Empty stdout (no common ancestor) resolves to undefined, not "".
+  git.nextStdout = "";
+  assert.strictEqual(await repo.mergeBase("HEAD", "MERGE_HEAD"), undefined);
+});
+
+test("replaceWithRef: rejects option-like ref; batches paths after --", async () => {
+  const { repo, git } = makeRepo();
+  await assertRejectsBeforeGit(git, () => repo.replaceWithRef(["a.txt"], "-x"), "ref=-x");
+  git.calls = [];
+  await repo.replaceWithRef(["a.txt", "-looks-like-option.txt"], "HEAD");
+  assert.deepStrictEqual(git.calls[0].args, [
+    "checkout",
+    "HEAD",
+    "--",
+    "a.txt",
+    "-looks-like-option.txt",
+  ]);
+  // Single-path (string) form and empty list both remain supported.
+  git.calls = [];
+  await repo.replaceWithRef("b.txt", "HEAD");
+  assert.deepStrictEqual(git.calls[0].args, ["checkout", "HEAD", "--", "b.txt"]);
+  git.calls = [];
+  await repo.replaceWithRef([], "HEAD");
+  assert.strictEqual(git.calls.length, 0, "no git call for an empty path list");
+});
+
+test("replaceWithRef: retries per path when a batch checkout fails", async () => {
+  const { repo, git } = makeRepo();
+  git.throwFor = (args) => args.includes("missing.txt");
+  const failed = await repo.replaceWithRef(["a.txt", "missing.txt"], "HEAD");
+  assert.deepStrictEqual(failed, ["missing.txt"]);
+  assert.deepStrictEqual(
+    git.calls.map((c) => c.args),
+    [
+      ["checkout", "HEAD", "--", "a.txt", "missing.txt"],
+      ["checkout", "HEAD", "--", "a.txt"],
+      ["checkout", "HEAD", "--", "missing.txt"],
+    ],
+  );
+});
+
 test("reflog: rejects option-like ref; default HEAD", async () => {
   const { repo, git } = makeRepo();
   await assertRejectsBeforeGit(git, () => repo.reflog("-x"), "ref=-x");
@@ -537,6 +591,11 @@ test("reflog: rejects option-like ref; default HEAD", async () => {
 test("log: rejects option-like revRange", async () => {
   const { repo, git } = makeRepo();
   await assertRejectsBeforeGit(git, () => repo.log({ revRange: "--evil" }), "revRange=--evil");
+  await assertRejectsBeforeGit(
+    git,
+    () => repo.log({ revRange: "HEAD...--evil" }),
+    "revRange=HEAD...--evil",
+  );
   git.calls = [];
   await repo.log({ revRange: "main...feature", order: "topo" });
   assert.ok(git.calls[0].args.includes("main...feature"));

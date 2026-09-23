@@ -15,7 +15,7 @@ export function registerCloneCommands(
   manager: RepositoryManager,
 ): void {
   const git = manager.getGitExecutor();
-  const shimPath = path.join(context.extensionPath, "resources", "askpass.js");
+  const shimPath = path.join(context.extensionPath, "webview-ui", "shared", "askpass.js");
 
   context.subscriptions.push(
     vscode.commands.registerCommand("vsgit.clone", async () => {

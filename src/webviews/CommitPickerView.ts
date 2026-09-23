@@ -24,13 +24,13 @@ export class CommitPickerView {
         {
           enableScripts: true,
           retainContextWhenHidden: false,
-          localResourceRoots: [vscode.Uri.joinPath(extensionUri, "resources")],
+          localResourceRoots: [vscode.Uri.joinPath(extensionUri, "webview-ui")],
         },
       );
 
       const nonce = makeNonce();
       const codiconCssUri = panel.webview.asWebviewUri(
-        vscode.Uri.joinPath(extensionUri, "resources", "codicon.css"),
+        vscode.Uri.joinPath(extensionUri, "webview-ui", "shared", "codicon.css"),
       );
       panel.webview.html = commitPickerHtml(
         nonce,

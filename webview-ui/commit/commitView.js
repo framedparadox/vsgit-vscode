@@ -1,13 +1,13 @@
 'use strict';
 
 /*
- * Shared, DOM-free helpers for the Commit view (resources/commit.js).
+ * Shared, DOM-free helpers for the Commit view (webview-ui/commit/commit.js).
  *
- * Like resources/graphLayout.js this is a UMD module: in the browser it attaches
+ * Like webview-ui/graph/graphLayout.js this is a UMD module: in the browser it attaches
  * to `self.CommitView`; in Node it exports via `module.exports`. Keeping the pure
  * data logic here (status codes, file-tree grouping, escaping) lets the commit
  * webview stay a thin DOM layer and lets this logic be unit-tested directly in
- * Node (resources/commitView.test.js) without a browser.
+ * Node (webview-ui/commit/commitView.test.js) without a browser.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
@@ -56,7 +56,7 @@
   // it is required; in the browser it is read off `self.SetiIcons`.
   const seti =
     typeof require === 'function'
-      ? require('./setiIcons.js')
+      ? require('../shared/setiIcons.js')
       : (typeof self !== 'undefined' ? self.SetiIcons : undefined);
   const setiIconClass = (name) => seti.setiIconClass(name);
 

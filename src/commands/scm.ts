@@ -6,6 +6,14 @@ import { GitContentProvider, VSGIT_EMPTY_REF } from "../git/GitContentProvider";
 import type { FileChange } from "../git/parsers/status";
 import { confirmDestructiveAction, DestructiveOperations } from "../util/confirmation";
 import { withProgress, errMsg } from "./shared";
+import {
+  dirtyTargetsWarning,
+  filesInRepo,
+  relativePaths,
+  repoForUri,
+  revertDirtyTargets,
+  withoutFailed,
+} from "./uriHelpers";
 
 /**
  * Commands for VS Code's built-in SCM (Source Control) view.
@@ -62,20 +70,19 @@ export function registerSCMCommands(
     if (files.length === 0) return;
     const confirmed = await confirmDestructiveAction({
       operation: DestructiveOperations.DISCARD_CHANGES,
-      message: `Discard changes in ${files.length} file(s)? This cannot be undone.`,
+      message: `Discard changes in ${files.length} file(s)? This cannot be undone.${dirtyTargetsWarning(uris)}`,
       items: files,
     });
 
     if (!confirmed) return;
 
-    try {
-      await withProgress(manager, `Discarding ${files.length} file(s)`, async () => {
-        await repo.discard(discard.tracked, discard.untracked);
-      });
-      vscode.window.showInformationMessage(`Discarded changes in ${files.length} file(s)`);
-    } catch (e) {
-      vscode.window.showErrorMessage(`Failed to discard changes: ${errMsg(e)}`);
-    }
+    // withProgress reports failures itself; only touch editors on success.
+    const ok = await withProgress(manager, `Discarding ${files.length} file(s)`, () =>
+      repo.discard(discard.tracked, discard.untracked),
+    );
+    if (!ok) return;
+    await revertDirtyTargets(uris);
+    vscode.window.showInformationMessage(`Discarded changes in ${files.length} file(s)`);
   });
 
   // Open diff for file
@@ -93,6 +100,13 @@ export function registerSCMCommands(
     const rel = manager.relativePath(repo, uri);
     const group = resourceGroup(resourceState);
     const change = resourceChange(resourceState);
+    if (group === "merge" || change?.conflicted) {
+      await vscode.commands.executeCommand("vsgit.conflict.openMergeEditor", {
+        repo,
+        change: { path: rel },
+      });
+      return;
+    }
     const isIndex = group === "index";
     const left = isIndex
       ? GitContentProvider.uri(repo.root, rel, "HEAD", uri.fsPath)
@@ -166,24 +180,29 @@ export function registerSCMCommands(
     const repo = findRepoForUri(manager, uris[0]);
     if (!repo) return;
 
-    const files = relativePaths(manager, repo, uris);
+    const target = filesInRepo(manager, repo, uris);
+    const files = target.rels;
+    if (files.length === 0) return;
     const confirmed = await confirmDestructiveAction({
       operation: DestructiveOperations.DISCARD_CHANGES,
-      message: `Replace ${files.length} file(s) with HEAD version? Local changes will be lost.`,
+      message: `Replace ${files.length} file(s) with HEAD version? Local changes will be lost.${dirtyTargetsWarning(target.uris)}`,
       items: files,
     });
 
     if (!confirmed) return;
 
-    try {
-      await withProgress(manager, `Replacing ${files.length} file(s)`, async () => {
-        for (const file of files) {
-          await repo.replaceWithRef(file, "HEAD");
-        }
-      });
+    const failed: string[] = [];
+    const ok = await withProgress(manager, `Replacing ${files.length} file(s)`, async () => {
+      failed.push(...(await repo.replaceWithRef(files, "HEAD")));
+    });
+    if (!ok) return;
+    await revertDirtyTargets(withoutFailed(target.uris, files, failed));
+    if (failed.length > 0) {
+      vscode.window.showWarningMessage(
+        `Replaced ${files.length - failed.length} file(s); ${failed.length} did not exist in HEAD.`,
+      );
+    } else {
       vscode.window.showInformationMessage(`Replaced ${files.length} file(s) with HEAD`);
-    } catch (e) {
-      vscode.window.showErrorMessage(`Failed to replace files: ${errMsg(e)}`);
     }
   });
 
@@ -309,25 +328,23 @@ export function registerSCMCommands(
     if (files.length === 0) return;
     const confirmed = await confirmDestructiveAction({
       operation: DestructiveOperations.DISCARD_ALL,
-      message: `Discard all ${files.length} changes? This cannot be undone.`,
+      message: `Discard all ${files.length} changes? This cannot be undone.${dirtyTargetsWarning(uris)}`,
       items: files,
     });
 
     if (!confirmed) return;
 
-    try {
-      await withProgress(manager, `Discarding ${files.length} changes`, async () => {
-        await repo.discard(discard.tracked, discard.untracked);
-      });
-      vscode.window.showInformationMessage(`Discarded all ${files.length} changes`);
-    } catch (e) {
-      vscode.window.showErrorMessage(`Failed to discard changes: ${errMsg(e)}`);
-    }
+    const ok = await withProgress(manager, `Discarding ${files.length} changes`, () =>
+      repo.discard(discard.tracked, discard.untracked),
+    );
+    if (!ok) return;
+    await revertDirtyTargets(uris);
+    vscode.window.showInformationMessage(`Discarded all ${files.length} changes`);
   });
 }
 
 function findRepoForUri(manager: RepositoryManager, uri: vscode.Uri): Repository | undefined {
-  return manager.findByUri(uri);
+  return repoForUri(manager, uri);
 }
 
 interface ScmResourceStateLike {
@@ -354,16 +371,6 @@ function groupResourceStates(group: unknown): ScmResourceStateLike[] {
     return [];
   }
   return resourceStates((group as { resourceStates: unknown[] }).resourceStates);
-}
-
-function relativePaths(
-  manager: RepositoryManager,
-  repo: Repository,
-  uris: vscode.Uri[],
-): string[] {
-  return uris
-    .filter((uri) => manager.uriBelongsTo(repo, uri))
-    .map((uri) => manager.relativePath(repo, uri));
 }
 
 function resourceGroup(resourceState: unknown): string | undefined {

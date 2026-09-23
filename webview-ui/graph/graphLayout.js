@@ -5,9 +5,9 @@
  *
  * This is the single source of truth for turning a list of commits (each with a
  * `sha` and `parents`) into a drawable DAG. It is consumed by BOTH webviews:
- *   • the Git Graph panel (resources/graph.js), and
+ *   • the Git Graph panel (webview-ui/graph/graph.js), and
  *   • the History view (built inline by src/webviews/historyHtml.ts),
- * and it is unit-tested directly in Node (resources/graphLayout.test.js).
+ * and it is unit-tested directly in Node (webview-ui/graph/graphLayout.test.js).
  *
  * It is a UMD module: in the browser it attaches to `self.GraphLayout`; in Node
  * it exports via `module.exports`. It must therefore stay completely free of any

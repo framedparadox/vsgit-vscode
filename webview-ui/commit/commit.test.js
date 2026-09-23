@@ -5,7 +5,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const root = path.resolve(__dirname, '..');
+const root = path.resolve(__dirname, '..', '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
 test('Commit advanced options are collapsed behind a disclosure by default', () => {
@@ -43,7 +43,7 @@ test('Commit view loads the shared helpers module before the client script', () 
 });
 
 test('commit.js toggles and persists the advanced disclosure state', () => {
-  const js = read('resources/commit.js');
+  const js = read('webview-ui/commit/commit.js');
 
   assert.ok(js.includes('self.CommitView'), 'client consumes the shared helpers global');
   assert.ok(js.includes('commitAdvancedOpen'), 'advanced state has a persisted key');
@@ -65,7 +65,7 @@ test('commit.js toggles and persists the advanced disclosure state', () => {
 });
 
 test('commit.css hides the bar by default and styles the advanced toggle', () => {
-  const css = read('resources/commit.css');
+  const css = read('webview-ui/commit/commit.css');
   const html = read('src/webviews/commit/CommitViewProvider.ts');
   assert.ok(css.includes('#commit-bar[hidden]'), 'hidden commit-bar collapses');
   assert.ok(css.includes('.advanced-toggle'), 'advanced toggle is styled');
@@ -78,8 +78,8 @@ test('commit.css hides the bar by default and styles the advanced toggle', () =>
 
 test('the collapsed toggle still surfaces an indicator when an option is active', () => {
   const html = read('src/webviews/commit/CommitViewProvider.ts');
-  const js = read('resources/commit.js');
-  const css = read('resources/commit.css');
+  const js = read('webview-ui/commit/commit.js');
+  const css = read('webview-ui/commit/commit.css');
 
   const badge = html.match(/<span id="advanced-badge"[^>]*>/);
   assert.ok(badge, 'advanced-badge element exists inside the toggle');
@@ -105,7 +105,7 @@ test('the collapsed toggle still surfaces an indicator when an option is active'
 
 test('checking Amend prefills the previous commit message without clobbering a draft', () => {
   const provider = read('src/webviews/commit/CommitViewProvider.ts');
-  const js = read('resources/commit.js');
+  const js = read('webview-ui/commit/commit.js');
 
   assert.ok(
     provider.includes('case "amendToggled"'),

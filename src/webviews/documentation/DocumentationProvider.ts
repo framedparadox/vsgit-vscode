@@ -66,7 +66,7 @@ export class DocumentationProvider
         enableScripts: true,
         retainContextWhenHidden: true,
         localResourceRoots: [
-          vscode.Uri.joinPath(this.extensionUri, "resources"),
+          vscode.Uri.joinPath(this.extensionUri, "webview-ui"),
         ],
       },
     );
@@ -97,7 +97,7 @@ export class DocumentationProvider
     webview.options = {
       enableScripts: true,
       localResourceRoots: [
-        vscode.Uri.joinPath(this.extensionUri, "resources"),
+        vscode.Uri.joinPath(this.extensionUri, "webview-ui"),
       ],
     };
     webview.html = this.getHtml(webview, mode);
@@ -132,14 +132,16 @@ export class DocumentationProvider
     const cssUri = webview.asWebviewUri(
       vscode.Uri.joinPath(
         this.extensionUri,
-        "resources",
+        "webview-ui",
+        "documentation",
         "documentation.css",
       ),
     );
     const jsUri = webview.asWebviewUri(
       vscode.Uri.joinPath(
         this.extensionUri,
-        "resources",
+        "webview-ui",
+        "documentation",
         "documentation.js",
       ),
     );

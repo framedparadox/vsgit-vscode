@@ -136,6 +136,10 @@ export function registerStagingCommands(
 
 async function openDiff(node: Extract<StagingNode, { type: "file" }>): Promise<void> {
   const repo = node.repo;
+  if (node.group === "conflicted" || node.change.conflicted) {
+    await vscode.commands.executeCommand("vsgit.conflict.openMergeEditor", node);
+    return;
+  }
   const abs = path.join(repo.root, node.change.path);
   const title = `${path.basename(node.change.path)} (${node.group})`;
 

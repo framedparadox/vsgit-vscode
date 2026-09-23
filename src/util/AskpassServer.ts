@@ -61,7 +61,11 @@ export class AskpassServer implements vscode.Disposable {
     this.sockets.add(socket);
     socket.once("close", () => this.sockets.delete(socket));
     let buf = "";
+    let handled = false;
     socket.on("data", (chunk) => {
+      if (handled) {
+        return;
+      }
       buf += chunk.toString("utf8");
       // Bound the buffer so a peer that never sends a newline can't grow memory.
       if (buf.length > 64 * 1024) {
@@ -72,6 +76,9 @@ export class AskpassServer implements vscode.Disposable {
       if (nl === -1) {
         return;
       }
+      // Each connection carries exactly one request; ignore any further data so
+      // a chunked or chatty peer can't trigger a second prompt/response.
+      handled = true;
       void this.respond(socket, buf.slice(0, nl));
     });
     socket.on("error", () => socket.destroy());

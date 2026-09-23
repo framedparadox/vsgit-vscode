@@ -1,6 +1,6 @@
 import * as path from "node:path";
 import { GitExecutor } from "./GitExecutor";
-import { safeRef, safeRemoteUrl } from "./argGuard";
+import { safeRef, safeRemoteUrl, safeRevRange } from "./argGuard";
 import { FOR_EACH_REF_FORMAT, parseForEachRef, RefInfo } from "./parsers/refs";
 import { parseStatusV2, StatusResult } from "./parsers/status";
 import {
@@ -930,7 +930,7 @@ export class Repository {
       }
     }
     if (options.revRange) {
-      args.push(safeRef(options.revRange, "rev range"));
+      args.push(safeRevRange(options.revRange, "rev range"));
     }
     if (options.file) {
       args.push("--follow", "--", options.file);
@@ -1027,6 +1027,22 @@ export class Repository {
       { cwd: this.root },
     );
     return parseNameStatus(out);
+  }
+
+  /** Best common ancestor of two revisions, or undefined when unrelated. */
+  async mergeBase(ref1: string, ref2: string): Promise<string | undefined> {
+    // Guard outside the try so an option-injection attempt surfaces as an
+    // error rather than being silently swallowed as "no merge base".
+    const safe1 = safeRef(ref1);
+    const safe2 = safeRef(ref2);
+    try {
+      const out = await this.git.stdout(["merge-base", safe1, safe2], {
+        cwd: this.root,
+      });
+      return out.trim() || undefined;
+    } catch {
+      return undefined; // no common ancestor (unrelated histories)
+    }
   }
 
   /** Local + remote branches that contain a commit (git branch --contains). */
@@ -1170,9 +1186,41 @@ export class Repository {
     );
   }
 
-  /** Replace a working-tree file with its content at a given ref. */
-  async replaceWithRef(relPath: string, ref: string): Promise<void> {
-    await this.git.run(["checkout", safeRef(ref), "--", relPath], { cwd: this.root });
+  /**
+   * Replace working-tree files with their content at a given ref.
+   * Returns paths that did not exist at `ref` (the rest were restored). Throws
+   * only when every path fails, so one new/untracked file in a multi-select
+   * does not block the rest of the checkout.
+   */
+  async replaceWithRef(relPaths: string | string[], ref: string): Promise<string[]> {
+    const paths = Array.isArray(relPaths) ? relPaths : [relPaths];
+    if (paths.length === 0) {
+      return [];
+    }
+    const safe = safeRef(ref);
+    try {
+      // One git process for the whole selection when every path exists at ref.
+      await this.git.run(["checkout", safe, "--", ...paths], {
+        cwd: this.root,
+      });
+      return [];
+    } catch (e) {
+      if (paths.length === 1) {
+        throw e;
+      }
+      const failed: string[] = [];
+      for (const p of paths) {
+        try {
+          await this.git.run(["checkout", safe, "--", p], { cwd: this.root });
+        } catch {
+          failed.push(p);
+        }
+      }
+      if (failed.length === paths.length) {
+        throw e;
+      }
+      return failed;
+    }
   }
 
   /** Set or clear git update-index --assume-unchanged for paths. */

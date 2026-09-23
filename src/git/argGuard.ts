@@ -36,6 +36,26 @@ export function safeRef(ref: string, label = "ref"): string {
 }
 
 /**
+ * Guard a `git log`/`git diff` revision range (`A..B` or `A...B`). Each side
+ * is validated independently so a composite such as `HEAD...--evil` cannot
+ * sneak an option past the leading-character check on the whole string.
+ */
+export function safeRevRange(range: string, label = "rev range"): string {
+  if (typeof range !== "string" || range.length === 0) {
+    throw new GitError(`Invalid ${label}: empty value`, -1, "", "", []);
+  }
+  const triple = range.indexOf("...");
+  if (triple >= 0) {
+    return `${safeRef(range.slice(0, triple), label)}...${safeRef(range.slice(triple + 3), label)}`;
+  }
+  const double = range.indexOf("..");
+  if (double >= 0) {
+    return `${safeRef(range.slice(0, double), label)}..${safeRef(range.slice(double + 2), label)}`;
+  }
+  return safeRef(range, label);
+}
+
+/**
  * Like {@link safeRef} but for a remote URL. Also rejects git's local
  * remote-helper transports (`ext::`, `fd::`) which can execute arbitrary
  * commands when git connects to the URL.

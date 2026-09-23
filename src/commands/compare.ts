@@ -2,10 +2,13 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { Repository } from "../git/Repository";
-import { GitContentProvider } from "../git/GitContentProvider";
+import { GitContentProvider, INDEX_STAGE } from "../git/GitContentProvider";
 import { VsgitNode } from "../views/RepositoriesProvider";
 import { resolveRepo, withProgress, errMsg } from "./shared";
-import { CompareProvider } from "../views/CompareProvider";
+import { CompareProvider, CompareTreeNode, fileStatusIcon } from "../views/CompareProvider";
+import { RefPickerView } from "../webviews/RefPickerView";
+import { confirmDestructiveAction } from "../util/confirmation";
+import { shortRefLabel } from "../util/revisionDiff";
 
 /**
  * Compare commands: compare the active file against a chosen ref, and 3-way
@@ -33,7 +36,12 @@ export function registerCompareCommands(
       vscode.window.showWarningMessage("File is not in a known repository.");
       return;
     }
-    const ref = await pickRef(repo);
+    // Same rich picker as vsgit.compare.withBranchOrTag so both entry points
+    // behave identically.
+    const ref = await RefPickerView.pick(repo, {
+      title: `Compare '${path.basename(fsPath)}' with a Branch, Tag, or Reference`,
+      subtitle: "Select a branch, tag, or reference to compare the resource with",
+    });
     if (!ref) {
       return;
     }
@@ -43,7 +51,7 @@ export function registerCompareCommands(
       "vscode.diff",
       left,
       uri,
-      `${path.basename(rel)} (${ref} ↔ working tree)`,
+      `${path.basename(rel)} (${shortRefLabel(ref)} ↔ working tree)`,
     );
   });
 
@@ -70,33 +78,51 @@ export function registerCompareCommands(
     }
     const workingUri = vscode.Uri.file(path.join(target.repo.root, target.rel));
 
-    // Try the VS Code built-in merge editor (1.79+).
-    // It accepts { base, input1, input2, output } or just a plain URI for
-    // single-file conflict resolution view.
+    // Use git's recorded conflict stages, not merge-base(HEAD, incoming).
+    // Cherry-pick/rebase/revert store the correct base in `:1`; merge-base of
+    // HEAD and the sequencer ref is often a distant fork point.
     try {
-      // ours = MERGE_HEAD side, theirs = HEAD side; base is the common ancestor
-      const oursUri  = GitContentProvider.uri(target.repo.root, target.rel, "MERGE_HEAD", workingUri.fsPath);
-      const theirsUri = GitContentProvider.uri(target.repo.root, target.rel, "HEAD", workingUri.fsPath);
-      const baseUri  = GitContentProvider.uri(target.repo.root, target.rel, "MERGE_BASE", workingUri.fsPath);
+      const op = await target.repo.inProgressOperation();
+      const incomingRef =
+        op === "cherry-pick" ? "CHERRY_PICK_HEAD"
+        : op === "revert" ? "REVERT_HEAD"
+        : op === "rebase" ? "REBASE_HEAD"
+        : "MERGE_HEAD";
 
-      await vscode.commands.executeCommand(
-        "vscode.openWith",
-        workingUri,
-        "mergeEditor.Input",
-        {
-          base: baseUri,
-          input1: { uri: theirsUri, title: "Current (HEAD)", description: "HEAD" },
-          input2: { uri: oursUri,   title: "Incoming (MERGE_HEAD)", description: "MERGE_HEAD" },
-          output: workingUri,
-        },
+      const currentUri = GitContentProvider.uri(
+        target.repo.root,
+        target.rel,
+        INDEX_STAGE.ours,
+        workingUri.fsPath,
       );
-    } catch {
-      // Fallback: open the conflicted file in the standard text editor so the
-      // user can resolve conflict markers manually, then use "Mark Resolved".
+      const incomingUri = GitContentProvider.uri(
+        target.repo.root,
+        target.rel,
+        INDEX_STAGE.theirs,
+        workingUri.fsPath,
+      );
+      const baseUri = GitContentProvider.uri(
+        target.repo.root,
+        target.rel,
+        INDEX_STAGE.base,
+        workingUri.fsPath,
+      );
+
+      await vscode.commands.executeCommand("_open.mergeEditor", {
+        base: baseUri,
+        input1: { uri: currentUri, title: "Current", description: "HEAD (ours)" },
+        input2: { uri: incomingUri, title: "Incoming", description: incomingRef },
+        output: workingUri,
+      });
+      vscode.window.setStatusBarMessage(
+        "Save the merge result, then run Mark Resolved to stage it.",
+        5000,
+      );
+    } catch (e) {
       const doc = await vscode.workspace.openTextDocument(workingUri);
       await vscode.window.showTextDocument(doc);
-      vscode.window.showInformationMessage(
-        `Resolve conflict markers in ${target.rel}, then run "Conflict: Mark Resolved".`,
+      vscode.window.showWarningMessage(
+        `Could not open the merge editor (${errMsg(e)}). Resolve conflict markers in ${target.rel}, then run "Conflict: Mark Resolved".`,
       );
     }
   });
@@ -110,25 +136,30 @@ export function registerCompareCommands(
         return;
       }
 
-      let repo = repos[0];
+      let repo = manager.getActive() ?? repos[0];
       if (repos.length > 1) {
         const pick = await vscode.window.showQuickPick(
-          repos.map((r) => ({ label: r.name, repo: r })),
+          repos.map((r) => ({
+            label: r.name,
+            description: r === repo ? "active" : undefined,
+            repo: r,
+          })),
           { placeHolder: "Select repository" },
         );
         if (!pick) return;
         repo = pick.repo;
       }
 
-      const refs = await getAllRefs(repo);
+      const refs = getAllRefs(repo);
       const ref1Pick = await vscode.window.showQuickPick(refs, {
         placeHolder: "Select first ref (base)",
       });
       if (!ref1Pick) return;
 
-      const ref2Pick = await vscode.window.showQuickPick(refs, {
-        placeHolder: "Select second ref (compare)",
-      });
+      const ref2Pick = await vscode.window.showQuickPick(
+        refs.filter((r) => r.ref !== ref1Pick.ref),
+        { placeHolder: `Select second ref (compare with ${ref1Pick.ref})` },
+      );
       if (!ref2Pick) return;
 
       await compareProvider.startComparison(repo, ref1Pick.ref, ref2Pick.ref);
@@ -155,28 +186,51 @@ export function registerCompareCommands(
 
     reg(
       "vsgit.compare.openDiff",
-      async (repo, filePath, ref1, ref2) => {
-        const r = repo as Repository;
+      async (repoOrNode, filePath, ref1, ref2, origPath) => {
+        // Click uses TreeItem.command args (repo, path, refs). Context menu
+        // passes the tree node itself as the first argument.
+        if (isCompareFileNode(repoOrNode)) {
+          await GitContentProvider.openDiff(
+            repoOrNode.repo.root,
+            repoOrNode.file,
+            repoOrNode.ref1,
+            repoOrNode.ref2,
+          );
+          return;
+        }
+        const r = repoOrNode as Repository;
         const fp = filePath as string;
         const r1 = ref1 as string;
         const r2 = ref2 as string;
-        const abs = path.join(r.root, fp);
-        const left = GitContentProvider.uri(r.root, fp, r1, abs);
-        const right = GitContentProvider.uri(r.root, fp, r2, abs);
-        await vscode.commands.executeCommand(
-          "vscode.diff",
-          left,
-          right,
-          `${path.basename(fp)} (${r1} ↔ ${r2})`,
+        if (!r?.root || typeof fp !== "string" || typeof r1 !== "string" || typeof r2 !== "string") {
+          return;
+        }
+        await GitContentProvider.openDiff(
+          r.root,
+          { path: fp, origPath: typeof origPath === "string" ? origPath : undefined },
+          r1,
+          r2,
         );
       },
     );
 
-    reg("vsgit.showCommitDetails", async (repo, sha) => {
-      const r = repo as Repository;
-      const s = sha as string;
+    reg("vsgit.showCommitDetails", async (repoOrNode, sha) => {
+      let r: Repository | undefined;
+      let s: string | undefined;
+      if (isCompareCommitNode(repoOrNode)) {
+        r = repoOrNode.repo;
+        s = repoOrNode.commit.sha;
+      } else {
+        r = repoOrNode as Repository;
+        s = sha as string;
+      }
+      if (!r?.root || typeof s !== "string") {
+        return;
+      }
       const files = await r.commitFiles(s);
-      const commits = await r.log({ revRange: `${s}~1..${s}`, limit: 1 });
+      // `s` alone (not `s~1..s`) so root commits — which have no parent —
+      // resolve instead of throwing.
+      const commits = await r.log({ revRange: s, limit: 1 });
       const commit = commits[0];
       if (!commit) {
         vscode.window.showErrorMessage("Commit not found");
@@ -187,16 +241,18 @@ export function registerCompareCommands(
         `$(git-commit) ${s.slice(0, 12)}  ${commit.subject}`,
       ].join("");
 
-      const fileItems = files.map((f: { status: string; path: string }) => ({
-        label: `$(${fileStatusIcon(f.status)}) ${f.path}`,
+      const fileItems = files.map((f) => ({
+        label: `$(${fileStatusIcon(f.status)}) ${f.origPath ? `${f.origPath} → ${f.path}` : f.path}`,
         description: f.status,
         filePath: f.path,
+        origPath: f.origPath,
       }));
 
       const metaItem = {
         label: `$(info) Show full commit info`,
         description: `${commit.authorName} · ${new Date(commit.authorDate * 1000).toLocaleString()}`,
         filePath: "",
+        origPath: undefined as string | undefined,
       };
 
       const pick = await vscode.window.showQuickPick(
@@ -216,21 +272,17 @@ export function registerCompareCommands(
           `${commit.subject}${body}`,
           ``,
           `Changed files (${files.length}):`,
-          ...files.map((f: { status: string; path: string }) => `  ${f.status}  ${f.path}`),
+          ...files.map((f) => `  ${f.status}  ${f.origPath ? `${f.origPath} → ${f.path}` : f.path}`),
         ].join("\n");
         const doc = await vscode.workspace.openTextDocument({ content: details, language: "plaintext" });
         await vscode.window.showTextDocument(doc);
       } else {
         // Diff selected file at this commit vs its parent
-        const rel = pick.filePath;
-        const abs = path.join(r.root, rel);
-        const left = GitContentProvider.uri(r.root, rel, `${s}~1`, abs);
-        const right = GitContentProvider.uri(r.root, rel, s, abs);
-        await vscode.commands.executeCommand(
-          "vscode.diff",
-          left,
-          right,
-          `${path.basename(rel)} @ ${s.slice(0, 8)}`,
+        await GitContentProvider.openDiff(
+          r.root,
+          { path: pick.filePath, origPath: pick.origPath },
+          `${s}~1`,
+          s,
         );
       }
     });
@@ -245,6 +297,23 @@ async function resolveConflict(
   const target = await resolveConflictTarget(manager, node);
   if (!target) {
     return;
+  }
+  // During a rebase, git's ours/theirs are inverted from what most users
+  // expect: "ours" is the branch being rebased ONTO and "theirs" is the
+  // user's own commits being replayed. Confirm before acting on that.
+  const op = await target.repo.inProgressOperation().catch(() => undefined);
+  if (op === "rebase") {
+    const meaning =
+      side === "ours"
+        ? '"ours" is the branch you are rebasing ONTO (not your own commits)'
+        : '"theirs" is your own commits being replayed (not the other branch)';
+    const confirmed = await confirmDestructiveAction({
+      operation: "resolveConflictDuringRebase",
+      message: `A rebase is in progress, so ${meaning}.\nResolve ${target.rel} using ${side}?`,
+    });
+    if (!confirmed) {
+      return;
+    }
   }
   try {
     await withProgress(manager, `Use ${side}: ${target.rel}`, () =>
@@ -285,49 +354,28 @@ async function resolveConflictTarget(
   return pick ? { repo, rel: pick } : undefined;
 }
 
-async function pickRef(repo: Repository): Promise<string | undefined> {
-  const items = [
-    { label: "HEAD", value: "HEAD" },
-    ...repo.localBranches.map((b) => ({ label: b.shortName, value: b.shortName })),
-    ...repo.remoteBranches.map((b) => ({ label: b.shortName, value: b.shortName })),
-    ...repo.tags.map((t) => ({ label: t.shortName, value: t.shortName })),
+/** Codicon-labelled quick-pick items, matching the pickers elsewhere (e.g. Switch To). */
+function getAllRefs(repo: Repository): Array<{ label: string; ref: string }> {
+  return [
+    { label: "$(target) HEAD", ref: "HEAD" },
+    ...repo.localBranches.map((b) => ({
+      label: `$(git-branch) ${b.shortName}`,
+      ref: b.shortName,
+    })),
+    ...repo.remoteBranches.map((b) => ({
+      label: `$(cloud) ${b.shortName}`,
+      ref: b.shortName,
+    })),
+    ...repo.tags.map((t) => ({ label: `$(tag) ${t.shortName}`, ref: t.shortName })),
   ];
-  const pick = await vscode.window.showQuickPick(items, {
-    placeHolder: "Compare against ref",
-  });
-  return pick?.value;
 }
 
-async function getAllRefs(repo: Repository): Promise<Array<{ label: string; ref: string }>> {
-  const refs: Array<{ label: string; ref: string }> = [];
-
-  // Add HEAD
-  refs.push({ label: "HEAD", ref: "HEAD" });
-
-  // Add local branches
-  for (const b of repo.localBranches) {
-    refs.push({ label: `📌 ${b.shortName}`, ref: b.shortName });
-  }
-
-  // Add remote branches
-  for (const b of repo.remoteBranches) {
-    refs.push({ label: `🌐 ${b.shortName}`, ref: b.shortName });
-  }
-
-  // Add tags
-  for (const t of repo.tags) {
-    refs.push({ label: `🏷️  ${t.shortName}`, ref: t.shortName });
-  }
-
-  return refs;
+function isCompareFileNode(value: unknown): value is Extract<CompareTreeNode, { type: "file" }> {
+  return !!value && typeof value === "object" && (value as CompareTreeNode).type === "file";
 }
 
-function fileStatusIcon(status: string): string {
-  switch (status.toUpperCase()) {
-    case "A": return "diff-added";
-    case "D": return "diff-removed";
-    case "M": return "diff-modified";
-    case "R": return "diff-renamed";
-    default:  return "circle-outline";
-  }
+function isCompareCommitNode(
+  value: unknown,
+): value is Extract<CompareTreeNode, { type: "commit" }> {
+  return !!value && typeof value === "object" && (value as CompareTreeNode).type === "commit";
 }

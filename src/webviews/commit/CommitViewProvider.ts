@@ -57,7 +57,7 @@ export class CommitViewProvider
     this.view = view;
     view.webview.options = {
       enableScripts: true,
-      localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, "resources")],
+      localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, "webview-ui")],
     };
     view.webview.html = this.getHtml(view.webview);
     this.viewDisposables.push(
@@ -252,22 +252,22 @@ export class CommitViewProvider
   private getHtml(webview: vscode.Webview): string {
     const nonce = makeNonce();
     const cssUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, "resources", "commit.css"),
+      vscode.Uri.joinPath(this.extensionUri, "webview-ui", "commit", "commit.css"),
     );
     const codiconCssUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, "resources", "codicon.css"),
+      vscode.Uri.joinPath(this.extensionUri, "webview-ui", "shared", "codicon.css"),
     );
     const setiCssUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, "resources", "seti.css"),
+      vscode.Uri.joinPath(this.extensionUri, "webview-ui", "shared", "seti.css"),
     );
     const setiJsUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, "resources", "setiIcons.js"),
+      vscode.Uri.joinPath(this.extensionUri, "webview-ui", "shared", "setiIcons.js"),
     );
     const helpersUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, "resources", "commitView.js"),
+      vscode.Uri.joinPath(this.extensionUri, "webview-ui", "commit", "commitView.js"),
     );
     const jsUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, "resources", "commit.js"),
+      vscode.Uri.joinPath(this.extensionUri, "webview-ui", "commit", "commit.js"),
     );
     const csp = [
       "default-src 'none'",

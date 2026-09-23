@@ -9,7 +9,7 @@
 
 const vscode = acquireVsCodeApi();
 
-// Pure, DOM-free helpers shared with Node tests (resources/commitView.js,
+// Pure, DOM-free helpers shared with Node tests (webview-ui/commit/commitView.js,
 // loaded as a global by the webview before this script).
 const { statusCode, setiIconClass, escapeHtml, buildFileTree } =
   self.CommitView;

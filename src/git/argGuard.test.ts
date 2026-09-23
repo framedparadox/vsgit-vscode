@@ -5,6 +5,7 @@ import {
   redactRemoteUrl,
   safeRef,
   safeRemoteUrl,
+  safeRevRange,
 } from "./argGuard";
 import { GitError } from "./GitError";
 
@@ -167,6 +168,16 @@ test("safeRef: a leading dash is rejected even when the rest looks like a ref", 
   // "-main" is NOT a valid ref to git; it would be parsed as bundled options.
   assert.throws(() => safeRef("-main"), GitError);
   assert.throws(() => safeRef("-HEAD"), GitError);
+});
+
+test("safeRevRange: validates each side of .. and ... independently", () => {
+  assert.strictEqual(safeRevRange("main...feature"), "main...feature");
+  assert.strictEqual(safeRevRange("HEAD..main"), "HEAD..main");
+  assert.strictEqual(safeRevRange("abc123"), "abc123");
+  assert.throws(() => safeRevRange("HEAD...--evil"), GitError);
+  assert.throws(() => safeRevRange("--evil...main"), GitError);
+  assert.throws(() => safeRevRange("main..-x"), GitError);
+  assert.throws(() => safeRevRange(""), GitError);
 });
 
 // ---------------------------------------------------------------------------

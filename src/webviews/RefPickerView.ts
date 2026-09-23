@@ -8,6 +8,8 @@ import { makeNonce } from "../util/token";
 
 interface RefEntry {
   ref: string;
+  /** Shown in the tree; defaults to `ref` when omitted. */
+  label?: string;
   shortSha: string;
   subject: string;
   isHead: boolean;
@@ -203,7 +205,8 @@ async function resolveSpecialRefs(repo: Repository): Promise<RefEntry[]> {
         ? `HEAD [${repo.headName.startsWith("refs/heads/") ? repo.headName.slice(11) : repo.headName}]`
         : name;
       items.push({
-        ref: displayName,
+        ref: name,
+        label: displayName,
         shortSha: sha.slice(0, 7),
         subject,
         isHead: name === "HEAD",

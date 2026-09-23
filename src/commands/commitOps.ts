@@ -29,10 +29,8 @@ export function registerCommitOpsCommands(
     const repo = n && "repo" in n ? n.repo : await resolveRepo(manager, undefined);
     if (!repo) return;
 
-    let sha: string | undefined;
-    if (n && n.type === "stash") {
-      sha = n.ref;
-    } else {
+    let sha = shaFromNode(n);
+    if (!sha) {
       const commits = await repo.log({ limit: 200, all: true });
       const pick = await vscode.window.showQuickPick(
         commits.map((c) => ({
@@ -95,8 +93,16 @@ export function registerCommitOpsCommands(
       return;
     }
 
+    const squashable = commits.slice(1).filter((c) => c.parents.length > 0);
+    if (squashable.length === 0) {
+      vscode.window.showWarningMessage(
+        "Cannot squash: the remaining history is a root commit with no parent.",
+      );
+      return;
+    }
+
     const picks = await vscode.window.showQuickPick(
-      commits.slice(1).map((c) => ({
+      squashable.map((c) => ({
         label: `$(git-commit) ${c.shortSha}`,
         description: c.subject,
         detail: `${c.authorName}  ${new Date(c.authorDate * 1000).toLocaleDateString()}`,
@@ -104,7 +110,7 @@ export function registerCommitOpsCommands(
         picked: false,
       })),
       {
-        placeHolder: "Select the base commit to squash into HEAD (all commits above it will be squashed)",
+        placeHolder: "Select the oldest commit to include in the squash (it and every newer commit become one)",
         canPickMany: false,
       },
     );
@@ -112,7 +118,7 @@ export function registerCommitOpsCommands(
 
     const confirmed = await confirmDestructiveAction({
       operation: "squashCommits",
-      message: `Squash all commits since ${picks.sha.slice(0, 8)} into HEAD?\nThis rewrites history — only do this on unpublished commits.`,
+      message: `Squash ${picks.sha.slice(0, 8)} and every newer commit into one?\nThis rewrites history — only do this on unpublished commits.`,
     });
     if (!confirmed) return;
 
@@ -310,39 +316,7 @@ export function registerCommitOpsCommands(
   // ── Merge Tool (per-file) ─────────────────────────────────────────────────
 
   reg("vsgit.mergeTool", async (node) => {
-    const n = node as VsgitNode | undefined;
-    const repo = n && "repo" in n ? n.repo : await resolveRepo(manager, undefined);
-    if (!repo) return;
-
-    const conflicted = repo.conflictedPaths;
-    if (conflicted.length === 0) {
-      vscode.window.showInformationMessage("No conflicts to resolve.");
-      return;
-    }
-
-    const picks = await vscode.window.showQuickPick(
-      conflicted.map((p) => ({ label: `$(warning) ${p}`, path: p })),
-      { placeHolder: "Select file to open in merge tool", canPickMany: false },
-    );
-    if (!picks) return;
-
-    const absPath = `${repo.root}/${picks.path}`;
-    const uri = vscode.Uri.file(absPath);
-
-    // Use VS Code built-in merge editor if available, otherwise open file
-    try {
-      await vscode.commands.executeCommand(
-        "mergeEditor.acceptAllCurrentAndGoNext",
-        uri,
-      );
-    } catch {
-      // Fall back: open the conflicted file, let the user resolve manually
-      const doc = await vscode.workspace.openTextDocument(uri);
-      await vscode.window.showTextDocument(doc);
-      vscode.window.showInformationMessage(
-        `Resolve conflicts in ${picks.path}, then run "Mark Resolved" (vsgit.conflict.markResolved).`,
-      );
-    }
+    await vscode.commands.executeCommand("vsgit.conflict.openMergeEditor", node);
   });
 
   // ── Rebase live progress status bar ──────────────────────────────────────
@@ -381,4 +355,19 @@ export function registerCommitOpsCommands(
       });
     }
   });
+}
+
+/** SHA from a stash, compare-view commit, or synchronize-view commit node. */
+function shaFromNode(node: unknown): string | undefined {
+  if (!node || typeof node !== "object") {
+    return undefined;
+  }
+  const n = node as { type?: string; ref?: string; commit?: { sha?: string } };
+  if (n.type === "stash" && typeof n.ref === "string") {
+    return n.ref;
+  }
+  if (typeof n.commit?.sha === "string") {
+    return n.commit.sha;
+  }
+  return undefined;
 }

@@ -20,7 +20,9 @@
     "src/util/token.ts",
     "src/util/token.test.ts",
     "src/util/html.ts",
-    "src/util/html.test.ts"
+    "src/util/html.test.ts",
+    "src/util/revisionDiff.ts",
+    "src/util/revisionDiff.test.ts"
   ],
   "exclude": ["node_modules"]
 }

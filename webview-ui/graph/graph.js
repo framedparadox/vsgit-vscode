@@ -102,7 +102,7 @@ function savePersisted() {
 
 // ─── Icons (VS Code codicons) ────────────────────────────────────────────────
 // Every glyph is a real codicon rendered from the bundled codicon font (see
-// resources/codicon.css). Each logical name maps to its exact codicon id; the
+// webview-ui/shared/codicon.css). Each logical name maps to its exact codicon id; the
 // `icon()` helper emits the standard `<i class="codicon codicon-…">` markup.
 const ICON_NAMES = {
   branch: 'git-branch',
@@ -447,7 +447,7 @@ function refBadgesFor(commit, colorIdx) {
 
 // ─── lane layout (two-half connected model, topological) ─────────────────────
 // The layout algorithm lives in the shared, unit-tested module
-// resources/graphLayout.js (GraphLayout), so the Git Graph panel and the History
+// webview-ui/graph/graphLayout.js (GraphLayout), so the Git Graph panel and the History
 // view draw from one identical, verified implementation. Commits arrive in
 // --topo-order (child before parents); each returned row carries its column,
 // stable lane colour, and the incoming/outgoing lane segments used to draw edges.
@@ -1270,7 +1270,7 @@ function renderFiles(sha, files) {
   const host = document.getElementById('cdvFiles');
   if (!host) return;
   renderFilePane(host, files, sha === '*uncommitted*' ? null : (f) => {
-    vscode.postMessage({ type: 'openFileDiff', data: { sha, path: f.path } });
+    vscode.postMessage({ type: 'openFileDiff', data: { sha, path: f.path, origPath: f.origPath } });
   });
 }
 
@@ -1741,7 +1741,7 @@ function renderComparisonFiles(fromSha, toSha, files) {
   const host = document.getElementById('cdvFiles');
   if (!host) return;
   renderFilePane(host, files, (f) => {
-    vscode.postMessage({ type: 'openComparisonDiff', data: { from: fromSha, to: toSha, path: f.path } });
+    vscode.postMessage({ type: 'openComparisonDiff', data: { from: fromSha, to: toSha, path: f.path, origPath: f.origPath } });
   }, 'No differences.');
 }
 

@@ -1,10 +1,44 @@
-# VsGit — a full Git client for VS Code
+<div align="center">
 
-VsGit is a complete, power-user Git client built into VS Code. It drives the real
-`git` binary directly — no libgit2, no JavaScript reimplementation of git — and
-surfaces **173 commands** across every Git workflow through dedicated tree
-views, rich webviews, an interactive commit graph, and native Source Control
-integration.
+<img src="resources/icon.png" alt="VsGit" width="112" height="112" />
+<br/>
+
+<h1>VsGit — a full Git client for VS Code</h1>
+
+<p><b>A complete, power-user Git client built into VS Code, driving the real <code>git</code> binary directly.</b></p>
+
+<p>
+Interactive commit graph &nbsp;&middot;&nbsp; Interactive rebase &nbsp;&middot;&nbsp; Worktrees &nbsp;&middot;&nbsp; LFS &nbsp;&middot;&nbsp; Gerrit &nbsp;&middot;&nbsp; Bisect &nbsp;&middot;&nbsp; Submodules &nbsp;&middot;&nbsp; Subtree<br />
+Native Source Control integration &nbsp;&middot;&nbsp; 173 commands across every Git workflow<br />
+No libgit2, no JavaScript reimplementation of git — every operation is a genuine <code>git</code> invocation.
+</p>
+
+<p>
+<a href="https://marketplace.visualstudio.com/items?itemName=framedparadox.vsgit-vscode"><img alt="VS Code Marketplace version" src="https://vsmarketplacebadges.dev/version-short/framedparadox.vsgit-vscode.svg?style=flat-square&label=Marketplace&color=007ACC" /></a>
+<a href="https://marketplace.visualstudio.com/items?itemName=framedparadox.vsgit-vscode"><img alt="VS Code Marketplace installs" src="https://vsmarketplacebadges.dev/installs-short/framedparadox.vsgit-vscode.svg?style=flat-square&label=installs&color=007ACC" /></a>
+<a href="https://marketplace.visualstudio.com/items?itemName=framedparadox.vsgit-vscode"><img alt="VS Code Marketplace downloads" src="https://vsmarketplacebadges.dev/downloads-short/framedparadox.vsgit-vscode.svg?style=flat-square&label=downloads&color=007ACC" /></a>
+</p>
+
+<p>
+<a href="https://open-vsx.org/extension/framedparadox/vsgit-vscode"><img alt="Open VSX version" src="https://img.shields.io/open-vsx/v/framedparadox/vsgit-vscode?style=flat-square&label=Open%20VSX&color=C160EF" /></a>
+<a href="https://open-vsx.org/extension/framedparadox/vsgit-vscode"><img alt="Open VSX downloads" src="https://img.shields.io/open-vsx/dt/framedparadox/vsgit-vscode?style=flat-square&label=downloads&color=C160EF" /></a>
+<a href="https://github.com/framedparadox/vsgit-vscode/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/github/license/framedparadox/vsgit-vscode?style=flat-square&color=3FB950" /></a>
+<img alt="Requires VS Code 1.85 or later" src="https://img.shields.io/badge/VS%20Code-%5E1.85.0-007ACC?style=flat-square&logo=visualstudiocode&logoColor=white" />
+</p>
+
+<p>
+<a href="https://marketplace.visualstudio.com/items?itemName=framedparadox.vsgit-vscode"><b>Install from the Marketplace</b></a>
+&nbsp;&middot;&nbsp;
+<a href="https://open-vsx.org/extension/framedparadox/vsgit-vscode">Install from Open VSX</a>
+&nbsp;&middot;&nbsp;
+<a href="docs/IMPLEMENTATION_PLAN.md">Implementation plan</a>
+&nbsp;&middot;&nbsp;
+<a href="https://github.com/framedparadox/vsgit-vscode/issues">Report an issue</a>
+</p>
+
+</div>
+
+---
 
 Because every operation is a genuine `git` invocation with an argv array, VsGit
 behaves *exactly* like your shell: the same config, hooks, credential helpers,
@@ -71,33 +105,23 @@ VsGit fills that gap by driving the real `git` CLI:
   URLs from untrusted surfaces are guarded against option injection; the
   credential/editor IPC channels are authenticated with a per-session token.
 
+---
+
 ## Feature highlights
 
-- 🌳 **Interactive commit graph** — an SVG-rendered DAG with colour-coded branch
-  lanes, inline ref pills, an expand-in-place commit-details row, flow tracing,
-  fuzzy find, toggleable metadata columns, and a full right-click action menu.
-- 📜 **History view** — a paginated log rendered with the *same* verified graph
-  layout, with branch/author/message/date filtering and a Compare-Branches mode.
-- ✍️ **Commit webview** — a Source-Control-style panel with a split **Commit /
-  Commit & Push / Commit & Sync** button, amend / sign-off / GPG options behind a
-  "more" menu, collapsible Staged/Changes groups, hunk-level staging, and a
-  tree-or-list file view.
-- 🗂️ **Rich sidebar** — Repositories, Commit, Staging, Synchronize, Conflicts,
-  Reflog, Worktrees, and Compare, all multi-root aware.
-- 🔁 **Native Source Control integration** — VsGit publishes real SCM resource
-  groups (staged / working tree / merge) so VS Code's built-in Source Control
-  panel gets VsGit's menus, quick-diff gutters, and commit input.
-- 🎨 **Real VS Code icons** — the UI uses official VS Code **codicons**
-  throughout, and file rows show the same **Seti file-type icons** you see in the
-  Explorer (no hand-drawn SVGs).
-- 🔧 **Everything else** — interactive rebase, LFS, notes, bisect, subtree,
-  archive, patch, Gerrit, submodules, maintenance, blame, tags, and a graphical
-  git-config editor.
-- 📚 **Built-in documentation library** — a searchable bottom sidebar view and
-  full editor screen explaining every VsGit component, key Git terminology, and
-  all contributed operations with their purpose and entry point.
-- 🔒 **Hardened** — argv-only spawning, option-injection guards, and authenticated
-  IPC for credential prompts and rebase/commit editing.
+| Feature | What you get |
+|---|---|
+| 🌳 **Interactive commit graph** | An SVG-rendered DAG with colour-coded branch lanes, inline ref pills, an expand-in-place commit-details row, flow tracing, fuzzy find, toggleable metadata columns, and a full right-click action menu. |
+| 📜 **History view** | A paginated log rendered with the *same* verified graph layout, with branch/author/message/date filtering and a Compare-Branches mode. |
+| ✍️ **Commit webview** | A Source-Control-style panel with a split **Commit / Commit & Push / Commit & Sync** button, amend / sign-off / GPG options behind a "more" menu, collapsible Staged/Changes groups, hunk-level staging, and a tree-or-list file view. |
+| 🗂️ **Rich sidebar** | Repositories, Commit, Staging, Synchronize, Conflicts, Reflog, Worktrees, and Compare, all multi-root aware. |
+| 🔁 **Native Source Control integration** | VsGit publishes real SCM resource groups (staged / working tree / merge) so VS Code's built-in Source Control panel gets VsGit's menus, quick-diff gutters, and commit input. |
+| 🎨 **Real VS Code icons** | The UI uses official VS Code **codicons** throughout, and file rows show the same **Seti file-type icons** you see in the Explorer (no hand-drawn SVGs). |
+| 🔧 **Everything else** | Interactive rebase, LFS, notes, bisect, subtree, archive, patch, Gerrit, submodules, maintenance, blame, tags, and a graphical git-config editor. |
+| 📚 **Built-in documentation library** | A searchable bottom sidebar view and full editor screen explaining every VsGit component, key Git terminology, and all contributed operations with their purpose and entry point. |
+| 🔒 **Hardened** | Argv-only spawning, option-injection guards, and authenticated IPC for credential prompts and rebase/commit editing. |
+
+---
 
 ## What's included and what's next
 
@@ -136,6 +160,8 @@ VsGit fills that gap by driving the real `git` CLI:
 The detailed engineering status remains in
 [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md). Pending items above
 are plans, not claims of implemented behavior.
+
+---
 
 ## Screenshots
 
@@ -367,10 +393,21 @@ Documentation library covers all **173** and identifies each entry point.
 
 ## Getting started
 
-VsGit isn't published to the Marketplace yet; build and install it from source.
+**Install**
+
+Pick whichever suits your editor:
+
+| Source | How |
+|---|---|
+| [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=framedparadox.vsgit-vscode) | Extensions (`Ctrl+Shift+X` / `Cmd+Shift+X`) → search **VsGit** → **Install** |
+| Command line | `code --install-extension framedparadox.vsgit-vscode` |
+| [Open VSX](https://open-vsx.org/extension/framedparadox/vsgit-vscode) | For VSCodium, Gitpod, Eclipse Theia and other non-Microsoft builds |
+| [GitHub Releases](https://github.com/framedparadox/vsgit-vscode/releases) | Download the `.vsix` → **Extensions → ⋯ → Install from VSIX…** |
+
+**Build from source**
 
 ```bash
-git clone https://github.com/framedparadox/git-vscode
+git clone https://github.com/framedparadox/vsgit-vscode.git
 cd git-vscode
 npm install
 npm run build                 # bundle the extension into dist/
@@ -380,6 +417,8 @@ code --install-extension vsgit.vsix
 
 Or run it live in the **Extension Development Host**: open the folder in VS Code,
 run `npm run watch`, then press `F5`.
+
+**Use**
 
 Once installed, click the **VsGit** icon in the activity bar, or run
 **VsGit: Show Git Graph** from the Command Palette. Open **Documentation** at the
@@ -468,18 +507,22 @@ src/
   util/                   IPC servers (askpass / editor), credential/editor
                           plumbing, and shared helpers (HTML escaping, crypto
                           token/nonce generation, command preview, confirmation)
-resources/
-  graph.js / graph.css    Git Graph panel client
-  documentation.js/.css  searchable documentation library client
-  graphLayout.js          shared, unit-tested commit-graph layout (UMD)
-  commit.js / commit.css  Commit webview client
-  commitView.js           Commit view pure helpers (UMD, unit-tested)
-  setiIcons.js            shared filename→Seti-icon resolver (UMD)
-  seti.css / seti.woff    bundled Seti file-icon font (Explorer icons)
-  codicon.css / codicon.ttf  bundled VS Code codicon font (UI glyphs)
-  askpass.js              GIT_ASKPASS shim
-  sequence-editor.js      GIT_SEQUENCE_EDITOR / GIT_EDITOR shim
-  icon.svg                activity-bar logo
+resources/                images only (icon.png/.svg, activity-bar logo)
+webview-ui/                webview runtime assets, shipped in the .vsix
+  graph/
+    graph.js / graph.css   Git Graph panel client
+    graphLayout.js          shared, unit-tested commit-graph layout (UMD)
+  commit/
+    commit.js / commit.css  Commit webview client
+    commitView.js           Commit view pure helpers (UMD, unit-tested)
+  documentation/
+    documentation.js/.css   searchable documentation library client
+  shared/
+    setiIcons.js            shared filename→Seti-icon resolver (UMD)
+    seti.css / seti.woff    bundled Seti file-icon font (Explorer icons)
+    codicon.css / codicon.ttf  bundled VS Code codicon font (UI glyphs)
+    askpass.js              GIT_ASKPASS shim
+    sequence-editor.js      GIT_SEQUENCE_EDITOR / GIT_EDITOR shim
 ```
 
 Key design points:
@@ -489,8 +532,8 @@ Key design points:
 - **Machine-readable output.** Operations request NUL-/porcelain-formatted output
   and parse it in small, pure functions under `git/parsers/`, each with tests.
 - **One graph layout.** Both the Git Graph panel and the History view import the
-  same `resources/graphLayout.js` (a UMD module that also loads in Node), so there
-  is a single, verified implementation of lane layout and edge geometry.
+  same `webview-ui/graph/graphLayout.js` (a UMD module that also loads in Node),
+  so there is a single, verified implementation of lane layout and edge geometry.
 - **Shared webview helpers.** Pure logic (status labels, file-tree grouping,
   HTML-escaping, Seti icon resolution) lives in UMD modules so it can be unit
   tested in Node and reused across the Commit and Graph webviews.
@@ -499,6 +542,8 @@ Key design points:
 - **Measured, coalesced discovery.** Workspace roots are discovered concurrently;
   overlapping scans share one in-flight operation, scan duration is recorded,
   and submodule enumeration is deferred until its tree is opened.
+
+---
 
 ## Security model
 
@@ -542,6 +587,8 @@ Key design points:
   virtual workspaces because Git configuration and repository hooks execute from
   a local checkout.
 
+---
+
 ## Development & testing
 
 ```bash
@@ -562,9 +609,9 @@ cover the pure logic that's most worth pinning down:
 
 - every output parser under `src/git/parsers/` (log, graph-log, status, refs,
   diff, blame, config, reflog, rebase-todo, worktree),
-- the shared commit-graph layout (`resources/graphLayout.test.js`) and the Git
-  Graph / Commit webview clients (`resources/manifest.test.js`,
-  `resources/commit.test.js`, `resources/commitView.test.js`),
+- the shared commit-graph layout (`webview-ui/graph/graphLayout.test.js`) and the
+  Git Graph / Commit webview clients (`webview-ui/manifest.test.js`,
+  `webview-ui/commit/commit.test.js`, `webview-ui/commit/commitView.test.js`),
 - the Seti filename→icon resolver,
 - the `GitExecutor` argv assembly and the `Repository` command builders,
 - the argument guards, the HTML-escape helper, and the IPC token comparison.
@@ -595,6 +642,8 @@ request. See [CONTRIBUTING.md](CONTRIBUTING.md) for development standards and
 - A trusted local workspace (virtual and Restricted Mode workspaces are not
   supported because VsGit executes the repository's Git configuration/hooks)
 
+---
+
 ## FAQ & troubleshooting
 
 **VsGit can't find my repository.** VsGit discovers repos from your open
@@ -614,6 +663,20 @@ will match a stock VS Code install.
 **Credential prompts.** VsGit uses your existing git credential helper via
 `GIT_ASKPASS`. If a remote needs auth, you'll get a native VS Code prompt.
 
+---
+
+## Contributing
+
+Contributions are welcome. Please submit issues and enhancement requests through
+the repository.
+
 ## License
 
-[MIT](LICENSE)
+Licensed under the [MIT License](LICENSE).
+
+## Links
+
+- **Repository:** [framedparadox/vsgit-vscode](https://github.com/framedparadox/vsgit-vscode)
+- **Issues:** [Report a bug](https://github.com/framedparadox/vsgit-vscode/issues)
+- **Implementation plan:** [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)
+</content>

@@ -80,7 +80,7 @@ test('Git Graph column settings are contributed, sent, and rendered', () => {
   const settingsObject = pkg.contributes?.configuration?.properties ?? {};
   const settings = new Set(Object.keys(settingsObject));
   const graphPanel = read('src/webviews/graph/GraphPanel.ts');
-  const graphJs = read('resources/graph.js');
+  const graphJs = read('webview-ui/graph/graph.js');
 
   const columns = [
     ['vsgit.graph.showIdColumn', 'graph.showIdColumn', 'id', 'col-id', true],
@@ -129,7 +129,11 @@ test('native SCM provider is registered and menu actions target resource groups'
   assert.ok(scmCommands.includes('repo.discard(discard.tracked, discard.untracked)'), 'SCM discard cleans untracked paths');
   assert.ok(scmCommands.includes('VSGIT_EMPTY_REF'), 'SCM diff can render deleted working-tree files');
   assert.ok(scmCommands.includes('Index ↔ Working Tree'), 'SCM working-tree diffs compare index to working tree');
-  assert.ok(scmCommands.includes('manager.findByUri'), 'SCM commands resolve repos by URI containment');
+  // Repo lookup moved into the shared commands/uriHelpers.ts; scm.ts resolves
+  // repositories through it while the helper performs the containment lookup.
+  const uriHelpers = read('src/commands/uriHelpers.ts');
+  assert.ok(scmCommands.includes('repoForUri('), 'SCM commands resolve repos via the shared helper');
+  assert.ok(uriHelpers.includes('manager.findByUri(uri)'), 'shared helper resolves repos by URI containment');
 
   assert.strictEqual(
     resourceStateMenus.find((item) => item.command === 'vsgit.scm.stage')?.when,
@@ -306,7 +310,7 @@ test('repository routing uses active repo and containment-aware URI lookup', () 
 });
 
 test('Git Graph trace defaults to explicit toolbar control', () => {
-  const graphJs = read('resources/graph.js');
+  const graphJs = read('webview-ui/graph/graph.js');
 
   assert.ok(
     graphJs.includes("return p.traceMode || 'off';"),
@@ -328,7 +332,7 @@ test('Git Graph trace defaults to explicit toolbar control', () => {
 
 test('Git Graph tracking is separate webview state', () => {
   const graphPanel = read('src/webviews/graph/GraphPanel.ts');
-  const graphJs = read('resources/graph.js');
+  const graphJs = read('webview-ui/graph/graph.js');
 
   assert.ok(graphPanel.includes('id="tb-tracking"'), 'Tracking toolbar button exists');
   assert.ok(graphPanel.includes('data-label="Tracking"'), 'Tracking button has hover label');
@@ -347,8 +351,8 @@ test('Git Graph tracking is separate webview state', () => {
 
 test('Git Graph top bar buttons expose labels and table fills available width', () => {
   const graphPanel = read('src/webviews/graph/GraphPanel.ts');
-  const graphJs = read('resources/graph.js');
-  const graphCss = read('resources/graph.css');
+  const graphJs = read('webview-ui/graph/graph.js');
+  const graphCss = read('webview-ui/graph/graph.css');
   const buttonIds = [
     'tb-pull',
     'tb-push',
@@ -388,7 +392,7 @@ test('Git Graph top bar buttons expose labels and table fills available width', 
 });
 
 test('Git Graph trace keeps the graph overlay bright', () => {
-  const graphCss = read('resources/graph.css');
+  const graphCss = read('webview-ui/graph/graph.css');
 
   assert.ok(
     graphCss.includes('tr.commit-row.dimmed td:not(.col-graph)'),
@@ -410,7 +414,7 @@ test('documentation library is the final sidebar view and has a full-panel comma
   const documentation = views.find((view) => view.id === 'vsgit.documentation');
   const extension = read('src/extension.ts');
   const provider = read('src/webviews/documentation/DocumentationProvider.ts');
-  const client = read('resources/documentation.js');
+  const client = read('webview-ui/documentation/documentation.js');
   const readme = read('README.md');
   const hiddenCommands = new Set(
     (pkg.contributes?.menus?.commandPalette ?? [])

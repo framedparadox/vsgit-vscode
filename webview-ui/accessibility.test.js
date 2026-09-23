@@ -39,16 +39,16 @@ test('every webview surface has live announcements, keyboard focus, and high-con
     ['Create Tag', read('src/webviews/CreateTagDialog.ts')],
     [
       'Git Graph',
-      read('src/webviews/graph/GraphPanel.ts') + read('resources/graph.css'),
+      read('src/webviews/graph/GraphPanel.ts') + read('webview-ui/graph/graph.css'),
     ],
     [
       'Commit',
-      read('src/webviews/commit/CommitViewProvider.ts') + read('resources/commit.css'),
+      read('src/webviews/commit/CommitViewProvider.ts') + read('webview-ui/commit/commit.css'),
     ],
     [
       'Documentation',
       read('src/webviews/documentation/DocumentationProvider.ts') +
-        read('resources/documentation.css'),
+        read('webview-ui/documentation/documentation.css'),
     ],
   ];
 
@@ -63,8 +63,8 @@ test('every webview surface has live announcements, keyboard focus, and high-con
 });
 
 test('custom clickable rows and disclosures expose keyboard semantics', () => {
-  const commit = read('resources/commit.js');
-  const graph = read('resources/graph.js');
+  const commit = read('webview-ui/commit/commit.js');
+  const graph = read('webview-ui/graph/graph.js');
   const history = read('src/webviews/historyHtml.ts');
   const refs = read('src/webviews/refPickerHtml.ts');
   const config = read('src/webviews/configHtml.ts');

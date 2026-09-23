@@ -11,7 +11,7 @@ export class Credentials {
   constructor(private readonly context: vscode.ExtensionContext) {}
 
   private get shimPath(): string {
-    return path.join(this.context.extensionPath, "resources", "askpass.js");
+    return path.join(this.context.extensionPath, "webview-ui", "shared", "askpass.js");
   }
 
   /** Provide askpass env to `fn`, disposing the server afterward. */

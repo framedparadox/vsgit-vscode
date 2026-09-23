@@ -1,12 +1,13 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
-import { Repository } from "../git/Repository";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { GitContentProvider } from "../git/GitContentProvider";
 import { errMsg, withProgress } from "./shared";
 import { confirmDestructiveAction, DestructiveOperations } from "../util/confirmation";
 import { CommitPickerView } from "../webviews/CommitPickerView";
 import { RefPickerView } from "../webviews/RefPickerView";
+import { relativePaths, repoForUri, resolveUri, resolveUris } from "./uriHelpers";
+import { shortRefLabel } from "../util/revisionDiff";
 
 /**
  * Explorer / editor context menu operations that map to VsGit's "Team" menu.
@@ -70,7 +71,25 @@ export function registerFileContextCommands(
   });
 
   reg("vsgit.compare.withPrevious", async (uriArg) => {
-    await compareFileWith(manager, resolveUri(uriArg), "HEAD~1");
+    const uri = resolveUri(uriArg);
+    if (!uri) return;
+    const repo = repoForUri(manager, uri);
+    if (!repo) return;
+    const rel = manager.relativePath(repo, uri);
+    // "Previous" means the revision before the file's latest change — not
+    // HEAD~1, which may not have touched this file at all (empty diff).
+    try {
+      const commits = await repo.log({ file: rel, limit: 2 });
+      if (commits.length < 2) {
+        vscode.window.showInformationMessage(
+          "This file has no earlier revision to compare with.",
+        );
+        return;
+      }
+      await compareFileWith(manager, uri, commits[1].sha);
+    } catch (e) {
+      vscode.window.showErrorMessage(`Compare with previous failed: ${errMsg(e)}`);
+    }
   });
 
   reg("vsgit.compare.withCommit", async (uriArg) => {
@@ -264,7 +283,9 @@ export function registerFileContextCommands(
 
     const confirmed = await confirmDestructiveAction({
       operation: DestructiveOperations.CLEAN_UNTRACKED,
-      message: "Remove all untracked files and directories? This cannot be undone.",
+      message: rels.length > 0
+        ? `Remove untracked files under ${rels.length} selected path(s)? This cannot be undone.`
+        : "Remove all untracked files and directories? This cannot be undone.",
       items: rels.length > 0 ? rels : undefined,
     });
     if (!confirmed) return;
@@ -276,37 +297,7 @@ export function registerFileContextCommands(
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
-
-function resolveUri(uriArg: unknown): vscode.Uri | undefined {
-  if (uriArg instanceof vscode.Uri) return uriArg;
-  return vscode.window.activeTextEditor?.document.uri;
-}
-
-function resolveUris(uriArg: unknown, allUris: unknown): vscode.Uri[] {
-  if (Array.isArray(allUris) && allUris.length > 0 && allUris[0] instanceof vscode.Uri) {
-    return allUris as vscode.Uri[];
-  }
-  const single = resolveUri(uriArg);
-  return single ? [single] : [];
-}
-
-function repoForUri(manager: RepositoryManager, uri: vscode.Uri) {
-  const repo = manager.findByUri(uri);
-  if (!repo) {
-    vscode.window.showWarningMessage("File is not in a known Git repository.");
-  }
-  return repo;
-}
-
-function relativePaths(
-  manager: RepositoryManager,
-  repo: Repository,
-  uris: vscode.Uri[],
-): string[] {
-  return uris
-    .filter((uri) => manager.uriBelongsTo(repo, uri))
-    .map((uri) => manager.relativePath(repo, uri));
-}
+// resolveUri / resolveUris / repoForUri / relativePaths live in ./uriHelpers.
 
 async function compareFileWith(
   manager: RepositoryManager,
@@ -318,7 +309,8 @@ async function compareFileWith(
   if (!repo) return;
   const rel = manager.relativePath(repo, uri);
   const left = GitContentProvider.uri(repo.root, rel, ref, uri.fsPath);
-  const label = `${path.basename(rel)} (${ref} ↔ working tree)`;
+  // Commit pickers hand us full 40-char SHAs — abbreviate for the tab title.
+  const label = `${path.basename(rel)} (${shortRefLabel(ref)} ↔ working tree)`;
   try {
     await vscode.commands.executeCommand("vscode.diff", left, uri, label);
   } catch (e) {
@@ -370,7 +362,7 @@ async function pickFileFromEditors(
   const openDocs = vscode.workspace.textDocuments
     .filter((d) => d.uri.scheme === "file" && d.uri.fsPath !== exclude.fsPath);
 
-  type FileItem = vscode.QuickPickItem & { uri: vscode.Uri };
+  type FileItem = vscode.QuickPickItem & { uri?: vscode.Uri; browse?: boolean };
 
   const items: FileItem[] = openDocs.map((d) => ({
     label: `$(file)  ${path.basename(d.uri.fsPath)}`,
@@ -379,11 +371,11 @@ async function pickFileFromEditors(
   }));
 
   items.push(
-    { label: "", kind: vscode.QuickPickItemKind.Separator, uri: vscode.Uri.parse("") },
+    { label: "", kind: vscode.QuickPickItemKind.Separator },
     {
       label: "$(folder-opened)  Browse for file…",
       description: "Open file picker",
-      uri: vscode.Uri.parse("__browse__"),
+      browse: true,
     },
   );
 
@@ -393,7 +385,7 @@ async function pickFileFromEditors(
   });
   if (!pick) return undefined;
 
-  if (pick.uri.toString() === "__browse__") {
+  if (pick.browse) {
     const chosen = await vscode.window.showOpenDialog({
       canSelectMany: false,
       canSelectFolders: false,

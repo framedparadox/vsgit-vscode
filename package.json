@@ -2,7 +2,7 @@
   "name": "vsgit-vscode",
   "displayName": "VS Git",
   "description": "GIT client for VS Code: Repositories, Staging, History, Graph, Compare, Worktrees, LFS, Gerrit, and more.",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "publisher": "framedparadox",
   "license": "MIT",
   "icon": "resources/icon.png",
@@ -2025,26 +2025,6 @@
           "group": "3_diff@1"
         },
         {
-          "command": "vsgit.conflict.useOurs",
-          "when": "view == vsgit.staging && viewItem =~ /^vsgit\\.(staged|unstaged)File$/",
-          "group": "4_conflict@1"
-        },
-        {
-          "command": "vsgit.conflict.useTheirs",
-          "when": "view == vsgit.staging && viewItem =~ /^vsgit\\.(staged|unstaged)File$/",
-          "group": "4_conflict@2"
-        },
-        {
-          "command": "vsgit.conflict.openMergeEditor",
-          "when": "view == vsgit.staging && viewItem =~ /^vsgit\\.(staged|unstaged)File$/",
-          "group": "4_conflict@3"
-        },
-        {
-          "command": "vsgit.conflict.markResolved",
-          "when": "view == vsgit.staging && viewItem =~ /^vsgit\\.(staged|unstaged)File$/",
-          "group": "4_conflict@4"
-        },
-        {
           "command": "vsgit.staging.stageAll",
           "when": "view == vsgit.staging && viewItem == vsgit.unstagedGroup",
           "group": "inline"
@@ -3221,10 +3201,10 @@
     "watch": "node esbuild.js --watch",
     "compile": "tsc -p ./",
     "check-types": "tsc --noEmit",
-    "test": "node --test \"out-test/**/*.test.js\" \"resources/**/*.test.js\"",
+    "test": "node --test \"out-test/**/*.test.js\" \"webview-ui/**/*.test.js\"",
     "clean:test-output": "node -e \"require('fs').rmSync('out-test',{recursive:true,force:true})\"",
     "pretest": "npm run clean:test-output && tsc -p ./tsconfig.test.json",
-    "test:coverage": "node --test --experimental-test-coverage --test-coverage-exclude=\"**/*.test.js\" --test-coverage-lines=80 --test-coverage-branches=80 --test-coverage-functions=70 \"out-test/**/*.test.js\" \"resources/**/*.test.js\"",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-exclude=\"**/*.test.js\" --test-coverage-lines=80 --test-coverage-branches=80 --test-coverage-functions=70 \"out-test/**/*.test.js\" \"webview-ui/**/*.test.js\"",
     "pretest:coverage": "npm run clean:test-output && tsc -p ./tsconfig.test.json",
     "compile:integration": "node -e \"require('fs').rmSync('out-integration',{recursive:true,force:true})\" && tsc -p ./tsconfig.integration.json",
     "test:integration": "npm run build && npm run compile:integration && vscode-test",

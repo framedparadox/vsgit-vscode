@@ -6,7 +6,7 @@
  * Maps a file name to its Seti icon — the icon set behind VS Code's default
  * "Seti" File Icon Theme shown in the Explorer. Webviews cannot read the user's
  * active File Icon Theme (vscode#183893), so we bundle the Seti font
- * (resources/seti.woff + resources/seti.css) and this mapping, generated from
+ * (webview-ui/shared/seti.woff + webview-ui/shared/seti.css) and this mapping, generated from
  * VS Code's extensions/theme-seti/icons/vs-seti-icon-theme.json.
  *
  * UMD module like graphLayout.js / commitView.js: attaches to `self.SetiIcons`

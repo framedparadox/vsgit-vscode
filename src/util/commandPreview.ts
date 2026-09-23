@@ -37,6 +37,7 @@ function isReadOnlyGitCommand(args: string[]): boolean {
   if (
     [
       "rev-parse",
+      "rev-list",
       "status",
       "for-each-ref",
       "symbolic-ref",
@@ -47,6 +48,9 @@ function isReadOnlyGitCommand(args: string[]): boolean {
       "describe",
       "blame",
       "fsck",
+      "ls-remote",
+      "verify-commit",
+      "merge-base",
     ].includes(command)
   ) {
     return true;
@@ -60,7 +64,10 @@ function isReadOnlyGitCommand(args: string[]): boolean {
   if (command === "tag" && args.some((arg) => arg.startsWith("--contains"))) {
     return true;
   }
-  if (command === "config" && args.includes("--list")) {
+  if (command === "config" && (args.includes("--list") || args.includes("--get"))) {
+    return true;
+  }
+  if (command === "bisect" && args[1] === "log") {
     return true;
   }
   if (command === "stash" && (args[1] === "list" || args[1] === "show")) {

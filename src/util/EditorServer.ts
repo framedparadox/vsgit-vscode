@@ -66,7 +66,11 @@ export class EditorServer implements vscode.Disposable {
     this.sockets.add(socket);
     socket.once("close", () => this.sockets.delete(socket));
     let buf = "";
+    let handled = false;
     socket.on("data", (chunk) => {
+      if (handled) {
+        return;
+      }
       buf += chunk.toString("utf8");
       // Bound the buffer so a peer that never sends a newline can't grow memory.
       if (buf.length > 8 * 1024 * 1024) {
@@ -77,6 +81,9 @@ export class EditorServer implements vscode.Disposable {
       if (nl === -1) {
         return;
       }
+      // Each connection carries exactly one request; ignore any further data so
+      // a chunked or chatty peer can't open a second editor round-trip.
+      handled = true;
       const line = buf.slice(0, nl);
       void this.respond(socket, line);
     });

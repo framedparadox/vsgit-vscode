@@ -25,7 +25,8 @@ export function registerInteractiveRebase(
 ): void {
   const shimPath = path.join(
     context.extensionPath,
-    "resources",
+    "webview-ui",
+    "shared",
     "sequence-editor.js",
   );
 

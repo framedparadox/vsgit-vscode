@@ -122,7 +122,7 @@ export class GraphPanel {
       {
         enableScripts: true,
         retainContextWhenHidden: true,
-        localResourceRoots: [vscode.Uri.joinPath(extensionUri, "resources")],
+        localResourceRoots: [vscode.Uri.joinPath(extensionUri, "webview-ui")],
       },
     );
 
@@ -393,8 +393,12 @@ export class GraphPanel {
         }
 
         case "openFileDiff": {
-          const { sha, path: filePath } = message.data as { sha: string; path: string };
-          await this.openCommitFileDiff(repo, sha, filePath);
+          const { sha, path: filePath, origPath } = message.data as {
+            sha: string;
+            path: string;
+            origPath?: string;
+          };
+          await this.openCommitFileDiff(repo, sha, filePath, origPath);
           return;
         }
 
@@ -409,12 +413,13 @@ export class GraphPanel {
         }
 
         case "openComparisonDiff": {
-          const { from, to, path: filePath } = message.data as {
+          const { from, to, path: filePath, origPath } = message.data as {
             from: string;
             to: string;
             path: string;
+            origPath?: string;
           };
-          await this.openComparisonFileDiff(repo, from, to, filePath);
+          await this.openComparisonFileDiff(repo, from, to, filePath, origPath);
           return;
         }
 
@@ -769,15 +774,13 @@ export class GraphPanel {
     repo: Repository,
     sha: string,
     filePath: string,
+    origPath?: string,
   ): Promise<void> {
-    const abs = path.join(repo.root, filePath);
-    const left = GitContentProvider.uri(repo.root, filePath, `${sha}^`, abs);
-    const right = GitContentProvider.uri(repo.root, filePath, sha, abs);
-    await vscode.commands.executeCommand(
-      "vscode.diff",
-      left,
-      right,
-      `${path.basename(filePath)} (${sha.slice(0, 8)})`,
+    await GitContentProvider.openDiff(
+      repo.root,
+      { path: filePath, origPath },
+      `${sha}~1`,
+      sha,
     );
   }
 
@@ -787,15 +790,13 @@ export class GraphPanel {
     fromSha: string,
     toSha: string,
     filePath: string,
+    origPath?: string,
   ): Promise<void> {
-    const abs = path.join(repo.root, filePath);
-    const left = GitContentProvider.uri(repo.root, filePath, fromSha, abs);
-    const right = GitContentProvider.uri(repo.root, filePath, toSha, abs);
-    await vscode.commands.executeCommand(
-      "vscode.diff",
-      left,
-      right,
-      `${path.basename(filePath)} (${fromSha.slice(0, 8)} ↔ ${toSha.slice(0, 8)})`,
+    await GitContentProvider.openDiff(
+      repo.root,
+      { path: filePath, origPath },
+      fromSha,
+      toSha,
     );
   }
 
@@ -853,22 +854,22 @@ export class GraphPanel {
     const nonce = makeNonce();
     const webview = this.panel.webview;
     const cssUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, "resources", "graph.css"),
+      vscode.Uri.joinPath(this.extensionUri, "webview-ui", "graph", "graph.css"),
     );
     const codiconCssUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, "resources", "codicon.css"),
+      vscode.Uri.joinPath(this.extensionUri, "webview-ui", "shared", "codicon.css"),
     );
     const setiCssUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, "resources", "seti.css"),
+      vscode.Uri.joinPath(this.extensionUri, "webview-ui", "shared", "seti.css"),
     );
     const setiJsUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, "resources", "setiIcons.js"),
+      vscode.Uri.joinPath(this.extensionUri, "webview-ui", "shared", "setiIcons.js"),
     );
     const jsUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, "resources", "graph.js"),
+      vscode.Uri.joinPath(this.extensionUri, "webview-ui", "graph", "graph.js"),
     );
     const layoutUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, "resources", "graphLayout.js"),
+      vscode.Uri.joinPath(this.extensionUri, "webview-ui", "graph", "graphLayout.js"),
     );
     const csp = [
       "default-src 'none'",

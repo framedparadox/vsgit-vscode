@@ -54,6 +54,11 @@ export class HistoryView implements vscode.Disposable {
     );
   }
 
+  /** Repository currently shown in the History panel, if any. */
+  get currentRepo(): Repository | undefined {
+    return this.repo;
+  }
+
   dispose(): void {
     this.queryGeneration += 1;
     this.commitsBySha.clear();
@@ -86,12 +91,12 @@ export class HistoryView implements vscode.Disposable {
       {
         enableScripts: true,
         retainContextWhenHidden: true,
-        localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, "resources")],
+        localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, "webview-ui")],
       },
     );
     const nonce = makeNonce();
     const codiconCssUri = this.panel.webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, "resources", "codicon.css"),
+      vscode.Uri.joinPath(this.extensionUri, "webview-ui", "shared", "codicon.css"),
     );
     this.panel.webview.html = historyHtml(
       nonce,
@@ -132,6 +137,7 @@ export class HistoryView implements vscode.Disposable {
     type: string;
     sha?: string;
     path?: string;
+    origPath?: string;
     search?: string;
     searchBy?: "message" | "author";
     branch?: string;
@@ -174,7 +180,7 @@ export class HistoryView implements vscode.Disposable {
         break;
       case "openFile":
         if (m.sha && m.path) {
-          await this.openFileDiff(m.sha, m.path);
+          await this.openFileDiff(m.sha, m.path, m.origPath);
         }
         break;
       case "context":
@@ -348,18 +354,15 @@ export class HistoryView implements vscode.Disposable {
   }
 
   /** Diff a file at a commit against its first parent. */
-  private async openFileDiff(sha: string, relPath: string): Promise<void> {
+  private async openFileDiff(sha: string, relPath: string, origPath?: string): Promise<void> {
     if (!this.repo) {
       return;
     }
-    const abs = path.join(this.repo.root, relPath);
-    const left = GitContentProvider.uri(this.repo.root, relPath, `${sha}~1`, abs);
-    const right = GitContentProvider.uri(this.repo.root, relPath, sha, abs);
-    await vscode.commands.executeCommand(
-      "vscode.diff",
-      left,
-      right,
-      `${path.basename(relPath)} @ ${sha.slice(0, 8)}`,
+    await GitContentProvider.openDiff(
+      this.repo.root,
+      { path: relPath, origPath },
+      `${sha}~1`,
+      sha,
     );
   }
 
@@ -380,7 +383,7 @@ export class HistoryView implements vscode.Disposable {
         "Compare with Another Commit…",
         "Show Commit Details",
         "Copy SHA",
-        "Copy SHA (full)",
+        "Copy SHA (short)",
       ],
       { placeHolder: label },
     );
@@ -462,9 +465,9 @@ export class HistoryView implements vscode.Disposable {
         await vscode.env.clipboard.writeText(sha);
         vscode.window.setStatusBarMessage("Copied SHA", 2000);
         break;
-      case "Copy SHA (full)":
-        await vscode.env.clipboard.writeText(sha);
-        vscode.window.setStatusBarMessage("Copied full SHA", 2000);
+      case "Copy SHA (short)":
+        await vscode.env.clipboard.writeText(sha.slice(0, 8));
+        vscode.window.setStatusBarMessage("Copied short SHA", 2000);
         break;
       case "Compare with HEAD": {
         const files = await repo.commitFiles(sha);

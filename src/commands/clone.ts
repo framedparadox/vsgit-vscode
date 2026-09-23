@@ -1,7 +1,7 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
-import { AskpassServer } from "../util/AskpassServer";
+import { Credentials } from "../util/credentials";
 import { redactRemoteUrl, safeRef, safeRemoteUrl } from "../git/argGuard";
 import { errMsg } from "./shared";
 
@@ -15,7 +15,7 @@ export function registerCloneCommands(
   manager: RepositoryManager,
 ): void {
   const git = manager.getGitExecutor();
-  const shimPath = path.join(context.extensionPath, "webview-ui", "shared", "askpass.js");
+  const creds = new Credentials(context);
 
   context.subscriptions.push(
     vscode.commands.registerCommand("vsgit.clone", async () => {
@@ -72,9 +72,7 @@ export function registerCloneCommands(
       }
       args.push("--", safeUrl);
 
-      const askpass = new AskpassServer();
       try {
-        await askpass.ready;
         const displayUrl = redactRemoteUrl(safeUrl);
         await vscode.window.withProgress(
           {
@@ -82,7 +80,7 @@ export function registerCloneCommands(
             title: `Cloning ${displayUrl}`,
             cancellable: false,
           },
-          () => git.run(args, { cwd: dest, env: askpass.env(shimPath) }),
+          () => creds.withAskpass((env) => git.run(args, { cwd: dest, env })),
         );
         await manager.scan();
         const open = await vscode.window.showInformationMessage(
@@ -90,7 +88,7 @@ export function registerCloneCommands(
           "Open Folder",
         );
         if (open === "Open Folder") {
-          const name = safeUrl.replace(/\.git$/, "").split(/[\\/]/).pop() || "repo";
+          const name = safeUrl.replace(/\/+$/, "").replace(/\.git$/, "").split(/[\\/:]/).pop() || "repo";
           const target = vscode.Uri.file(path.join(dest, name));
           await vscode.commands.executeCommand("vscode.openFolder", target, {
             forceNewWindow: false,
@@ -98,8 +96,6 @@ export function registerCloneCommands(
         }
       } catch (e) {
         vscode.window.showErrorMessage(`Clone failed: ${errMsg(e)}`);
-      } finally {
-        askpass.dispose();
       }
     }),
 

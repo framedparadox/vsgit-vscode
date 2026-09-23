@@ -67,9 +67,10 @@ export function registerWorktreeCommands(
     if (!targetFolder || targetFolder.length === 0) return;
     const worktreePath = path.join(targetFolder[0].fsPath, branch.replace(/\//g, "-"));
 
-    await withProgress(manager, `Create worktree: ${branch}`, () =>
+    const ok = await withProgress(manager, `Create worktree: ${branch}`, () =>
       repo.worktreeAdd(worktreePath, branch!, createNew),
     );
+    if (!ok) return;
 
     const open = await vscode.window.showInformationMessage(
       `Worktree created at ${worktreePath}`,
@@ -144,9 +145,10 @@ export function registerWorktreeCommands(
     const dest = path.join(target[0].fsPath, path.basename(n.info.path));
 
     try {
-      await withProgress(n.manager, `Move worktree → ${dest}`, () =>
+      const ok = await withProgress(n.manager, `Move worktree → ${dest}`, () =>
         repo.worktreeMove(n.info.path, dest),
       );
+      if (!ok) return;
       vscode.window.showInformationMessage(`Worktree moved to ${dest}`);
     } catch (e) {
       vscode.window.showErrorMessage(`Move worktree failed: ${errMsg(e)}`);
@@ -186,11 +188,12 @@ export function registerWorktreeCommands(
     if (!repo) return;
 
     try {
-      await withProgress(
+      const ok = await withProgress(
         manager,
         `Locking worktree ${path.basename(n.info.path)}`,
         () => repo.worktreeLock(n.info.path, reason || undefined)
       );
+      if (!ok) return;
       vscode.window.showInformationMessage(
         `Worktree locked: ${n.info.path}`
       );
@@ -208,11 +211,12 @@ export function registerWorktreeCommands(
     if (!repo) return;
 
     try {
-      await withProgress(
+      const ok = await withProgress(
         manager,
         `Unlocking worktree ${path.basename(n.info.path)}`,
         () => repo.worktreeUnlock(n.info.path)
       );
+      if (!ok) return;
       vscode.window.showInformationMessage(
         `Worktree unlocked: ${n.info.path}`
       );

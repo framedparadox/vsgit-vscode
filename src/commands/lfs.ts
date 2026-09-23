@@ -50,9 +50,10 @@ export function registerLfsCommands(
     if (!pattern) return;
 
     try {
-      await withProgress(manager, `Tracking ${pattern} with LFS`, () =>
+      const ok = await withProgress(manager, `Tracking ${pattern} with LFS`, () =>
         repo.lfsTrack(pattern)
       );
+      if (!ok) return;
       vscode.window.showInformationMessage(
         `Pattern '${pattern}' is now tracked by LFS. Remember to commit .gitattributes.`
       );
@@ -73,9 +74,10 @@ export function registerLfsCommands(
     if (!pattern) return;
 
     try {
-      await withProgress(manager, `Untracking ${pattern} from LFS`, () =>
+      const ok = await withProgress(manager, `Untracking ${pattern} from LFS`, () =>
         repo.lfsUntrack(pattern)
       );
+      if (!ok) return;
       vscode.window.showInformationMessage(
         `Pattern '${pattern}' is no longer tracked by LFS. Remember to commit .gitattributes.`
       );
@@ -101,9 +103,10 @@ export function registerLfsCommands(
     if (!file) return;
 
     try {
-      await withProgress(manager, `Locking ${file}`, () =>
+      const ok = await withProgress(manager, `Locking ${file}`, () =>
         repo.lfsLock(file)
       );
+      if (!ok) return;
       vscode.window.showInformationMessage(`Locked ${file} on remote.`);
     } catch (e) {
       vscode.window.showErrorMessage(`Failed to lock file: ${errMsg(e)}`);
@@ -148,9 +151,10 @@ export function registerLfsCommands(
     }
 
     try {
-      await withProgress(manager, `Unlocking ${selected.lock.path}`, () =>
+      const ok = await withProgress(manager, `Unlocking ${selected.lock.path}`, () =>
         repo.lfsUnlock(selected.lock.path, force)
       );
+      if (!ok) return;
       vscode.window.showInformationMessage(`Unlocked ${selected.lock.path}.`);
     } catch (e) {
       vscode.window.showErrorMessage(`Failed to unlock: ${errMsg(e)}`);
@@ -188,9 +192,10 @@ export function registerLfsCommands(
     if (!repo) return;
 
     try {
-      await withProgress(manager, "Pulling LFS objects", () =>
+      const ok = await withProgress(manager, "Pulling LFS objects", () =>
         repo.lfsPull()
       );
+      if (!ok) return;
       vscode.window.showInformationMessage("LFS objects pulled successfully.");
     } catch (e) {
       vscode.window.showErrorMessage(`Failed to pull LFS objects: ${errMsg(e)}`);
@@ -209,9 +214,10 @@ export function registerLfsCommands(
     if (!confirmed) return;
 
     try {
-      await withProgress(manager, "Pruning LFS objects", () =>
+      const ok = await withProgress(manager, "Pruning LFS objects", () =>
         repo.lfsPrune()
       );
+      if (!ok) return;
       vscode.window.showInformationMessage("LFS objects pruned successfully.");
     } catch (e) {
       vscode.window.showErrorMessage(`Failed to prune LFS objects: ${errMsg(e)}`);

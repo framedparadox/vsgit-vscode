@@ -163,12 +163,12 @@ const components: DocumentationEntry[] = [
   {
     name: "Git Graph",
     definition:
-      "A full editor panel that renders the commit DAG, branch lanes, ref labels, metadata, changed files, and commit actions.",
+      "A full editor panel that renders the commit DAG of branches, remote branches, and tags with stable lane colours, ref labels, a marked HEAD, uncommitted changes, metadata, changed files, and commit actions.",
     purpose:
-      "Provides visual history exploration, ancestry tracing, tracking, searching, filtering, and ref or commit operations.",
+      "Provides visual history exploration, ancestry tracing, tracking, searching, filtering, paging through long histories, and ref or commit operations.",
     use:
-      "Run VsGit: Show Git Graph. Select a row for details, Ctrl/Cmd-click two commits to compare, or right-click for actions.",
-    keywords: "dag history graph lanes trace tracking",
+      "Run VsGit: Show Git Graph. Select a row for details, Ctrl/Cmd-click two commits to compare, right-click for actions, double-click a pill to check it out, and use Load More Commits for older history.",
+    keywords: "dag history graph lanes trace tracking head uncommitted load more",
   },
   {
     name: "History",
@@ -181,14 +181,14 @@ const components: DocumentationEntry[] = [
     keywords: "log commits author message date filter",
   },
   {
-    name: "Native Source Control integration",
+    name: "Credential and editor helpers",
     definition:
-      "VsGit-backed staged, working-tree, and merge resource groups published through VS Code's Source Control API.",
+      "Small helper programs that Git launches for HTTPS/SSH credential prompts and for commit-message or rebase-todo editing.",
     purpose:
-      "Makes VsGit diffs, quick-diff gutters, commit input, and resource actions available in the built-in Source Control panel.",
+      "Routes every prompt Git would normally print to a terminal into VS Code input boxes and editors, so network and sequencer operations never hang.",
     use:
-      "Open Source Control and use the VsGit repository groups or their file/group context menus.",
-    keywords: "scm source control quick diff resource groups",
+      "Push, pull, fetch, clone, or continue a rebase; when Git needs a password, passphrase, or message, VsGit asks inside VS Code.",
+    keywords: "askpass credentials password passphrase ssh https editor",
   },
   {
     name: "Git Config editor",
@@ -213,9 +213,9 @@ const components: DocumentationEntry[] = [
   {
     name: "Background services",
     definition:
-      "Repository file watching, optional automatic fetch, notifications, and the Git Graph status-bar entry.",
+      "Working-tree and Git-directory watching, optional automatic fetch, notifications, and the Git Graph status-bar entry.",
     purpose:
-      "Keeps views current when Git changes inside or outside VS Code and can discover remote updates periodically.",
+      "Keeps views current when files are edited or saved, when Git changes inside or outside VS Code (including `git add` in a terminal), and can discover remote updates periodically.",
     use:
       "Configure vsgit.autoRefresh, vsgit.autoFetch.*, and vsgit.graph.showStatusBarItem in Settings.",
     keywords: "watch auto fetch refresh status bar notification",
@@ -261,7 +261,7 @@ const glossary: DocumentationEntry[] = [
   term("Origin", "The conventional default remote name created by clone.", "Provides the usual fetch and push destination.", "Treat it as a convention, not a special Git keyword; other remote names work too."),
   term("Clone", "Creation of a new local repository from a remote repository.", "Copies history, configures a remote, and checks out an initial branch.", "Run VsGit: Clone Repository and choose a URL and destination."),
   term("Initialize", "Creation of a new .git database in an existing folder.", "Starts version control for a local project.", "Run VsGit: Initialize Repository, then stage and commit the initial files."),
-  term("Stage / add", "Copy selected working-tree content into the index.", "Builds the next commit snapshot.", "Stage files, groups, or individual hunks from Commit, Staging, Explorer, or Source Control."),
+  term("Stage / add", "Copy selected working-tree content into the index.", "Builds the next commit snapshot.", "Stage files, groups, or individual hunks from Commit, Staging, or Explorer."),
   term("Unstage", "Remove selected changes from the index while normally preserving working-tree edits.", "Refines the next commit without losing work.", "Use Unstage on a file, group, or hunk."),
   term("Diff", "A line-level comparison between two file or tree states.", "Explains exactly what changed.", "Open a diff from a file row or compare refs, commits, the index, and HEAD."),
   term("Fetch", "Download remote objects and update remote-tracking refs without changing the working tree.", "Refreshes knowledge of remote history safely.", "Fetch before reviewing incoming work or comparing with a remote branch."),
@@ -460,7 +460,6 @@ const namespaceCategory: Record<string, string> = {
   replace: "changes",
   repo: "recovery",
   repositories: "repository",
-  scm: "changes",
   staging: "changes",
   stash: "stash",
   submodule: "composition",

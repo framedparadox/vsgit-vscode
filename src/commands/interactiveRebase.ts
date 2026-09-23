@@ -1,7 +1,7 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
-import { Repository } from "../git/Repository";
+import { Repository, SequencerKind } from "../git/Repository";
 import { VsgitNode } from "../views/RepositoriesProvider";
 import { EditorServer, EditRequest } from "../util/EditorServer";
 import { rebaseTodoHtml } from "../webviews/rebaseTodoHtml";
@@ -19,6 +19,9 @@ import { makeNonce } from "../util/token";
  * via an EditorServer. The shim routes the todo file to a structured webview
  * and commit messages (reword/edit) to a text webview.
  */
+/** Editor shim path, set once the rebase commands are registered. */
+let editorShimPath: string | undefined;
+
 export function registerInteractiveRebase(
   context: vscode.ExtensionContext,
   manager: RepositoryManager,
@@ -29,6 +32,7 @@ export function registerInteractiveRebase(
     "shared",
     "sequence-editor.js",
   );
+  editorShimPath = shimPath;
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -77,20 +81,51 @@ async function pickOnto(
   return pick.value;
 }
 
+/** Route git's todo/commit-message editors to VsGit's webviews. */
+const editHandler = async (req: EditRequest): Promise<string | undefined> => {
+  if (req.kind === "sequence") {
+    return editTodo(req.content);
+  }
+  return editCommitMessage(req.content);
+};
+
+/**
+ * Continue / skip / abort a paused operation. When a stopped interactive
+ * rebase still has reword/squash steps to run, those get VsGit's message
+ * editor; everything else accepts git's prepared message (see
+ * Repository.sequencerAction).
+ */
+export async function runSequencerAction(
+  repo: Repository,
+  kind: SequencerKind,
+  action: "continue" | "skip" | "abort",
+): Promise<void> {
+  if (
+    kind === "rebase" &&
+    action !== "abort" &&
+    editorShimPath &&
+    (await repo.rebaseNeedsMessageEditor())
+  ) {
+    const shimPath = editorShimPath;
+    const server = new EditorServer(editHandler);
+    try {
+      await server.ready;
+      await repo.sequencerAction(kind, action, server.editorEnv(shimPath));
+    } finally {
+      server.dispose();
+    }
+    return;
+  }
+  await repo.sequencerAction(kind, action);
+}
+
 async function runInteractiveRebase(
   manager: RepositoryManager,
   repo: Repository,
   onto: string,
   shimPath: string,
 ): Promise<void> {
-  const handler = async (req: EditRequest): Promise<string | undefined> => {
-    if (req.kind === "sequence") {
-      return editTodo(req.content);
-    }
-    return editCommitMessage(req.content);
-  };
-
-  const server = new EditorServer(handler);
+  const server = new EditorServer(editHandler);
   try {
     await server.ready;
     const ok = await withProgress(manager, `Interactive rebase onto ${onto}`, () =>

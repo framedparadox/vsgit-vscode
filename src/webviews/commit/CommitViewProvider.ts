@@ -94,6 +94,8 @@ export class CommitViewProvider
         conflicted: conflicted.map(toFileDto),
         staged: staged.map(toFileDto),
         unstaged: unstaged.map(toFileDto),
+        // vsgit.commit.signOff / gpgSign pre-check the matching options.
+        defaults: commitDefaults(),
       },
     });
   }
@@ -378,5 +380,14 @@ function toFileDto(change: FileChange): FileDto {
       ? "conflicted"
       : (change.indexState ?? change.worktreeState ?? "modified"),
     conflicted: change.conflicted,
+  };
+}
+
+/** Commit options the user asked to have enabled by default. */
+export function commitDefaults(): { signoff: boolean; gpg: boolean } {
+  const cfg = vscode.workspace.getConfiguration("vsgit");
+  return {
+    signoff: cfg.get<boolean>("commit.signOff", false),
+    gpg: cfg.get<boolean>("commit.gpgSign", false),
   };
 }

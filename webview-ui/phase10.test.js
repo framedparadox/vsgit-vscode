@@ -69,7 +69,6 @@ test('repository discovery is concurrent, coalesced, and measured', () => {
 
 test('contributor and release documentation covers Phase 10 gates', () => {
   const contributing = read('CONTRIBUTING.md');
-  const marketplace = read('docs/MARKETPLACE_CHECKLIST.md');
   for (const command of [
     'npm run verify',
     'npm run test:integration',
@@ -78,9 +77,15 @@ test('contributor and release documentation covers Phase 10 gates', () => {
     assert.ok(contributing.includes(command), `CONTRIBUTING includes ${command}`);
   }
   assert.ok(contributing.includes('Accessibility requirements'));
-  assert.ok(marketplace.includes('npm run test:coverage'));
-  assert.ok(marketplace.includes('VSCE_PAT'));
-  assert.ok(marketplace.includes('Rollback'));
+  // The release checklist is a maintainer-local file (listed in .gitignore),
+  // so fresh clones and CI checkouts do not have it.
+  const checklist = path.join(root, 'docs', 'MARKETPLACE_CHECKLIST.md');
+  if (fs.existsSync(checklist)) {
+    const marketplace = fs.readFileSync(checklist, 'utf8');
+    assert.ok(marketplace.includes('npm run test:coverage'));
+    assert.ok(marketplace.includes('VSCE_PAT'));
+    assert.ok(marketplace.includes('Rollback'));
+  }
 });
 
 test('package and lockfile versions remain aligned', () => {

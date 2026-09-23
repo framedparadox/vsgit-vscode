@@ -498,7 +498,7 @@ test("bisectMark: rejects option-like sha; omits sha when absent", async () => {
 // Read paths that take refs (commitFiles / diffFiles / reflog / log range)
 // ===========================================================================
 
-test("commitFiles: rejects option-like sha; positional sha after --format=", async () => {
+test("commitFiles: rejects option-like sha; merges diff against the first parent", async () => {
   const { repo, git } = makeRepo();
   await assertRejectsBeforeGit(git, () => repo.commitFiles("-x"), "sha=-x");
   git.calls = [];
@@ -508,6 +508,8 @@ test("commitFiles: rejects option-like sha; positional sha after --format=", asy
     "--name-status",
     "-z",
     "-M",
+    "-m",
+    "--first-parent",
     "--format=",
     "abc123",
   ]);
@@ -641,8 +643,23 @@ test("graphLog: rejects option-like branch in the branches list", async () => {
   );
   git.calls = [];
   await repo.graphLog({ branches: ["main", "develop"] });
-  const args = git.calls[0].args;
+  const args = git.calls.find((c) => c.args[0] === "log")!.args;
   assert.ok(args.includes("main") && args.includes("develop"));
+  assert.ok(!args.includes("--all"), "a branch filter replaces --all");
+});
+
+test("graphLog: excludes internal refs before --all and asks for one extra commit", async () => {
+  const { repo, git } = makeRepo();
+  await repo.graphLog({ limit: 10 });
+  const args = git.calls.find((c) => c.args[0] === "log")!.args;
+  assert.ok(args.includes("--decorate=full"));
+  assert.ok(args.includes("--max-count=11"));
+  const all = args.indexOf("--all");
+  assert.ok(all > 0);
+  for (const exclude of ["--exclude=refs/stash", "--exclude=refs/notes/*", "--exclude=refs/prefetch/*"]) {
+    const at = args.indexOf(exclude);
+    assert.ok(at >= 0 && at < all, `${exclude} precedes --all`);
+  }
 });
 
 // ===========================================================================
@@ -929,5 +946,62 @@ test("reference-picker helpers guard refs and keep executor access encapsulated"
     "rev-parse",
     "--git-path",
     "hooks/commit-msg",
+  ]);
+});
+
+test("submodule status parsing keeps paths with spaces", async () => {
+  const { repo, git } = makeRepo();
+  git.nextStdout =
+    " 1111111111111111111111111111111111111111 libs/with space (v1.0)\n" +
+    "+2222222222222222222222222222222222222222 plain\n" +
+    "-3333333333333333333333333333333333333333 uninit\n";
+  await repo.ensureSubmodules();
+  assert.deepStrictEqual(
+    repo.submodules.map((s) => [s.status, s.path]),
+    [
+      [" ", "libs/with space"],
+      ["+", "plain"],
+      ["-", "uninit"],
+    ],
+  );
+});
+
+test("cherryPick / revert pass -m only for a chosen mainline", async () => {
+  const { repo, git } = makeRepo();
+  await repo.cherryPick("abc123");
+  await repo.cherryPick("abc123", { mainline: 2 });
+  await repo.revert("abc123", { mainline: 1 });
+  assert.deepStrictEqual(git.calls.map((c) => c.args), [
+    ["cherry-pick", "abc123"],
+    ["cherry-pick", "-m", "2", "abc123"],
+    ["revert", "--no-edit", "-m", "1", "abc123"],
+  ]);
+});
+
+test("sequencerAction supplies a no-op editor except when aborting", async () => {
+  const { repo, git } = makeRepo();
+  await repo.sequencerAction("rebase", "continue");
+  await repo.sequencerAction("cherry-pick", "skip");
+  await repo.sequencerAction("merge", "abort");
+  await repo.sequencerAction("rebase", "continue", { GIT_EDITOR: "custom" });
+  assert.deepStrictEqual(git.calls.map((c) => c.args), [
+    ["rebase", "--continue"],
+    ["cherry-pick", "--skip"],
+    ["merge", "--abort"],
+    ["rebase", "--continue"],
+  ]);
+  assert.strictEqual(git.calls[0].options.env?.GIT_EDITOR, ":");
+  assert.strictEqual(git.calls[1].options.env?.GIT_EDITOR, ":");
+  assert.strictEqual(git.calls[2].options.env, undefined);
+  assert.strictEqual(git.calls[3].options.env?.GIT_EDITOR, "custom");
+});
+
+test("pull: --ff-only and --rebase are mutually exclusive", async () => {
+  const { repo, git } = makeRepo();
+  await repo.pull({ ffOnly: true });
+  await repo.pull({ rebase: true, ffOnly: true });
+  assert.deepStrictEqual(git.calls.map((c) => c.args), [
+    ["pull", "--ff-only"],
+    ["pull", "--rebase"],
   ]);
 });

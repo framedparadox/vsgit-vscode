@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { VsgitNode } from "../views/RepositoriesProvider";
 import { Repository } from "../git/Repository";
-import { resolveRepo, withProgress, errMsg } from "./shared";
+import { checkoutRemoteBranchInteractive, resolveRepo, withProgress, errMsg } from "./shared";
 import { confirmDestructiveAction, DestructiveOperations } from "../util/confirmation";
 
 /**
@@ -300,27 +300,16 @@ export function registerBranchExtraCommands(
       const repo = await resolveRepo(manager, undefined);
       if (!repo) return;
       const picked = await vscode.window.showQuickPick(
-        repo.remoteBranches.map((b) => b.shortName),
+        repo.remoteBranches
+          .map((b) => b.shortName)
+          .filter((name) => !name.endsWith("/HEAD")),
         { placeHolder: "Select remote branch to checkout" },
       );
       if (!picked) return;
-      const localName = picked.replace(/^[^/]+\//, ""); // strip remote/
-      await withProgress(manager, `Checkout ${picked}`, () =>
-        repo.checkoutRemoteBranch(picked, localName),
-      );
+      await checkoutRemoteBranchInteractive(manager, repo, picked);
       return;
     }
-    const fullName = n.ref.shortName; // e.g. origin/feature
-    const localName = fullName.replace(/^[^/]+\//, "");
-    const proposedName = await vscode.window.showInputBox({
-      prompt: "Local branch name",
-      value: localName,
-      validateInput: (v) => (v.trim() === "" ? "Required" : undefined),
-    });
-    if (!proposedName) return;
-    await withProgress(manager, `Checkout ${fullName} → ${proposedName}`, () =>
-      n.repo.checkoutRemoteBranch(fullName, proposedName.trim()),
-    );
+    await checkoutRemoteBranchInteractive(manager, n.repo, n.ref.shortName);
   });
 
   // ── Remote branch: delete ─────────────────────────────────────────────
@@ -331,15 +320,15 @@ export function registerBranchExtraCommands(
       vscode.window.showWarningMessage("Select a remote branch to delete.");
       return;
     }
-    const [remoteName, ...branchParts] = n.ref.shortName.split("/");
-    const branchName = branchParts.join("/");
+    const target = n.repo.splitRemoteBranch(n.ref.shortName);
+    if (!target) return;
     const confirmed = await confirmDestructiveAction({
       operation: DestructiveOperations.DELETE_REMOTE_BRANCH,
       message: `Delete remote branch ${n.ref.shortName}? This cannot be undone.`,
     });
     if (!confirmed) return;
     await withProgress(manager, `Delete remote branch ${n.ref.shortName}`, () =>
-      n.repo.deleteRemoteBranch(remoteName, branchName),
+      n.repo.deleteRemoteBranch(target.remote, target.branch),
     );
   });
 }

@@ -4,6 +4,17 @@ import * as path from "node:path";
 import * as fs from "node:fs";
 import * as vscode from "vscode";
 import { makeNonce, makeToken, safeEqual } from "./token";
+import { isSecretPrompt } from "./askpassScript";
+
+export { ASKPASS_LAUNCHER_SCRIPT } from "./askpassScript";
+
+/** Paths of the helper programs git launches for credential prompts. */
+export interface AskpassHelper {
+  /** Single-executable launcher script used as GIT_ASKPASS / SSH_ASKPASS. */
+  launcher: string;
+  /** Node shim (askpass.js) the launcher runs with VS Code's runtime. */
+  main: string;
+}
 
 /**
  * IPC server the askpass shim connects back to. For each prompt git issues
@@ -46,15 +57,34 @@ export class AskpassServer implements vscode.Disposable {
     });
   }
 
-  /** Env vars that route git credential prompts back here via the shim. */
-  env(shimPath: string): NodeJS.ProcessEnv {
-    return {
+  /**
+   * Env vars that route git (and ssh) credential prompts back here.
+   *
+   * Git executes GIT_ASKPASS as a single program path — it does not split a
+   * quoted "node script.js" command line — so the prompt goes through a tiny
+   * launcher script that re-executes VS Code's bundled Node runtime on the
+   * shim. The runtime and shim paths travel in their own variables so paths
+   * with spaces need no quoting.
+   */
+  env(helper: AskpassHelper): NodeJS.ProcessEnv {
+    const env: NodeJS.ProcessEnv = {
       VSGIT_ASKPASS_SOCK: this.sockPath,
       VSGIT_ASKPASS_TOKEN: this.token,
-      GIT_ASKPASS: `"${process.execPath}" "${shimPath}"`,
+      VSGIT_ASKPASS_NODE: process.execPath,
+      VSGIT_ASKPASS_MAIN: helper.main,
+      GIT_ASKPASS: helper.launcher,
       // Never fall back to a blocking terminal prompt.
       GIT_TERMINAL_PROMPT: "0",
     };
+    // OpenSSH (8.4+) uses SSH_ASKPASS for key passphrases and host-key
+    // confirmation when forced; without it, ssh has no TTY to prompt on and the
+    // operation fails. Windows' native ssh.exe cannot launch a shell script, so
+    // leave SSH prompting to the user's own configuration there.
+    if (process.platform !== "win32") {
+      env.SSH_ASKPASS = helper.launcher;
+      env.SSH_ASKPASS_REQUIRE = "force";
+    }
+    return env;
   }
 
   private onConnection(socket: net.Socket): void {
@@ -97,12 +127,11 @@ export class AskpassServer implements vscode.Disposable {
       }
       authed = true;
       // Mask conservatively: treat every prompt as secret UNLESS it clearly asks
-      // for a username, so a locale-translated "password" prompt is never echoed
-      // back in cleartext.
-      const isUsername = /username|user name|\blogin\b/i.test(prompt);
+      // for a username or a yes/no confirmation (ssh host-key checks), so a
+      // locale-translated "password" prompt is never echoed back in cleartext.
       value = await vscode.window.showInputBox({
         prompt: prompt.trim() || "Git credentials",
-        password: !isUsername,
+        password: isSecretPrompt(prompt),
         ignoreFocusOut: true,
       });
     } catch {

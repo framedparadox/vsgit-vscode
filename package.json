@@ -925,18 +925,6 @@
         "icon": "$(clear-all)"
       },
       {
-        "command": "vsgit.scm.rename",
-        "title": "Rename / Move...",
-        "category": "VsGit",
-        "icon": "$(edit)"
-      },
-      {
-        "command": "vsgit.scm.delete",
-        "title": "Delete (git rm)",
-        "category": "VsGit",
-        "icon": "$(trash)"
-      },
-      {
         "command": "vsgit.worktree.move",
         "title": "Move Worktree...",
         "category": "VsGit",
@@ -947,71 +935,6 @@
         "title": "Branches/Tags Containing Commit...",
         "category": "VsGit",
         "icon": "$(git-branch)"
-      },
-      {
-        "command": "vsgit.scm.stage",
-        "title": "Stage Changes",
-        "category": "VsGit",
-        "icon": "$(add)"
-      },
-      {
-        "command": "vsgit.scm.unstage",
-        "title": "Unstage Changes",
-        "category": "VsGit",
-        "icon": "$(remove)"
-      },
-      {
-        "command": "vsgit.scm.discard",
-        "title": "Discard Changes",
-        "category": "VsGit",
-        "icon": "$(discard)"
-      },
-      {
-        "command": "vsgit.scm.openDiff",
-        "title": "Open Diff",
-        "category": "VsGit",
-        "icon": "$(git-compare)"
-      },
-      {
-        "command": "vsgit.scm.openFile",
-        "title": "Open File",
-        "category": "VsGit",
-        "icon": "$(go-to-file)"
-      },
-      {
-        "command": "vsgit.scm.showHistory",
-        "title": "Show History",
-        "category": "VsGit",
-        "icon": "$(history)"
-      },
-      {
-        "command": "vsgit.scm.blame",
-        "title": "Blame",
-        "category": "VsGit",
-        "icon": "$(person)"
-      },
-      {
-        "command": "vsgit.scm.replaceWithHead",
-        "title": "Replace with HEAD",
-        "category": "VsGit"
-      },
-      {
-        "command": "vsgit.scm.stageAll",
-        "title": "Stage All Changes",
-        "category": "VsGit",
-        "icon": "$(add)"
-      },
-      {
-        "command": "vsgit.scm.unstageAll",
-        "title": "Unstage All Changes",
-        "category": "VsGit",
-        "icon": "$(remove)"
-      },
-      {
-        "command": "vsgit.scm.discardAll",
-        "title": "Discard All Changes",
-        "category": "VsGit",
-        "icon": "$(discard)"
       },
       {
         "command": "vsgit.commit.cherryPick",
@@ -1102,7 +1025,7 @@
     "submenus": [
       {
         "id": "vsgit.repo",
-        "label": "VsGit"
+        "label": "Repository Actions"
       },
       {
         "id": "vsgit.team",
@@ -1194,20 +1117,6 @@
       }
     ],
     "menus": {
-      "scm/title": [
-        {
-          "command": "vsgit.graph.show",
-          "when": "scmProvider == vsgit",
-          "group": "navigation@9"
-        }
-      ],
-      "scm/sourceControl": [
-        {
-          "submenu": "vsgit.repo",
-          "when": "scmProvider == git",
-          "group": "9_vsgit@1"
-        }
-      ],
       "explorer/context": [
         {
           "submenu": "vsgit.team.compareWith",
@@ -1836,6 +1745,11 @@
           "command": "vsgit.documentation.open",
           "when": "view == vsgit.documentation",
           "group": "navigation@1"
+        },
+        {
+          "submenu": "vsgit.repo",
+          "when": "view == vsgit.repositoriesList",
+          "group": "0_repo@1"
         }
       ],
       "view/item/context": [
@@ -2355,80 +2269,6 @@
           "group": "8@2"
         }
       ],
-      "scm/resourceState/context": [
-        {
-          "command": "vsgit.scm.stage",
-          "when": "scmProvider == vsgit && scmResourceGroup != index",
-          "group": "inline@1"
-        },
-        {
-          "command": "vsgit.scm.unstage",
-          "when": "scmProvider == vsgit && scmResourceGroup == index",
-          "group": "inline@2"
-        },
-        {
-          "command": "vsgit.scm.openDiff",
-          "when": "scmProvider == vsgit",
-          "group": "1_open@1"
-        },
-        {
-          "command": "vsgit.scm.openFile",
-          "when": "scmProvider == vsgit",
-          "group": "1_open@2"
-        },
-        {
-          "command": "vsgit.scm.showHistory",
-          "when": "scmProvider == vsgit",
-          "group": "2_info@1"
-        },
-        {
-          "command": "vsgit.scm.blame",
-          "when": "scmProvider == vsgit",
-          "group": "2_info@2"
-        },
-        {
-          "command": "vsgit.scm.rename",
-          "when": "scmProvider == vsgit",
-          "group": "7_modify@1"
-        },
-        {
-          "command": "vsgit.scm.discard",
-          "when": "scmProvider == vsgit && scmResourceGroup != index",
-          "group": "9_destructive@1"
-        },
-        {
-          "command": "vsgit.scm.replaceWithHead",
-          "when": "scmProvider == vsgit",
-          "group": "9_destructive@2"
-        },
-        {
-          "command": "vsgit.scm.delete",
-          "when": "scmProvider == vsgit",
-          "group": "9_destructive@3"
-        }
-      ],
-      "scm/resourceGroup/context": [
-        {
-          "command": "vsgit.scm.stageAll",
-          "when": "scmProvider == vsgit && scmResourceGroup != index",
-          "group": "1_modify@1"
-        },
-        {
-          "command": "vsgit.scm.unstageAll",
-          "when": "scmProvider == vsgit && scmResourceGroup == index",
-          "group": "1_modify@2"
-        },
-        {
-          "command": "vsgit.scm.discardAll",
-          "when": "scmProvider == vsgit && scmResourceGroup != index",
-          "group": "9_destructive@1"
-        },
-        {
-          "submenu": "vsgit.repo",
-          "when": "scmProvider == git && scmResourceGroup == workingTree",
-          "group": "9_vsgit@1"
-        }
-      ],
       "editor/title": [
         {
           "command": "vsgit.compare.withRef",
@@ -2479,14 +2319,6 @@
         }
       ],
       "commandPalette": [
-        {
-          "command": "vsgit.scm.rename",
-          "when": "false"
-        },
-        {
-          "command": "vsgit.scm.delete",
-          "when": "false"
-        },
         {
           "command": "vsgit.worktree.move",
           "when": "false"
@@ -2733,50 +2565,6 @@
         },
         {
           "command": "vsgit.bisect.reset",
-          "when": "false"
-        },
-        {
-          "command": "vsgit.scm.stage",
-          "when": "false"
-        },
-        {
-          "command": "vsgit.scm.unstage",
-          "when": "false"
-        },
-        {
-          "command": "vsgit.scm.discard",
-          "when": "false"
-        },
-        {
-          "command": "vsgit.scm.openDiff",
-          "when": "false"
-        },
-        {
-          "command": "vsgit.scm.openFile",
-          "when": "false"
-        },
-        {
-          "command": "vsgit.scm.showHistory",
-          "when": "false"
-        },
-        {
-          "command": "vsgit.scm.blame",
-          "when": "false"
-        },
-        {
-          "command": "vsgit.scm.replaceWithHead",
-          "when": "false"
-        },
-        {
-          "command": "vsgit.scm.stageAll",
-          "when": "false"
-        },
-        {
-          "command": "vsgit.scm.unstageAll",
-          "when": "false"
-        },
-        {
-          "command": "vsgit.scm.discardAll",
           "when": "false"
         },
         {
@@ -3036,6 +2824,13 @@
           "default": "",
           "description": "Custom path to the git executable. Leave empty to use the system default."
         },
+        "vsgit.repositoryScanMaxDepth": {
+          "type": "number",
+          "default": 1,
+          "minimum": 0,
+          "maximum": 5,
+          "description": "When a workspace folder is not itself inside a Git repository, how many folder levels below it to search for repositories (0 disables the search)."
+        },
         "vsgit.autoRefresh": {
           "type": "boolean",
           "default": true,
@@ -3132,7 +2927,22 @@
           "type": "number",
           "default": 500,
           "minimum": 50,
-          "description": "Maximum number of commits to load in the Git Graph."
+          "description": "Number of commits the Git Graph loads per page. Use Load More Commits at the bottom of the graph to load the next page."
+        },
+        "vsgit.graph.commitOrdering": {
+          "type": "string",
+          "enum": [
+            "topo",
+            "date",
+            "author-date"
+          ],
+          "enumDescriptions": [
+            "Keep each branch's commits together (git log --topo-order).",
+            "Newest commit first by commit date, parents after children (git log --date-order).",
+            "Newest commit first by author date, parents after children (git log --author-date-order)."
+          ],
+          "default": "topo",
+          "description": "Order of commits in the Git Graph."
         },
         "vsgit.graph.showRemoteBranches": {
           "type": "boolean",
@@ -3173,24 +2983,6 @@
           ],
           "default": "standard",
           "description": "Date format used in the Git Graph (standard shows an absolute date/time, relative shows e.g. '5d ago')."
-        },
-        "vsgit.graph.showSidebar": {
-          "type": "boolean",
-          "default": true,
-          "description": "Show the left sidebar tree (Branches, Tags, Remotes, Stashes, Submodules) in the Git Graph."
-        },
-        "vsgit.graph.bottomPanelMode": {
-          "type": "string",
-          "enum": [
-            "editor",
-            "inline"
-          ],
-          "enumDescriptions": [
-            "Open changed files in the native VS Code diff editor.",
-            "Render a unified diff inline within the Git Graph panel."
-          ],
-          "default": "editor",
-          "description": "How the Git Graph bottom panel shows a changed file's diff."
         }
       }
     }

@@ -22,7 +22,12 @@
     "src/util/html.ts",
     "src/util/html.test.ts",
     "src/util/revisionDiff.ts",
-    "src/util/revisionDiff.test.ts"
+    "src/util/revisionDiff.test.ts",
+    "src/git/Repository.git.test.ts",
+    "src/git/discovery.ts",
+    "src/git/discovery.test.ts",
+    "src/util/askpassScript.ts",
+    "src/util/askpassScript.test.ts"
   ],
   "exclude": ["node_modules"]
 }

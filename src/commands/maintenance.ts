@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { VsgitNode } from "../views/RepositoriesProvider";
-import { resolveRepo, withProgress } from "./shared";
+import { resolveRepo, showGitProgress, withProgress } from "./shared";
 import { confirmDestructiveAction, DestructiveOperations } from "../util/confirmation";
 
 /** Repository maintenance: garbage collection, integrity check, object prune. */
@@ -11,6 +11,7 @@ export function registerMaintenanceCommands(
 ): void {
   const reg = (id: string, fn: (...a: unknown[]) => unknown) =>
     context.subscriptions.push(vscode.commands.registerCommand(id, fn));
+  let fsckChannel: vscode.OutputChannel | undefined;
 
   reg("vsgit.maintenance.gc", async (node) => {
     const repo = await resolveRepo(manager, node as VsgitNode);
@@ -31,9 +32,10 @@ export function registerMaintenanceCommands(
     if (!choice) {
       return;
     }
-    await withProgress(manager, "Garbage collect", () =>
+    const ok = await withProgress(manager, "Garbage collect", () =>
       repo.gc(choice.aggressive),
     );
+    if (!ok) return;
     vscode.window.setStatusBarMessage("Repository garbage collected", 3000);
   });
 
@@ -44,17 +46,19 @@ export function registerMaintenanceCommands(
     }
     let output: string;
     try {
-      output = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.SourceControl, title: "Check integrity" },
-        () => repo.fsck(),
-      );
+      output = await showGitProgress("Check integrity", () => repo.fsck());
     } catch (e) {
       vscode.window.showErrorMessage(
         `Integrity check failed: ${e instanceof Error ? e.message : String(e)}`,
       );
       return;
     }
-    const channel = vscode.window.createOutputChannel("VsGit fsck");
+    // Reuse one channel; creating a new one per run leaks an Output entry each time.
+    if (!fsckChannel) {
+      fsckChannel = vscode.window.createOutputChannel("VsGit fsck");
+      context.subscriptions.push(fsckChannel);
+    }
+    const channel = fsckChannel;
     channel.clear();
     channel.appendLine(output.trim() || "No issues found — object database is intact.");
     channel.show(true);
@@ -73,7 +77,8 @@ export function registerMaintenanceCommands(
     if (!confirmed) {
       return;
     }
-    await withProgress(manager, "Prune objects", () => repo.pruneObjects());
+    const ok = await withProgress(manager, "Prune objects", () => repo.pruneObjects());
+    if (!ok) return;
     vscode.window.setStatusBarMessage("Unreachable objects pruned", 3000);
   });
 }

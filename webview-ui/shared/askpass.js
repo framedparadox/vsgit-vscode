@@ -47,8 +47,10 @@ socket.on("data", (chunk) => {
   if (!resp || resp.ok !== true) {
     process.exit(1);
   }
-  process.stdout.write(resp.value);
-  process.exit(0);
+  // Exit only after the answer is flushed: stdout is asynchronous for pipes
+  // on some platforms (and under Electron), and exiting early hands git an
+  // empty credential.
+  process.stdout.write(String(resp.value), () => process.exit(0));
 });
 
 socket.on("error", () => process.exit(1));

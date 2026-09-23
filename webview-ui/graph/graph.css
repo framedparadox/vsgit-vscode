@@ -651,6 +651,7 @@ tr.cdv-row > td.cdv-cell {
 .file-change.C { color: #4daafc; }
 .file-change.T { color: #e2c08d; }
 .file-change.U { color: #f14c4c; }
+.file-change.untracked { color: #73c991; }
 
 /* ─── changed-file tree view ──────────────────────────────────────────── */
 .tree-children.collapsed { display: none; }
@@ -877,3 +878,44 @@ tr.cdv-row > td.cdv-cell {
   color: var(--vscode-descriptionForeground);
   font-size: 13px;
 }
+
+/* ── HEAD commit, pagination, commit details extras ─────────────────────── */
+#graph-table tr.commit-row.head-commit .desc-text { font-weight: 600; }
+#graph-svg .graph-node-head { pointer-events: none; }
+#graph-svg .graph-line.off-page { opacity: 0.55; }
+
+#graph-table tr.load-more-row td {
+  padding: 8px 0 12px;
+  border: none;
+}
+#graph-table tr.load-more-row .load-more {
+  padding: 4px 14px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 2px;
+  color: var(--vscode-button-secondaryForeground);
+  background-color: var(--vscode-button-secondaryBackground);
+}
+#graph-table tr.load-more-row .load-more:hover:not(:disabled) {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+}
+#graph-table tr.load-more-row .load-more:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.cdvHeadBadge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--vscode-badge-foreground);
+  background-color: var(--vscode-badge-background);
+}
+.cdvEmail {
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+}
+.cdvEmail:hover { text-decoration: underline; }
+

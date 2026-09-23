@@ -1,8 +1,9 @@
 import * as path from "node:path";
 import { GitExecutor } from "./GitExecutor";
+import { GitError } from "./GitError";
 import { safeRef, safeRemoteUrl, safeRevRange } from "./argGuard";
 import { FOR_EACH_REF_FORMAT, parseForEachRef, RefInfo } from "./parsers/refs";
-import { parseStatusV2, StatusResult } from "./parsers/status";
+import { FileChangeState, parseStatusV2, StatusResult } from "./parsers/status";
 import {
   Commit,
   CommitFile,
@@ -14,7 +15,7 @@ import { parseReflog, REFLOG_FORMAT, ReflogEntry } from "./parsers/reflog";
 import { BlameLine, parseBlamePorcelain } from "./parsers/blame";
 import { ConfigEntry, parseConfigListZ } from "./parsers/config";
 import { parseWorktreeList, WorktreeInfo } from "./parsers/worktree";
-import { GRAPH_LOG_FORMAT, parseGraphLog } from "./parsers/graphLog";
+import { GRAPH_LOG_FORMAT, GRAPH_REF_EXCLUDES, GraphCommit, parseGraphLog } from "./parsers/graphLog";
 
 export { WorktreeInfo } from "./parsers/worktree";
 
@@ -35,6 +36,19 @@ export interface StashInfo {
   baseObjectId?: string;
   message: string;
 }
+
+/** Name-status letter for each parsed file state. */
+const STATE_LETTER: Partial<Record<FileChangeState, string>> = {
+  modified: "M",
+  added: "A",
+  deleted: "D",
+  renamed: "R",
+  copied: "C",
+  conflicted: "U",
+};
+
+/** Multi-step operations git can pause for conflict resolution. */
+export type SequencerKind = "rebase" | "merge" | "cherry-pick" | "revert" | "am";
 
 export interface SubmoduleInfo {
   path: string;
@@ -246,17 +260,27 @@ export class Repository {
     await this.git.run(args, { cwd: this.root, env: opts.env });
   }
 
-  /** Continue/skip/abort an in-progress rebase, merge, or cherry-pick. */
+  /**
+   * Continue/skip/abort an in-progress rebase, merge, cherry-pick, revert, or
+   * `git am`.
+   *
+   * `--continue` (and `--skip` while replaying a sequence) commits the resolved
+   * state, which makes git launch an editor for the message. The extension
+   * host has no terminal, so without an editor git either fails ("Terminal is
+   * dumb, but EDITOR unset") or blocks on a terminal editor forever. Unless
+   * the caller routes GIT_EDITOR somewhere interactive, accept the message git
+   * prepared (`:` is git's built-in "no-op editor").
+   */
   async sequencerAction(
-    kind: "rebase" | "merge" | "cherry-pick" | "revert",
+    kind: SequencerKind,
     action: "continue" | "skip" | "abort",
+    env?: NodeJS.ProcessEnv,
   ): Promise<void> {
-    if (kind === "merge" && action !== "abort") {
-      // merge only supports --abort/--continue (no --skip).
-      await this.git.run(["merge", `--${action}`], { cwd: this.root });
-      return;
+    if (kind === "merge" && action === "skip") {
+      throw new GitError("A merge cannot be skipped; continue or abort it.", -1, "", "", []);
     }
-    await this.git.run([kind, `--${action}`], { cwd: this.root });
+    const runEnv = action === "abort" ? env : { GIT_EDITOR: ":", ...env };
+    await this.git.run([kind, `--${action}`], { cwd: this.root, env: runEnv });
   }
 
   // --- Remotes / transport ------------------------------------------------
@@ -337,11 +361,19 @@ export class Repository {
   }
 
   async pull(
-    opts: { rebase?: boolean; remote?: string; branch?: string; env?: NodeJS.ProcessEnv } = {},
+    opts: {
+      rebase?: boolean;
+      ffOnly?: boolean;
+      remote?: string;
+      branch?: string;
+      env?: NodeJS.ProcessEnv;
+    } = {},
   ): Promise<void> {
     const args = ["pull"];
     if (opts.rebase) {
       args.push("--rebase");
+    } else if (opts.ffOnly) {
+      args.push("--ff-only");
     }
     if (opts.remote) {
       args.push(safeRef(opts.remote, "remote"));
@@ -378,6 +410,23 @@ export class Repository {
       args.push(safeRef(opts.refspec, "refspec"));
     }
     await this.git.run(args, { cwd: this.root, env: opts.env });
+  }
+
+  /**
+   * Explicit refspec for pushing local `branch` to `remote`. With git's
+   * default `push.default=simple`, a bare `git push <remote>` refuses a branch
+   * that has no upstream yet ("The current branch has no upstream branch") and
+   * one whose upstream has a different name, so always name the destination:
+   * the tracked branch when it lives on this remote, otherwise the same name.
+   */
+  pushRefspec(branch: string, remote: string): string {
+    const upstream = this.localBranches.find((b) => b.shortName === branch)?.upstream;
+    const prefix = `${remote}/`;
+    if (upstream && upstream.startsWith(prefix)) {
+      const target = upstream.slice(prefix.length);
+      return target === branch ? branch : `${branch}:refs/heads/${target}`;
+    }
+    return branch;
   }
 
   // --- Tags ---------------------------------------------------------------
@@ -692,13 +741,30 @@ export class Repository {
 
   // --- Stash --------------------------------------------------------------
 
-  async stashPush(message: string | undefined, includeUntracked: boolean): Promise<void> {
+  /**
+   * Stash changes. `includeUntracked` also stashes new files; `keepIndex`
+   * leaves staged changes in place; `staged` stashes only what is staged.
+   * `paths` limits the stash to those files.
+   */
+  async stashPush(
+    message: string | undefined,
+    includeUntracked: boolean,
+    opts: { keepIndex?: boolean; staged?: boolean; paths?: string[] } = {},
+  ): Promise<void> {
     const args = ["stash", "push"];
-    if (includeUntracked) {
+    if (opts.staged) {
+      args.push("--staged");
+    } else if (includeUntracked) {
       args.push("--include-untracked");
+    }
+    if (opts.keepIndex && !opts.staged) {
+      args.push("--keep-index");
     }
     if (message) {
       args.push("-m", message);
+    }
+    if (opts.paths && opts.paths.length > 0) {
+      args.push("--", ...opts.paths);
     }
     await this.git.run(args, { cwd: this.root });
   }
@@ -720,12 +786,19 @@ export class Repository {
     await this.git.run(["stash", "clear"], { cwd: this.root });
   }
 
-  /** Files changed in a stash, name-status. */
+  /**
+   * Files changed in a stash, name-status. Includes files stashed with
+   * `--include-untracked` where git supports showing them (2.32+).
+   */
   async stashFiles(ref: string): Promise<CommitFile[]> {
-    const out = await this.git.stdout(
-      ["stash", "show", "--name-status", "-z", safeRef(ref, "stash")],
-      { cwd: this.root },
-    );
+    const stash = safeRef(ref, "stash");
+    const out = await this.git
+      .stdout(["stash", "show", "--name-status", "-z", "--include-untracked", stash], {
+        cwd: this.root,
+      })
+      .catch(() =>
+        this.git.stdout(["stash", "show", "--name-status", "-z", stash], { cwd: this.root }),
+      );
     return parseNameStatus(out);
   }
 
@@ -849,15 +922,19 @@ export class Repository {
 
   // --- Interactive rebase -------------------------------------------------
 
-  /** Detect whether a rebase/merge/cherry-pick is currently in progress. */
-  async inProgressOperation(): Promise<
-    "rebase" | "merge" | "cherry-pick" | "revert" | undefined
-  > {
+  /** Detect whether a rebase/merge/cherry-pick/revert/am is in progress. */
+  async inProgressOperation(): Promise<SequencerKind | undefined> {
     const gitDir = await this.gitDirectory().catch(() =>
       path.join(this.root, ".git"),
     );
     const fs = await import("node:fs");
     const exists = (p: string) => fs.existsSync(path.join(gitDir, p));
+    // `git am` shares the rebase-apply directory with the old apply backend
+    // of `git rebase`; the `applying` marker tells them apart. Continuing an
+    // am session with `git rebase --continue` would fail.
+    if (exists("rebase-apply/applying")) {
+      return "am";
+    }
     if (exists("rebase-merge") || exists("rebase-apply")) {
       return "rebase";
     }
@@ -871,6 +948,30 @@ export class Repository {
       return "revert";
     }
     return undefined;
+  }
+
+  /**
+   * True when continuing the stopped rebase will ask for a commit message:
+   * the stopped step or a remaining step is a reword, a squash, or a
+   * `fixup -c`. Such rebases need a real message editor on continue/skip; any
+   * other rebase (including every non-interactive one) can accept git's
+   * prepared messages.
+   */
+  async rebaseNeedsMessageEditor(): Promise<boolean> {
+    try {
+      const fs = await import("node:fs/promises");
+      const read = async (name: string) =>
+        fs.readFile(await this.gitPath(`rebase-merge/${name}`), "utf8").catch(() => "");
+      const [done, todo] = await Promise.all([read("done"), read("git-rebase-todo")]);
+      const steps = (text: string) =>
+        text.split("\n").map((l) => l.trim()).filter((l) => l !== "" && !l.startsWith("#"));
+      const stopped = steps(done).slice(-1);
+      return [...stopped, ...steps(todo)].some((line) =>
+        /^(reword|r|squash|s)\s/.test(line) || /^(fixup|f)\s+-c\s/.test(line),
+      );
+    } catch {
+      return false;
+    }
   }
 
   // --- History ------------------------------------------------------------
@@ -940,81 +1041,172 @@ export class Repository {
   }
 
   /**
-   * Get commit graph data for visualization.
-   * Returns commits with graph structure (parents, children, branch/tag refs).
+   * Commit graph data for visualization: commits (child before parent) with
+   * parents and full ref decorations, plus the HEAD commit and whether more
+   * commits exist beyond `limit`.
+   *
+   * Only branch, remote-tracking, and tag history is walked. `--all` would
+   * also walk git's internal refs — the stash (whose "WIP on"/"index on"
+   * commits would appear as merge commits), notes, maintenance prefetch refs,
+   * replace refs, and filter-branch backups — none of which belong in a
+   * branch graph. Stashes are decorated onto their base commit by the caller.
    */
   async graphLog(options: {
     limit?: number;
-    all?: boolean;
+    /** Walk remote-tracking branches too (default true). */
+    remotes?: boolean;
+    /** Restrict the walk to these refs instead of every branch and tag. */
     branches?: string[];
+    order?: "date" | "author-date" | "topo";
+    /** @deprecated kept for callers written against the old API. */
+    all?: boolean;
   } = {}): Promise<{
-    commits: Array<{
-      sha: string;
-      shortSha: string;
-      message: string;
-      author: string;
-      date: string;
-      committer: string;
-      committerDate: string;
-      parents: string[];
-      refs: string[];
-    }>;
-    branches: Array<{ name: string; sha: string; isHead: boolean }>;
-    tags: Array<{ name: string; sha: string }>;
+    commits: GraphCommit[];
+    headSha: string | undefined;
+    hasMore: boolean;
   }> {
-    // Get commits with graph structure. Fields (NUL-separated): full SHA, short
-    // SHA, subject, author name, author date, committer name, committer date,
-    // parent SHAs, ref names. VsGit's history shows author and committer (and both
-    // of their dates) as separate columns, so we capture %cn/%ci alongside %an/%ai.
-    // --topo-order guarantees a child is always listed before its parents, which
-    // keeps the lane layout free of backtracking edges (date-order can interleave
-    // branches and place a child after a parent dated earlier).
-    const args = ["log", `--format=${GRAPH_LOG_FORMAT}`, "--topo-order"];
+    // Every supported order lists a child before all of its parents, which the
+    // lane layout relies on. `topo` also keeps each branch's commits together.
+    const orderFlag =
+      options.order === "date"
+        ? "--date-order"
+        : options.order === "author-date"
+          ? "--author-date-order"
+          : "--topo-order";
+    // `--decorate=full` makes %D print full ref names (refs/heads/x,
+    // refs/remotes/origin/x, tag: refs/tags/x) so a local branch called
+    // `origin/x`, or a branch and tag sharing a name, classify correctly.
+    const args = ["log", `--format=${GRAPH_LOG_FORMAT}`, "--decorate=full", orderFlag];
 
-    if (options.limit !== undefined) {
-      args.push(`--max-count=${options.limit}`);
+    const limit = options.limit;
+    if (limit !== undefined) {
+      // One extra commit tells us whether a "load more" is possible.
+      args.push(`--max-count=${limit + 1}`);
     }
 
-    if (options.all) {
-      args.push("--all");
-    } else if (options.branches && options.branches.length > 0) {
-      for (const branch of options.branches) {
-        args.push(safeRef(branch, "branch"));
-      }
+    // Validate untrusted branch names before running anything.
+    const branchArgs = (options.branches ?? []).map((branch) => safeRef(branch, "branch"));
+    const headSha = await this.headCommit();
+    if (branchArgs.length > 0) {
+      args.push(...branchArgs);
+    } else if (options.remotes === false) {
+      // HEAD keeps a detached checkout visible; an unborn HEAD would be fatal.
+      args.push("--branches", "--tags", ...(headSha ? ["HEAD"] : []));
+    } else {
+      args.push(...GRAPH_REF_EXCLUDES, "--all");
     }
 
     const out = await this.git.stdout(args, { cwd: this.root });
-    const commits = parseGraphLog(out);
+    let commits = parseGraphLog(out);
+    const hasMore = limit !== undefined && commits.length > limit;
+    if (hasMore) {
+      commits = commits.slice(0, limit);
+    }
+    return { commits, headSha, hasMore };
+  }
 
-    // Get branch and tag info
-    const branches = this.localBranches.map((b) => ({
-      name: b.shortName,
-      sha: b.objectId,
-      isHead: b.isHead,
-    }));
-    
-    const remoteBranches = this.remoteBranches.map((b) => ({
-      name: b.shortName,
-      sha: b.objectId,
-      isHead: false,
-    }));
+  /** SHA of HEAD, or undefined on an unborn branch. */
+  async headCommit(): Promise<string | undefined> {
+    try {
+      const out = await this.git.stdout(["rev-parse", "--verify", "-q", "HEAD"], {
+        cwd: this.root,
+      });
+      return out.trim() || undefined;
+    } catch {
+      return undefined;
+    }
+  }
 
-    const tags = this.tags.map((t) => ({
-      name: t.shortName,
-      sha: t.objectId,
-    }));
+  /** Parent SHAs of a commit (two or more for a merge). */
+  async commitParents(sha: string): Promise<string[]> {
+    const out = await this.git.stdout(
+      ["rev-list", "--parents", "-n", "1", "--end-of-options", safeRef(sha, "commit")],
+      { cwd: this.root },
+    );
+    return out.trim().split(/\s+/).slice(1).filter(Boolean);
+  }
 
+  /** Full message and identities of a commit, for commit-details panes. */
+  async commitDetails(sha: string): Promise<{
+    authorName: string;
+    authorEmail: string;
+    committerName: string;
+    committerEmail: string;
+    message: string;
+  }> {
+    const out = await this.git.stdout(
+      ["show", "-s", "--format=%an%x00%ae%x00%cn%x00%ce%x00%B", "--end-of-options", safeRef(sha, "commit")],
+      { cwd: this.root },
+    );
+    const [authorName = "", authorEmail = "", committerName = "", committerEmail = "", ...rest] =
+      out.split("\x00");
     return {
-      commits,
-      branches: [...branches, ...remoteBranches],
-      tags,
+      authorName,
+      authorEmail,
+      committerName,
+      committerEmail,
+      message: rest.join("\x00").replace(/\s+$/, ""),
     };
   }
 
-  /** Files touched by a commit (name-status, rename-aware). */
+  /** True when `ancestor` is reachable from `descendant` (default HEAD). */
+  async isAncestor(ancestor: string, descendant = "HEAD"): Promise<boolean> {
+    const result = await this.git.run(
+      ["merge-base", "--is-ancestor", safeRef(ancestor, "commit"), safeRef(descendant, "commit")],
+      { cwd: this.root, okCodes: [1] },
+    );
+    return result.exitCode === 0;
+  }
+
+  /**
+   * Uncommitted changes (staged and unstaged, combined) as name-status
+   * records, for the graph's "Uncommitted Changes" row.
+   */
+  get workingChanges(): CommitFile[] {
+    return this.status.changes
+      .filter((change) => change.worktreeState !== "ignored")
+      .map((change) => {
+        if (change.conflicted) {
+          return { status: "U", path: change.path };
+        }
+        const state = change.worktreeState ?? change.indexState;
+        const renamed = change.indexState === "renamed" || change.indexState === "copied";
+        return {
+          status: state === "untracked" ? "?" : renamed ? "R" : STATE_LETTER[state ?? "modified"] ?? "M",
+          path: change.path,
+          origPath: renamed ? change.origPath : undefined,
+        };
+      });
+  }
+
+  /**
+   * Split a remote-tracking branch's short name ("origin/feature/x") into its
+   * remote and branch, preferring the longest configured remote name so
+   * remotes that contain a slash work too.
+   */
+  splitRemoteBranch(shortName: string): { remote: string; branch: string } | undefined {
+    const remote = this.remotes
+      .map((r) => r.name)
+      .filter((name) => shortName.startsWith(`${name}/`))
+      .sort((a, b) => b.length - a.length)[0];
+    if (remote) {
+      return { remote, branch: shortName.slice(remote.length + 1) };
+    }
+    const slash = shortName.indexOf("/");
+    return slash > 0
+      ? { remote: shortName.slice(0, slash), branch: shortName.slice(slash + 1) }
+      : undefined;
+  }
+
+  /**
+   * Files touched by a commit (name-status, rename-aware). A merge commit is
+   * compared with its first parent — plain `git show` prints a combined diff
+   * that lists nothing for a clean merge — which matches the `<sha>~1` left
+   * side the diff editors open.
+   */
   async commitFiles(sha: string): Promise<CommitFile[]> {
     const out = await this.git.stdout(
-      ["show", "--name-status", "-z", "-M", "--format=", safeRef(sha, "commit")],
+      ["show", "--name-status", "-z", "-M", "-m", "--first-parent", "--format=", safeRef(sha, "commit")],
       { cwd: this.root },
     );
     return parseNameStatus(out);
@@ -1081,12 +1273,31 @@ export class Repository {
     await this.git.run(["checkout", safeRef(sha, "commit")], { cwd: this.root });
   }
 
-  async cherryPick(sha: string): Promise<void> {
-    await this.git.run(["cherry-pick", safeRef(sha, "commit")], { cwd: this.root });
+  /**
+   * Cherry-pick a commit. Merge commits need `mainline` (1-based parent
+   * number): git refuses to pick a merge without knowing which side it is
+   * relative to.
+   */
+  async cherryPick(sha: string, opts: { mainline?: number; noCommit?: boolean } = {}): Promise<void> {
+    const args = ["cherry-pick"];
+    if (opts.mainline) {
+      args.push("-m", String(Math.trunc(opts.mainline)));
+    }
+    if (opts.noCommit) {
+      args.push("--no-commit");
+    }
+    args.push(safeRef(sha, "commit"));
+    await this.git.run(args, { cwd: this.root });
   }
 
-  async revert(sha: string): Promise<void> {
-    await this.git.run(["revert", "--no-edit", safeRef(sha, "commit")], { cwd: this.root });
+  /** Revert a commit; merge commits need `mainline` like cherryPick. */
+  async revert(sha: string, opts: { mainline?: number } = {}): Promise<void> {
+    const args = ["revert", "--no-edit"];
+    if (opts.mainline) {
+      args.push("-m", String(Math.trunc(opts.mainline)));
+    }
+    args.push(safeRef(sha, "commit"));
+    await this.git.run(args, { cwd: this.root });
   }
 
   /** Fetch a specific refspec from a remote (e.g. for GitHub PRs). */
@@ -1484,10 +1695,13 @@ export class Repository {
       if (line.trim() === "") {
         continue;
       }
-      // " <sha> <path> (<describe>)" with a leading status char
-      const status = line[0];
-      const rest = line.slice(1).trim();
-      const [objectId, subPath] = rest.split(/\s+/);
+      // " <sha> <path> (<describe>)" with a leading status char. The path may
+      // contain spaces; the describe suffix is optional.
+      const match = /^(.)([0-9a-f]+) (.+?)(?: \([^()]*\))?$/.exec(line);
+      if (!match) {
+        continue;
+      }
+      const [, status, objectId, subPath] = match;
       subs.push({ status, objectId, path: subPath });
     }
     this.submodules = subs;

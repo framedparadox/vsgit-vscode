@@ -110,3 +110,69 @@ test('custom cyOf (expanded-row offset) shifts only rows below the gap', () => {
   const aEdge = edges.find((e) => e.sha === 'A');
   assert.ok(aEdge.d.startsWith('M' + geom.cx(0) + ',12'));
 });
+
+test('openParents keeps a lane running to the bottom for an unloaded parent', () => {
+  // A page of history cut off below B: B's parent C was not loaded.
+  const commits = [c('A', ['B']), c('X', ['B']), c('B', ['C'])];
+  const rows = buildLayout(commits, { openParents: true });
+  const geom = defaultGeom({ bottomY: 500 });
+  const edges = computeEdges(rows, geom);
+  const offPage = edges.filter((e) => e.offPage);
+  assert.strictEqual(offPage.length, 1, 'one edge continues off the page');
+  assert.strictEqual(offPage[0].sha, 'B');
+  assert.ok(offPage[0].d.trim().endsWith(',500'), 'the edge runs to the bottom of the graph');
+  // Without openParents the same history draws no dangling edge (History view behaviour).
+  assert.strictEqual(computeEdges(buildLayout(commits), geom).filter((e) => e.offPage).length, 0);
+});
+
+test('open lanes are reserved: later commits never sit on a continuing line', () => {
+  // A's parent P is off-page; B and C are an unrelated branch loaded below.
+  const commits = [c('A', ['P']), c('B', ['C']), c('C', [])];
+  const rows = buildLayout(commits, { openParents: true });
+  const aLane = rows[0].outgoing[0].toCol;
+  assert.notStrictEqual(rows[1].col, aLane, 'B avoids the continuing lane');
+  assert.notStrictEqual(rows[2].col, aLane, 'C avoids the continuing lane');
+});
+
+test('the uncommitted row never opens a lane and its edge is dashed', () => {
+  const commits = [
+    c('*uncommitted*', ['H'], { kind: 'uncommitted' }),
+    c('H', ['G']),
+    c('G', []),
+  ];
+  const edges = computeEdges(buildLayout(commits, { openParents: true }));
+  const wip = edges.filter((e) => e.sha === '*uncommitted*');
+  assert.strictEqual(wip.length, 1);
+  assert.strictEqual(wip[0].dashed, true);
+  assert.strictEqual(wip[0].offPage, false);
+
+  // HEAD outside the loaded set (e.g. filtered out): no dangling WIP line.
+  const orphan = computeEdges(buildLayout([c('*uncommitted*', ['Z'], { kind: 'uncommitted' }), c('G', [])], { openParents: true }));
+  assert.strictEqual(orphan.length, 0);
+});
+
+test('a lane keeps its colour when another branch joins it from the side', () => {
+  // M merges T into main; F is a feature branch forked from main's D and listed
+  // first (topo order). D sits in main's lane and must keep main's colour even
+  // though F's lane reaches it first.
+  const commits = [
+    c('F', ['D']),
+    c('M', ['D', 'T']),
+    c('T', ['B']),
+    c('D', ['B']),
+    c('B', []),
+  ];
+  const rows = buildLayout(commits);
+  const byId = new Map(rows.map((r) => [r.commit.sha, r]));
+  const d = byId.get('D');
+  // D lands in the leftmost lane flowing to it, and takes that lane's colour.
+  const laneIntoD = d.incoming.find((seg) => seg.toNode && seg.fromCol === d.col);
+  assert.ok(laneIntoD, 'D is entered from its own column');
+  assert.strictEqual(d.colorIdx, laneIntoD.colorIdx, 'dot colour matches the lane it sits in');
+  // Every commit's first-parent edge continues in the commit's own colour.
+  for (const r of rows) {
+    if (r.outgoing.length && r.parentShas.length) {
+      assert.strictEqual(r.outgoing[0].colorIdx, r.colorIdx, `${r.commit.sha} keeps its colour`);
+    }
+  }
+});

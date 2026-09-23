@@ -407,11 +407,29 @@ function wire() {
   setCommitMode(commitMode);
 }
 
+// ─── commit option defaults (vsgit.commit.signOff / vsgit.commit.gpgSign) ──────
+// Pre-check Sign off / GPG from settings. A changed default is applied to the
+// checkbox, but a choice the user made for the current draft is left alone.
+let commitDefaults = { signoff: false, gpg: false };
+function applyCommitDefaults(defaults) {
+  if (!defaults) return;
+  const next = { signoff: defaults.signoff === true, gpg: defaults.gpg === true };
+  [['signoff', 'opt-signoff'], ['gpg', 'opt-gpg']].forEach(([key, id]) => {
+    const box = el(id);
+    if (box && next[key] !== commitDefaults[key] && box.checked === commitDefaults[key]) {
+      box.checked = next[key];
+    }
+  });
+  commitDefaults = next;
+  syncAdvancedBadge();
+}
+
 // ─── messages ────────────────────────────────────────────────────────────────
 window.addEventListener('message', (event) => {
   const m = event.data;
   if (m.type === 'state') {
     state = m.data;
+    applyCommitDefaults(state.defaults);
     // Preserve the in-progress textarea value if the host echoes a stale one.
     const cur = el('message');
     if (state.active && typeof state.message === 'string' && document.activeElement !== cur) {
@@ -437,8 +455,8 @@ window.addEventListener('message', (event) => {
   } else if (m.type === 'committed') {
     el('message').value = '';
     el('opt-amend').checked = false;
-    el('opt-signoff').checked = false;
-    el('opt-gpg').checked = false;
+    el('opt-signoff').checked = commitDefaults.signoff;
+    el('opt-gpg').checked = commitDefaults.gpg;
     preAmendMessage = '';
     lastAmendMessage = null;
     syncAdvancedBadge();

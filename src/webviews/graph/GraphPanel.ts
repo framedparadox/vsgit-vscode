@@ -1,10 +1,19 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
-import { Repository } from "../../git/Repository";
+import { Repository, SequencerKind } from "../../git/Repository";
 import { RepositoryManager } from "../../git/RepositoryManager";
-import { GitContentProvider } from "../../git/GitContentProvider";
+import { GitContentProvider, VSGIT_EMPTY_REF } from "../../git/GitContentProvider";
+import { GitError } from "../../git/GitError";
 import { confirmDestructiveAction } from "../../util/confirmation";
 import { makeNonce } from "../../util/token";
+import { classifyGraphRef } from "../../git/parsers/graphLog";
+import {
+  checkoutRemoteBranchInteractive,
+  humanizeGitError,
+  pickMainline,
+  showGitProgress,
+} from "../../commands/shared";
+import { runSequencerAction } from "../../commands/interactiveRebase";
 
 type RefType = "head" | "localBranch" | "remoteBranch" | "tag" | "stash";
 
@@ -23,8 +32,21 @@ interface WebviewCommit {
   committerDate: string;
   parents: string[];
   refs: WebviewRef[];
+  isHead: boolean;
   kind?: "commit" | "uncommitted";
 }
+
+/** Pseudo-SHA of the synthetic "Uncommitted Changes" row. */
+const UNCOMMITTED_SHA = "*uncommitted*";
+
+/** Display order of ref pills within a row. */
+const REF_ORDER: Record<RefType, number> = {
+  head: 0,
+  localBranch: 1,
+  tag: 2,
+  remoteBranch: 3,
+  stash: 4,
+};
 
 interface CreateTagRequest {
   sha: string;
@@ -55,6 +77,8 @@ export class GraphPanel {
   private activeRepo: Repository | undefined;
 
   private branchFilters: string[] = [];
+  /** Commits currently requested; grows by a page on "Load more". */
+  private commitLimit: number | undefined;
   private refreshGeneration = 0;
   /** A refresh requested while the panel was hidden; replayed when it reveals. */
   private pendingRefresh = false;
@@ -85,6 +109,22 @@ export class GraphPanel {
           void this.refresh();
         } else {
           this.pendingRefresh = true;
+        }
+      }),
+    );
+    // Apply settings edited while the graph is open (colours, curve style,
+    // date format, columns, page size, ordering, remote branches).
+    this.disposables.push(
+      vscode.workspace.onDidChangeConfiguration((e) => {
+        if (!e.affectsConfiguration("vsgit.graph")) return;
+        void this.sendConfig();
+        if (
+          e.affectsConfiguration("vsgit.graph.maxCommits") ||
+          e.affectsConfiguration("vsgit.graph.commitOrdering") ||
+          e.affectsConfiguration("vsgit.graph.showRemoteBranches")
+        ) {
+          this.commitLimit = undefined;
+          void this.refresh();
         }
       }),
     );
@@ -156,7 +196,6 @@ export class GraphPanel {
         style: c.get<string>("graph.style", "rounded"),
         dateFormat: c.get<string>("graph.dateFormat", "standard"),
         showRemoteBranches: c.get<boolean>("graph.showRemoteBranches", true),
-        showSidebar: c.get<boolean>("graph.showSidebar", true),
         columns: {
           id: c.get<boolean>("graph.showIdColumn", true),
           author: c.get<boolean>("graph.showAuthorColumn", true),
@@ -169,6 +208,11 @@ export class GraphPanel {
   }
 
   // ─── data ────────────────────────────────────────────────────────────────
+  /** Commits per page (`vsgit.graph.maxCommits`); "Load more" adds a page. */
+  private pageSize(): number {
+    return Math.max(1, this.cfg.get<number>("graph.maxCommits", 500));
+  }
+
   private async refresh(): Promise<void> {
     const generation = ++this.refreshGeneration;
     const repo = this.resolveActiveRepo();
@@ -179,34 +223,34 @@ export class GraphPanel {
       return;
     }
     try {
-      const limit = this.cfg.get<number>("graph.maxCommits", 500);
+      const limit = Math.max(this.commitLimit ?? 0, this.pageSize());
+      this.commitLimit = limit;
       const showRemote = this.cfg.get<boolean>("graph.showRemoteBranches", true);
+      const order = this.cfg.get<"date" | "author-date" | "topo">("graph.commitOrdering", "topo");
 
-      const options = this.branchFilters.length > 0
-        ? { limit, branches: this.branchFilters }
-        : { limit, all: true };
-      const data = await repo.graphLog(options);
+      const [data, aheadBehind, inProgress] = await Promise.all([
+        repo.graphLog({
+          limit,
+          remotes: showRemote,
+          branches: this.branchFilters.length > 0 ? this.branchFilters : undefined,
+          order,
+        }),
+        repo.aheadBehind().catch(() => undefined),
+        repo.inProgressOperation().catch(() => undefined),
+      ]);
 
-      // Classify each commit's flattened ref strings into typed refs.
-      const localSet = new Set(repo.localBranches.map((b) => b.shortName));
-      const remoteSet = new Set(repo.remoteBranches.map((b) => b.shortName));
-      const tagSet = new Set(repo.tags.map((t) => t.shortName));
-      const headName = repo.headName;
-
+      // Classify each commit's full decorations into typed ref pills.
+      const currentBranch = repo.localBranches.find((b) => b.isHead)?.shortName;
       const commits: WebviewCommit[] = data.commits.map((c) => {
         const refs: WebviewRef[] = [];
         for (const raw of c.refs) {
-          if (!raw) continue;
-          if (tagSet.has(raw)) {
-            refs.push({ name: raw, type: "tag" });
-          } else if (remoteSet.has(raw)) {
-            if (showRemote) refs.push({ name: raw, type: "remoteBranch" });
-          } else if (localSet.has(raw)) {
-            refs.push({ name: raw, type: raw === headName ? "head" : "localBranch" });
-          } else {
-            refs.push({ name: raw, type: "localBranch" });
+          const ref = classifyGraphRef(raw, currentBranch);
+          if (ref && (showRemote || ref.type !== "remoteBranch")) {
+            refs.push(ref);
           }
         }
+        // Current branch first, then local branches, tags, remotes.
+        refs.sort((a, b) => REF_ORDER[a.type] - REF_ORDER[b.type]);
         return { ...c, refs, kind: "commit" as const };
       });
 
@@ -220,28 +264,25 @@ export class GraphPanel {
         if (target) target.refs.push({ name: stash.ref, type: "stash" });
       }
 
-      // Synthetic "uncommitted changes" row pinned at the top.
-      const uncommittedCount = repo.status.changes.length;
-      if (uncommittedCount > 0 && commits.length > 0) {
-        const head = commits[0];
+      // Synthetic "uncommitted changes" row pinned at the top, joined to the
+      // commit HEAD points at (which, with every branch shown, is often not the
+      // newest commit in the list).
+      const uncommittedCount = repo.workingChanges.length;
+      if (uncommittedCount > 0) {
         commits.unshift({
-          sha: "*uncommitted*",
+          sha: UNCOMMITTED_SHA,
           shortSha: "*",
           message: `Uncommitted Changes (${uncommittedCount})`,
           author: "",
           date: "",
           committer: "",
           committerDate: "",
-          parents: [head.sha],
+          parents: data.headSha ? [data.headSha] : [],
           refs: [],
+          isHead: false,
           kind: "uncommitted",
         });
       }
-
-      const [aheadBehind, inProgress] = await Promise.all([
-        repo.aheadBehind().catch(() => undefined),
-        repo.inProgressOperation().catch(() => undefined),
-      ]);
 
       // A repo switch or watcher refresh may have completed a newer request.
       // Never let this older result replace the current graph.
@@ -255,8 +296,17 @@ export class GraphPanel {
         type: "graphData",
         data: {
           commits,
-          head: headName,
-          branches: repo.localBranches.map((b) => b.shortName),
+          head: repo.headName,
+          headSha: data.headSha ?? null,
+          hasMore: data.hasMore,
+          branches: [
+            ...repo.localBranches.map((b) => b.shortName),
+            ...(showRemote
+              ? repo.remoteBranches
+                  .map((b) => b.shortName)
+                  .filter((name) => !name.endsWith("/HEAD"))
+              : []),
+          ],
           showRemoteBranches: showRemote,
           repos: this.manager.getAll().map((r) => ({
             root: r.root,
@@ -269,7 +319,8 @@ export class GraphPanel {
       });
     } catch (error) {
       if (generation === this.refreshGeneration) {
-        vscode.window.showErrorMessage(`Failed to load graph: ${error}`);
+        vscode.window.showErrorMessage(`Failed to load graph: ${humanizeGitError(error)}`);
+        await this.panel.webview.postMessage({ type: "loadFailed" });
       }
     }
   }
@@ -288,12 +339,18 @@ export class GraphPanel {
           await this.refresh();
           return;
 
+        case "loadMore":
+          this.commitLimit = (this.commitLimit ?? this.pageSize()) + this.pageSize();
+          await this.refresh();
+          return;
+
         case "switchRepo": {
           const root = (message.data as { root: string }).root;
           const next = this.manager.get(root);
           if (next) {
             this.activeRepo = next;
             this.branchFilters = [];
+            this.commitLimit = undefined;
             await this.refresh();
           }
           return;
@@ -332,6 +389,7 @@ export class GraphPanel {
           this.branchFilters = ((message.data as { branches?: string[] }).branches || []).filter(
             (b) => b && b.length > 0,
           );
+          this.commitLimit = undefined;
           await this.refresh();
           return;
       }
@@ -372,9 +430,9 @@ export class GraphPanel {
           return;
 
         // ── sequencer (continue / skip / abort) ──
-        // Driven directly through Repository.sequencerAction, which supports all
-        // four kinds (rebase / merge / cherry-pick / revert); only rebase exposes
-        // continue/skip/abort as standalone vsgit.* commands.
+        // Driven through runSequencerAction, which supports every paused kind
+        // (rebase / merge / cherry-pick / revert / am) and keeps git from
+        // waiting on a terminal editor.
         case "seqContinue":
           await this.runSequencer(repo, message.data, "continue");
           return;
@@ -385,20 +443,22 @@ export class GraphPanel {
           await this.runSequencer(repo, message.data, "abort");
           return;
 
-        case "requestFiles": {
-          const sha = message.data as string;
-          const files = await repo.commitFiles(sha);
-          await this.panel.webview.postMessage({ type: "files", data: { sha, files } });
+        case "requestFiles":
+          await this.sendCommitFiles(repo, message.data as string);
           return;
-        }
 
         case "openFileDiff": {
-          const { sha, path: filePath, origPath } = message.data as {
+          const { sha, path: filePath, origPath, status } = message.data as {
             sha: string;
             path: string;
             origPath?: string;
+            status?: string;
           };
-          await this.openCommitFileDiff(repo, sha, filePath, origPath);
+          if (sha === UNCOMMITTED_SHA) {
+            await this.openWorkingFileDiff(repo, filePath, origPath, status);
+          } else {
+            await this.openCommitFileDiff(repo, sha, filePath, origPath);
+          }
           return;
         }
 
@@ -424,9 +484,11 @@ export class GraphPanel {
         }
 
         case "checkout":
-          await repo.checkoutRef(message.data as string);
-          this.notify(`Checked out ${message.data}`);
-          await this.refresh();
+          await this.checkoutCommit(message.data as string);
+          return;
+
+        case "checkoutRef":
+          await this.checkoutRef(message.data as { name: string; type: string });
           return;
 
         case "createBranch":
@@ -446,15 +508,11 @@ export class GraphPanel {
           return;
 
         case "cherryPick":
-          await repo.cherryPick(message.data as string);
-          this.notify(`Cherry-picked ${(message.data as string).slice(0, 8)}`);
-          await this.refresh();
+          await this.cherryPick(message.data as string);
           return;
 
         case "revert":
-          await repo.revert(message.data as string);
-          this.notify(`Reverted ${(message.data as string).slice(0, 8)}`);
-          await this.refresh();
+          await this.revert(message.data as string);
           return;
 
         case "dropCommit":
@@ -465,18 +523,9 @@ export class GraphPanel {
           await this.reset(message.data as { sha: string; mode: "soft" | "mixed" | "hard" });
           return;
 
-        case "compareWithHead":
-          await this.compare(message.data as string, "HEAD");
+        case "compareWithAnother":
+          await this.compareWithAnother(message.data as string);
           return;
-
-        case "compareWithAnother": {
-          const target = await vscode.window.showInputBox({
-            prompt: "Enter commit SHA or ref to compare with",
-            placeHolder: "HEAD, branch name, or SHA",
-          });
-          if (target) await this.compare(message.data as string, target);
-          return;
-        }
 
         case "renameBranch":
           await this.renameBranch((message.data as { name: string }).name);
@@ -503,15 +552,15 @@ export class GraphPanel {
           return;
 
         case "stashApply":
-          await repo.stashApply((message.data as { ref: string }).ref);
-          this.notify("Stash applied");
-          await this.refresh();
+          await this.runOp(`Apply ${(message.data as { ref: string }).ref}`, () =>
+            repo.stashApply((message.data as { ref: string }).ref),
+          );
           return;
 
         case "stashPop":
-          await repo.stashPop((message.data as { ref: string }).ref);
-          this.notify("Stash popped");
-          await this.refresh();
+          await this.runOp(`Pop ${(message.data as { ref: string }).ref}`, () =>
+            repo.stashPop((message.data as { ref: string }).ref),
+          );
           return;
 
         case "stashDrop":
@@ -527,12 +576,29 @@ export class GraphPanel {
           this.notify("Commit SHA copied to clipboard");
           return;
 
+        case "copyText": {
+          const { text, label } = message.data as { text: string; label?: string };
+          await vscode.env.clipboard.writeText(String(text));
+          this.notify(`${label ?? "Text"} copied to clipboard`);
+          return;
+        }
+
+        case "copyCommitMessage": {
+          const details = await repo.commitDetails(message.data as string);
+          await vscode.env.clipboard.writeText(details.message);
+          this.notify("Commit message copied to clipboard");
+          return;
+        }
+
         default:
           console.warn(`GraphPanel: unhandled message type "${message.type}"`);
           return;
       }
     } catch (error) {
-      vscode.window.showErrorMessage(`${message.type} failed: ${error}`);
+      vscode.window.showErrorMessage(`${message.type} failed: ${humanizeGitError(error)}`);
+      // A failed merge/rebase/cherry-pick usually leaves conflicts or an
+      // in-progress operation behind; refresh so every view shows that state.
+      await this.manager.refreshAll();
     }
   }
 
@@ -542,16 +608,46 @@ export class GraphPanel {
     return r;
   }
 
+  /**
+   * Run a mutating git operation with VsGit progress, then refresh every view
+   * (the graph refreshes through RepositoryManager.onDidChange). Errors
+   * propagate to handleMessage, which reports them and refreshes too.
+   */
+  private async runOp(title: string, fn: () => Promise<void>, done?: string): Promise<void> {
+    await showGitProgress(title, fn);
+    if (done) this.notify(done);
+    await this.manager.refreshAll();
+  }
+
   // ─── operations ────────────────────────────────────────────────────────────
+  private async checkoutCommit(sha: string): Promise<void> {
+    await this.runOp(`Checkout ${sha.slice(0, 8)}`, () => this.repo.checkoutDetached(sha),
+      `Checked out ${sha.slice(0, 8)} (detached HEAD)`);
+  }
+
+  /**
+   * Check out a ref from its pill. A remote branch gets a local tracking
+   * branch (reusing an existing one that already tracks it) instead of
+   * leaving HEAD detached at the remote-tracking ref.
+   */
+  private async checkoutRef(ref: { name: string; type: string }): Promise<void> {
+    const repo = this.repo;
+    if (ref.type === "remoteBranch") {
+      await checkoutRemoteBranchInteractive(this.manager, repo, ref.name);
+      return;
+    }
+    await this.runOp(`Checkout ${ref.name}`, () => repo.checkoutRef(ref.name), `Checked out ${ref.name}`);
+  }
+
   private async createBranch(sha: string, checkout: boolean): Promise<void> {
     const name = await vscode.window.showInputBox({
       prompt: checkout ? "Create and checkout branch" : "Enter branch name",
       placeHolder: "feature/new-branch",
+      validateInput: (v) => (v.trim() === "" ? "Branch name required" : undefined),
     });
     if (!name) return;
-    await this.repo.createBranchAt(name, sha, checkout);
-    this.notify(`Branch '${name}' created`);
-    await this.refresh();
+    await this.runOp(`Create branch ${name.trim()}`, () =>
+      this.repo.createBranchAt(name.trim(), sha, checkout), `Branch '${name.trim()}' created`);
   }
 
   private async createTag(request: CreateTagRequest): Promise<void> {
@@ -563,18 +659,19 @@ export class GraphPanel {
       if (!remote) return;
     }
     const message = request.message?.trim() || undefined;
-    await this.repo.createTagAt(
-      name,
-      request.sha,
-      request.sign === true || request.annotate === true ? message ?? name : undefined,
-      request.sign === true,
-      request.force === true,
-    );
-    if (remote) {
-      await this.repo.pushTag(remote, name, request.force === true);
-    }
-    this.notify(request.push ? `Tag '${name}' created and pushed` : `Tag '${name}' created`);
-    await this.refresh();
+    const repo = this.repo;
+    await this.runOp(`Create tag ${name}`, async () => {
+      await repo.createTagAt(
+        name,
+        request.sha,
+        request.sign === true || request.annotate === true ? message ?? name : undefined,
+        request.sign === true,
+        request.force === true,
+      );
+      if (remote) {
+        await repo.pushTag(remote, name, request.force === true);
+      }
+    }, request.push ? `Tag '${name}' created and pushed` : `Tag '${name}' created`);
   }
 
   private async mergeInto(ref: string): Promise<void> {
@@ -582,14 +679,16 @@ export class GraphPanel {
       [
         { label: "Default", detail: "Fast-forward when possible", opts: {} },
         { label: "Create merge commit", detail: "--no-ff", opts: { noFf: true } },
-        { label: "Squash", detail: "--squash", opts: { squash: true } },
+        { label: "Fast-forward only", detail: "--ff-only", opts: { ffOnly: true } },
+        { label: "Squash", detail: "--squash (stage the changes; commit them yourself)", opts: { squash: true } },
       ],
-      { placeHolder: `Merge ${ref} into current branch` },
+      { placeHolder: `Merge ${shortLabel(ref)} into ${this.repo.headName ?? "HEAD"}` },
     );
     if (!pick) return;
-    await this.repo.merge(ref, pick.opts);
-    this.notify(`Merged ${ref}`);
-    await this.refresh();
+    await this.runOp(`Merge ${shortLabel(ref)}`, () => this.repo.merge(ref, pick.opts),
+      "squash" in pick.opts
+        ? `Squashed ${shortLabel(ref)} — review and commit the staged changes`
+        : `Merged ${shortLabel(ref)}`);
   }
 
   private async runSequencer(
@@ -597,42 +696,68 @@ export class GraphPanel {
     data: unknown,
     action: "continue" | "skip" | "abort",
   ): Promise<void> {
-    const kind = (data as { kind?: string } | undefined)?.kind as
-      | "rebase"
-      | "merge"
-      | "cherry-pick"
-      | "revert"
-      | undefined;
-    if (!kind) return;
+    const kind = (data as { kind?: string } | undefined)?.kind;
+    if (!isSequencerKind(kind)) return;
     if (action === "abort") {
       const confirm = await this.confirm(`Abort the ${kind} in progress?`, "Abort");
       if (!confirm) return;
     }
-    await repo.sequencerAction(kind, action);
-    this.notify(`${kind} ${action}`);
-    await this.refresh();
+    await this.runOp(`${kind} --${action}`, () => runSequencerAction(repo, kind, action),
+      `${kind} ${action}`);
   }
 
   private async rebaseOnto(ref: string): Promise<void> {
     const confirm = await this.confirm(
-      `Rebase the current branch onto ${ref.slice(0, 12)}?`,
+      `Rebase ${this.repo.headName ?? "HEAD"} onto ${shortLabel(ref)}?`,
       "Rebase",
     );
     if (!confirm) return;
-    await this.repo.rebase(ref);
-    this.notify(`Rebased onto ${ref.slice(0, 8)}`);
-    await this.refresh();
+    await this.runOp(`Rebase onto ${shortLabel(ref)}`, () => this.repo.rebase(ref),
+      `Rebased onto ${shortLabel(ref)}`);
+  }
+
+  private async cherryPick(sha: string): Promise<void> {
+    const mainline = await pickMainline(this.repo, sha, "Cherry-pick");
+    if (mainline === null) return;
+    await this.runOp(`Cherry-pick ${sha.slice(0, 8)}`, () =>
+      this.repo.cherryPick(sha, { mainline }), `Cherry-picked ${sha.slice(0, 8)}`);
+  }
+
+  private async revert(sha: string): Promise<void> {
+    const mainline = await pickMainline(this.repo, sha, "Revert");
+    if (mainline === null) return;
+    await this.runOp(`Revert ${sha.slice(0, 8)}`, () =>
+      this.repo.revert(sha, { mainline }), `Reverted ${sha.slice(0, 8)}`);
   }
 
   private async dropCommit(sha: string): Promise<void> {
+    const repo = this.repo;
+    // `rebase --onto <sha>^ <sha>` only makes sense for a single-parent commit
+    // that the current branch actually contains.
+    const [parents, onBranch] = await Promise.all([
+      repo.commitParents(sha),
+      repo.isAncestor(sha, "HEAD"),
+    ]);
+    if (!onBranch) {
+      vscode.window.showWarningMessage(
+        `${sha.slice(0, 8)} is not on the current branch, so it cannot be dropped from it.`,
+      );
+      return;
+    }
+    if (parents.length !== 1) {
+      vscode.window.showWarningMessage(
+        parents.length === 0
+          ? "The root commit cannot be dropped."
+          : "Merge commits cannot be dropped this way; use an interactive rebase.",
+      );
+      return;
+    }
     const confirm = await this.confirm(
       `Drop commit ${sha.slice(0, 8)}? This rewrites history on the current branch.`,
       "Drop Commit",
     );
     if (!confirm) return;
-    await this.repo.dropCommit(sha);
-    this.notify(`Dropped ${sha.slice(0, 8)}`);
-    await this.refresh();
+    await this.runOp(`Drop ${sha.slice(0, 8)}`, () => repo.dropCommit(sha), `Dropped ${sha.slice(0, 8)}`);
   }
 
   private async reset(data: { sha: string; mode: "soft" | "mixed" | "hard" }): Promise<void> {
@@ -643,20 +768,19 @@ export class GraphPanel {
       );
       if (!confirm) return;
     }
-    await this.repo.reset(data.sha, data.mode);
-    this.notify(`Reset (${data.mode}) to ${data.sha.slice(0, 8)}`);
-    await this.refresh();
+    await this.runOp(`Reset --${data.mode}`, () => this.repo.reset(data.sha, data.mode),
+      `Reset (${data.mode}) to ${data.sha.slice(0, 8)}`);
   }
 
   private async renameBranch(name: string): Promise<void> {
     const newName = await vscode.window.showInputBox({
       prompt: `Rename branch '${name}' to`,
       value: name,
+      validateInput: (v) => (v.trim() === "" ? "Branch name required" : undefined),
     });
-    if (!newName || newName === name) return;
-    await this.repo.renameBranch(name, newName);
-    this.notify(`Renamed '${name}' → '${newName}'`);
-    await this.refresh();
+    if (!newName || newName.trim() === name) return;
+    await this.runOp(`Rename ${name}`, () => this.repo.renameBranch(name, newName.trim()),
+      `Renamed '${name}' → '${newName.trim()}'`);
   }
 
   private async deleteBranch(name: string): Promise<void> {
@@ -664,7 +788,12 @@ export class GraphPanel {
     if (!confirm) return;
     try {
       await this.repo.deleteBranch(name, false);
-    } catch {
+    } catch (error) {
+      // Only an unmerged branch is worth forcing; surface anything else
+      // (e.g. deleting the checked-out branch) as the real error.
+      if (!(error instanceof GitError) || !/not fully merged/i.test(error.stderr)) {
+        throw error;
+      }
       const force = await this.confirm(
         `Branch '${name}' is not fully merged. Force delete?`,
         "Force Delete",
@@ -673,23 +802,19 @@ export class GraphPanel {
       await this.repo.deleteBranch(name, true);
     }
     this.notify(`Deleted branch '${name}'`);
-    await this.refresh();
+    await this.manager.refreshAll();
   }
 
   private async deleteRemoteBranch(fullName: string): Promise<void> {
-    // fullName is like "origin/feature"; split into remote + branch.
-    const slash = fullName.indexOf("/");
-    if (slash === -1) return;
-    const remote = fullName.slice(0, slash);
-    const branch = fullName.slice(slash + 1);
+    const target = this.repo.splitRemoteBranch(fullName);
+    if (!target) return;
     const confirm = await this.confirm(
       `Delete remote branch '${fullName}'? This affects the remote.`,
       "Delete Remote Branch",
     );
     if (!confirm) return;
-    await this.repo.deleteRemoteBranch(remote, branch);
-    this.notify(`Deleted remote branch '${fullName}'`);
-    await this.refresh();
+    await this.runOp(`Delete ${fullName}`, () =>
+      this.repo.deleteRemoteBranch(target.remote, target.branch), `Deleted remote branch '${fullName}'`);
   }
 
   private async pushBranch(name: string): Promise<void> {
@@ -710,25 +835,22 @@ export class GraphPanel {
       );
       if (!confirm) return;
     }
-    await this.repo.push({ remote, refspec: name, ...pick.opts });
-    this.notify(`Pushed '${name}' to ${remote}`);
-    await this.refresh();
+    await this.runOp(`Push ${name}`, () =>
+      this.repo.push({ remote, refspec: this.repo.pushRefspec(name, remote), ...pick.opts }),
+      `Pushed '${name}' to ${remote}`);
   }
 
   private async deleteTag(name: string): Promise<void> {
     const confirm = await this.confirm(`Delete tag '${name}'?`, "Delete");
     if (!confirm) return;
-    await this.repo.deleteTag(name);
-    this.notify(`Deleted tag '${name}'`);
-    await this.refresh();
+    await this.runOp(`Delete tag ${name}`, () => this.repo.deleteTag(name), `Deleted tag '${name}'`);
   }
 
   private async pushTag(name: string): Promise<void> {
     const remote = await this.pickRemote();
     if (!remote) return;
-    await this.repo.pushTag(remote, name);
-    this.notify(`Pushed tag '${name}' to ${remote}`);
-    await this.refresh();
+    await this.runOp(`Push tag ${name}`, () => this.repo.pushTag(remote, name),
+      `Pushed tag '${name}' to ${remote}`);
   }
 
   private async stashPush(repo: Repository): Promise<void> {
@@ -737,50 +859,109 @@ export class GraphPanel {
       placeHolder: "WIP on current branch",
     });
     if (message === undefined) return;
-    const untrackedPick = await vscode.window.showQuickPick(
+    const pick = await vscode.window.showQuickPick(
       [
-        { label: "Stash tracked changes", untracked: false },
-        { label: "Include untracked files", untracked: true },
+        { label: "Stash tracked changes", opts: {} },
+        { label: "Include untracked files", opts: { untracked: true } },
+        { label: "Keep staged changes in place", detail: "--keep-index", opts: { keepIndex: true } },
+        { label: "Stash staged changes only", detail: "--staged", opts: { staged: true } },
       ],
       { placeHolder: "What to stash?" },
     );
-    if (!untrackedPick) return;
-    await repo.stashPush(message || undefined, untrackedPick.untracked);
-    this.notify("Changes stashed");
-    await this.refresh();
+    if (!pick) return;
+    const opts = pick.opts as { untracked?: boolean; keepIndex?: boolean; staged?: boolean };
+    await this.runOp("Stash", () =>
+      repo.stashPush(message || undefined, opts.untracked === true, opts), "Changes stashed");
   }
 
   private async stashDrop(ref: string): Promise<void> {
     const confirm = await this.confirm(`Drop stash ${ref}?`, "Drop Stash");
     if (!confirm) return;
-    await this.repo.stashDrop(ref);
-    this.notify(`Dropped ${ref}`);
-    await this.refresh();
+    await this.runOp(`Drop ${ref}`, () => this.repo.stashDrop(ref), `Dropped ${ref}`);
   }
 
   private async stashBranch(ref: string): Promise<void> {
     const name = await vscode.window.showInputBox({
       prompt: `Create branch from ${ref}`,
       placeHolder: "feature/from-stash",
+      validateInput: (v) => (v.trim() === "" ? "Branch name required" : undefined),
     });
     if (!name) return;
-    await this.repo.stashBranch(name, ref);
-    this.notify(`Created branch '${name}' from ${ref}`);
-    await this.refresh();
+    await this.runOp(`Branch from ${ref}`, () => this.repo.stashBranch(name.trim(), ref),
+      `Created branch '${name.trim()}' from ${ref}`);
   }
 
   // ─── diff / compare ──────────────────────────────────────────────────────────
+  /**
+   * Changed files (and the full message) for the commit-details pane. The
+   * synthetic uncommitted row lists the working tree against HEAD.
+   */
+  private async sendCommitFiles(repo: Repository, sha: string): Promise<void> {
+    if (sha === UNCOMMITTED_SHA) {
+      await this.panel.webview.postMessage({
+        type: "files",
+        data: { sha, files: repo.workingChanges },
+      });
+      return;
+    }
+    const [files, details, parents] = await Promise.all([
+      repo.commitFiles(sha),
+      repo.commitDetails(sha).catch(() => undefined),
+      repo.commitParents(sha).catch(() => [] as string[]),
+    ]);
+    await this.panel.webview.postMessage({
+      type: "files",
+      data: { sha, files, details, isMerge: parents.length > 1 },
+    });
+  }
+
   private async openCommitFileDiff(
     repo: Repository,
     sha: string,
     filePath: string,
     origPath?: string,
   ): Promise<void> {
+    // A root commit has no parent: diff against an empty file.
+    const parents = await repo.commitParents(sha).catch(() => [] as string[]);
     await GitContentProvider.openDiff(
       repo.root,
       { path: filePath, origPath },
-      `${sha}~1`,
+      parents.length > 0 ? `${sha}~1` : VSGIT_EMPTY_REF,
       sha,
+    );
+  }
+
+  /** Diff HEAD ↔ the working-tree file for the uncommitted row. */
+  private async openWorkingFileDiff(
+    repo: Repository,
+    filePath: string,
+    origPath: string | undefined,
+    status: string | undefined,
+  ): Promise<void> {
+    if (status === "U") {
+      await vscode.commands.executeCommand("vsgit.conflict.openMergeEditor", {
+        repo,
+        change: { path: filePath },
+      });
+      return;
+    }
+    const leftRel = origPath ?? filePath;
+    const absolute = path.join(repo.root, filePath);
+    const left = GitContentProvider.uri(
+      repo.root,
+      leftRel,
+      status === "?" || status === "A" ? VSGIT_EMPTY_REF : "HEAD",
+      path.join(repo.root, leftRel),
+    );
+    const right =
+      status === "D"
+        ? GitContentProvider.uri(repo.root, filePath, VSGIT_EMPTY_REF, absolute)
+        : vscode.Uri.file(absolute);
+    await vscode.commands.executeCommand(
+      "vscode.diff",
+      left,
+      right,
+      `${path.basename(filePath)} (HEAD ↔ Working Tree)`,
     );
   }
 
@@ -800,27 +981,19 @@ export class GraphPanel {
     );
   }
 
-  private async compare(sha: string, targetRef: string): Promise<void> {
-    const repo = this.repo;
-    const files = await repo.commitFiles(sha);
-    if (files.length === 0) {
-      vscode.window.showInformationMessage("No file changes in this commit.");
-      return;
-    }
-    const pick = await vscode.window.showQuickPick(
-      files.map((f) => ({ label: f.path, description: f.status, filePath: f.path })),
-      { placeHolder: `Select file to compare ${sha.slice(0, 8)} ↔ ${targetRef}` },
-    );
-    if (!pick) return;
-    const abs = path.join(repo.root, pick.filePath);
-    const left = GitContentProvider.uri(repo.root, pick.filePath, sha, abs);
-    const right = GitContentProvider.uri(repo.root, pick.filePath, targetRef, abs);
-    await vscode.commands.executeCommand(
-      "vscode.diff",
-      left,
-      right,
-      `${path.basename(pick.filePath)} (${sha.slice(0, 8)} ↔ ${targetRef.slice(0, 8)})`,
-    );
+  /** Ask for a second revision, then show the comparison in the graph. */
+  private async compareWithAnother(sha: string): Promise<void> {
+    const target = await vscode.window.showInputBox({
+      prompt: `Compare ${sha.slice(0, 8)} with…`,
+      placeHolder: "HEAD, a branch or tag name, or a commit SHA",
+      validateInput: (v) => (v.trim() === "" ? "Enter a revision" : undefined),
+    });
+    if (!target) return;
+    const resolved = await this.repo.resolveRevision(target.trim());
+    await this.panel.webview.postMessage({
+      type: "startComparison",
+      data: { from: sha, to: resolved, label: target.trim() },
+    });
   }
 
   // ─── shared helpers ──────────────────────────────────────────────────────────
@@ -1039,4 +1212,19 @@ export class GraphPanel {
       if (d) d.dispose();
     }
   }
+}
+
+function isSequencerKind(kind: unknown): kind is SequencerKind {
+  return (
+    kind === "rebase" ||
+    kind === "merge" ||
+    kind === "cherry-pick" ||
+    kind === "revert" ||
+    kind === "am"
+  );
+}
+
+/** A ref name as-is, or an abbreviated SHA. */
+function shortLabel(ref: string): string {
+  return /^[0-9a-f]{40,64}$/i.test(ref) ? ref.slice(0, 8) : ref;
 }

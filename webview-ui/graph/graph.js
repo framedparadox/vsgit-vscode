@@ -48,7 +48,6 @@ let CONFIG = {
     committedDate: true,
   },
   showRemoteBranches: true,
-  showSidebar: true,
 };
 function laneColor(idx) { return CONFIG.palette[idx % CONFIG.palette.length]; }
 
@@ -425,6 +424,14 @@ function makeRefBadge(ref, colorIdx) {
     e.stopPropagation();
     showRefMenu(e.clientX, e.clientY, ref);
   });
+  // Double-click a pill to check it out (git-graph style). The current
+  // branch, a detached HEAD, and stashes have nothing to check out.
+  span.addEventListener('dblclick', (e) => {
+    e.stopPropagation();
+    if (ref.type === 'localBranch' || ref.type === 'remoteBranch' || ref.type === 'tag') {
+      vscode.postMessage({ type: 'checkoutRef', data: { name: ref.name, type: ref.type } });
+    }
+  });
   span.addEventListener('click', (e) => {
     e.stopPropagation();
     const host = span.closest('tr.commit-row');
@@ -446,16 +453,16 @@ function refBadgesFor(commit, colorIdx) {
 }
 
 // ─── lane layout (two-half connected model, topological) ─────────────────────
-// The layout algorithm lives in the shared, unit-tested module
-// webview-ui/graph/graphLayout.js (GraphLayout), so the Git Graph panel and the History
-// view draw from one identical, verified implementation. Commits arrive in
-// --topo-order (child before parents); each returned row carries its column,
-// stable lane colour, and the incoming/outgoing lane segments used to draw edges.
+// The layout algorithm and edge geometry live in the shared, unit-tested module
+// webview-ui/graph/graphLayout.js (GraphLayout). Commits arrive child-before-
+// parents; each returned row carries its column, stable lane colour, and the
+// incoming/outgoing lane segments used to draw edges. When more history exists
+// beyond the loaded page, lanes to unloaded parents stay open to the bottom.
 function buildLayout(commits) {
-  return GraphLayout.buildLayout(commits);
+  return GraphLayout.buildLayout(commits, { openParents: !!(graphData && graphData.hasMore) });
 }
 
-// ─── SVG drawing (ported verbatim) ───────────────────────────────────────────
+// ─── SVG drawing ─────────────────────────────────────────────────────────────
 // One overlay SVG spans the whole graph (vscode-git-graph style). A commit's
 // vertical position is fixed to its row index, so each edge is drawn as a single
 // continuous path from the commit down to its parent — routed through the lane
@@ -478,47 +485,15 @@ function cyOf(rowIdx) {
   return rowIdx * ROW_H + ROW_H / 2;
 }
 
-// One smooth/angular transition between two adjacent row centres (x1,y1)->(x2,y2).
-function transition(x1, y1, x2, y2) {
-  if (x1 === x2) return `L${x2},${y2} `;
-  if (CONFIG.style === 'angular') {
-    const bend = ROW_H * 0.4;
-    return `L${x1},${y2 - bend} L${x2},${y2} `;
-  }
-  const dy = (y2 - y1) * 0.8;
-  return `C${x1},${y1 + dy} ${x2},${y2 - dy} ${x2},${y2} `;
-}
-
-// Path from a commit (commitCol, commitRow) to a parent (parentCol, parentRow),
-// travelling in the edge's lane column (laneCol). The transition into the lane
-// happens just below the commit; the line then runs straight down the lane; and
-// the final transition (just above the parent) jogs from the lane to the
-// parent's actual dot column — which may differ from the lane column. Modelled on
-// vscode-git-graph, where the horizontal moves are confined to single-row gaps.
-function commitToParentPath(commitCol, commitRow, laneCol, parentCol, parentRow) {
-  const xc = cx(commitCol), yc = cyOf(commitRow);
-  const xl = cx(laneCol);
-  const xp = cx(parentCol), yp = cyOf(parentRow);
-  let d = `M${xc},${yc} `;
-
-  // Enter the lane over the first inter-row gap.
-  const yEnter = cyOf(commitRow + 1);
-  d += transition(xc, yc, xl, yEnter);
-
-  // Straight vertical down the lane to the row just above the parent.
-  const yBeforeParent = cyOf(parentRow - 1);
-  if (yBeforeParent > yEnter) d += `L${xl},${yBeforeParent} `;
-
-  // Final transition into the parent's actual dot column.
-  if (parentRow - 1 >= commitRow + 1) {
-    d += transition(xl, yBeforeParent, xp, yp);
-  } else if (xl !== xp) {
-    // Parent is the immediate next row: single combined transition.
-    d = `M${xc},${yc} ` + transition(xc, yc, xp, yp);
-  } else {
-    d += `L${xp},${yp} `;
-  }
-  return d;
+// Geometry handed to the shared edge builder: measured row centres, the
+// configured curve style, and the bottom of the graph for off-page lanes.
+function graphGeometry(rowCount) {
+  return GraphLayout.defaultGeom({
+    ROW_H, COL_W, PAD, R,
+    style: CONFIG.style,
+    cyOf,
+    bottomY: graphHeight || rowCount * ROW_H,
+  });
 }
 
 // Build the single overlay SVG for all rows: edges first, then dots on top.
@@ -533,36 +508,20 @@ function buildGraphSvg(rows) {
   svg.style.width = w + 'px';
   svg.style.height = h + 'px';
 
-  const rowOf = new Map();
-  rows.forEach((r, i) => rowOf.set(r.commit.sha, i));
-
-  const addLine = (d, colorIdx, sha) => {
+  // Edges: one path per (commit → parent), from the shared layout module.
+  GraphLayout.computeEdges(rows, graphGeometry(rows.length)).forEach((edge) => {
     const p = document.createElementNS(SVGNS, 'path');
-    p.setAttribute('d', d);
+    p.setAttribute('d', edge.d);
     p.setAttribute('fill', 'none');
-    p.setAttribute('stroke', laneColor(colorIdx));
+    p.setAttribute('stroke', laneColor(edge.colorIdx));
     p.setAttribute('stroke-width', '2');
     p.setAttribute('stroke-linecap', 'round');
     p.setAttribute('stroke-linejoin', 'round');
-    p.setAttribute('class', 'graph-line');
-    p.dataset.sha = sha;
+    // Uncommitted work is not history yet: join it to HEAD with a dashed line.
+    if (edge.dashed) p.setAttribute('stroke-dasharray', '3 3');
+    p.setAttribute('class', 'graph-line' + (edge.offPage ? ' off-page' : ''));
+    p.dataset.sha = edge.sha;
     svg.appendChild(p);
-  };
-
-  // Edges: one path per (commit → parent). The parent's lane column comes from
-  // this row's `outgoing` list (pi-th entry == pi-th parent), so the vertical run
-  // lands exactly on the parent's dot column.
-  const colByRow = rows.map((r) => r.col);
-  rows.forEach((row, i) => {
-    const parents = (row.commit.parents || []).filter((p) => rowOf.has(p));
-    parents.forEach((pSha, pi) => {
-      const pRow = rowOf.get(pSha);
-      const seg = row.outgoing[pi];
-      const laneCol = seg ? seg.toCol : row.col;        // lane the edge travels in
-      const parentCol = colByRow[pRow];                  // parent's actual dot column
-      const colorIdx = seg ? seg.colorIdx : row.colorIdx;
-      addLine(commitToParentPath(row.col, i, laneCol, parentCol, pRow), colorIdx, row.commit.sha);
-    });
   });
 
   // Dots on top of the lines. Each dot is its own pointer target: clicking a node
@@ -570,6 +529,20 @@ function buildGraphSvg(rows) {
   // the overlay SVG physically lives in, and right-click opens the commit menu.
   rows.forEach((row, i) => {
     const commit = row.commit;
+    const color = laneColor(row.colorIdx);
+    if (commit.isHead) {
+      // The checked-out commit gets a ring around its dot, like git-graph.
+      const ring = document.createElementNS(SVGNS, 'circle');
+      ring.setAttribute('cx', String(cx(row.col)));
+      ring.setAttribute('cy', String(cyOf(i)));
+      ring.setAttribute('r', String(R + 3));
+      ring.setAttribute('fill', 'var(--vscode-editor-background)');
+      ring.setAttribute('stroke', color);
+      ring.setAttribute('stroke-width', '2');
+      ring.setAttribute('class', 'graph-node graph-node-head');
+      ring.dataset.sha = commit.sha;
+      svg.appendChild(ring);
+    }
     const dot = document.createElementNS(SVGNS, 'circle');
     dot.setAttribute('cx', String(cx(row.col)));
     dot.setAttribute('cy', String(cyOf(i)));
@@ -578,13 +551,18 @@ function buildGraphSvg(rows) {
     dot.dataset.sha = commit.sha;
     if (commit.kind === 'uncommitted') {
       dot.setAttribute('fill', 'var(--vscode-editor-background)');
-      dot.setAttribute('stroke', laneColor(row.colorIdx));
+      dot.setAttribute('stroke', color);
       dot.setAttribute('stroke-width', '2');
     } else {
-      dot.setAttribute('fill', laneColor(row.colorIdx));
+      dot.setAttribute('fill', color);
       dot.setAttribute('stroke', 'rgba(0,0,0,0.35)');
       dot.setAttribute('stroke-width', '1');
     }
+    const title = document.createElementNS(SVGNS, 'title');
+    title.textContent = commit.kind === 'uncommitted'
+      ? 'Uncommitted changes'
+      : commit.shortSha + (commit.isHead ? ' (HEAD)' : '') + ' — ' + commit.message;
+    dot.appendChild(title);
     dot.addEventListener('click', (e) => {
       e.stopPropagation();
       const tr = document.querySelector('#graph-body tr[data-sha="' + cssEsc(commit.sha) + '"]');
@@ -593,8 +571,8 @@ function buildGraphSvg(rows) {
     dot.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      if (commit.kind === 'uncommitted') return;
-      showCommitMenu(e.clientX, e.clientY, commit);
+      if (commit.kind === 'uncommitted') showUncommittedMenu(e.clientX, e.clientY);
+      else showCommitMenu(e.clientX, e.clientY, commit);
     });
     svg.appendChild(dot);
   });
@@ -816,8 +794,9 @@ function renderTable(rows) {
     tr.className = 'commit-row' + (commit.kind === 'uncommitted' ? ' uncommitted' : '');
     tr.dataset.sha = commit.sha;
     tr.tabIndex = 0;
-    tr.setAttribute('aria-label', `${commit.message}, ${commit.kind === 'uncommitted' ? 'uncommitted changes' : `commit ${commit.shortSha}, by ${commit.author || 'unknown author'}`}`);
+    tr.setAttribute('aria-label', `${commit.message}, ${commit.kind === 'uncommitted' ? 'uncommitted changes' : `commit ${commit.shortSha}${commit.isHead ? ' (HEAD)' : ''}, by ${commit.author || 'unknown author'}`}`);
     if (commit.sha === selectedSha) tr.classList.add('selected');
+    if (commit.isHead) tr.classList.add('head-commit');
 
     // Column order mirrors VsGit / EGit history: Graph | Description | Author |
     // Authored Date | Committer | Committed Date | Commit.
@@ -877,23 +856,51 @@ function renderTable(rows) {
         selectCommit(commit, tr, e);
       } else if ((e.shiftKey && e.key === 'F10') || e.key === 'ContextMenu') {
         e.preventDefault();
-        if (commit.kind !== 'uncommitted') {
-          const rect = tr.getBoundingClientRect();
-          showCommitMenu(rect.left + 24, rect.top + Math.min(rect.height, 24), commit);
-        }
+        const rect = tr.getBoundingClientRect();
+        const x = rect.left + 24, y = rect.top + Math.min(rect.height, 24);
+        if (commit.kind === 'uncommitted') showUncommittedMenu(x, y);
+        else showCommitMenu(x, y, commit);
       }
     });
     tr.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      if (commit.kind === 'uncommitted') return;
-      showCommitMenu(e.clientX, e.clientY, commit);
+      if (commit.kind === 'uncommitted') showUncommittedMenu(e.clientX, e.clientY);
+      else showCommitMenu(e.clientX, e.clientY, commit);
     });
     frag.appendChild(tr);
   });
+  if (graphData && graphData.hasMore) frag.appendChild(buildLoadMoreRow());
   tbody.appendChild(frag);
   applyColumnVisibility();
   // Build the overlay SVG now that the rows are in the DOM and measurable.
   rebuildGraphOverlay();
+}
+
+// Trailing row shown when the loaded page does not reach the root of history.
+function buildLoadMoreRow() {
+  const tr = document.createElement('tr');
+  tr.id = 'load-more-row';
+  tr.className = 'load-more-row';
+  const spacer = document.createElement('td');
+  spacer.className = 'col-graph';
+  tr.appendChild(spacer);
+  const td = document.createElement('td');
+  td.colSpan = 6;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id = 'load-more';
+  btn.className = 'tb-btn load-more';
+  btn.textContent = 'Load More Commits';
+  btn.title = 'Load the next page of history (vsgit.graph.maxCommits per page)';
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    btn.disabled = true;
+    btn.textContent = 'Loading…';
+    vscode.postMessage({ type: 'loadMore' });
+  });
+  td.appendChild(btn);
+  tr.appendChild(td);
+  return tr;
 }
 
 function applyColumnWidths() {
@@ -1070,7 +1077,7 @@ function selectCommit(commit, tr, ev) {
 
 // Open the CDV in comparison mode (two commits). Summary names the range; the
 // file list is filled when the host replies with `comparisonFiles`.
-function openComparison(fromSha, toSha) {
+function openComparison(fromSha, toSha, toLabel) {
   const fromRow = layoutRows.find((r) => r.commit.sha === fromSha);
   const tr = document.querySelector('#graph-body tr[data-sha="' + cssEsc(fromSha) + '"]');
   if (!fromRow || !tr) return;
@@ -1078,8 +1085,34 @@ function openComparison(fromSha, toSha) {
   const summary = document.getElementById('cdvSummary');
   if (summary) {
     summary.innerHTML = 'Displaying all changes from <b>' + esc(fromSha.slice(0, 8)) +
-      '</b> to <b>' + esc(toSha.slice(0, 8)) + '</b>.';
+      '</b> to <b>' + esc(toLabel || shortRevision(toSha)) + '</b>.';
   }
+}
+
+function shortRevision(rev) {
+  return /^[0-9a-f]{40,64}$/i.test(rev) ? rev.slice(0, 8) : rev;
+}
+
+// Compare a commit with another revision (a SHA, or a ref such as HEAD) from a
+// menu, highlighting the other side when it is a loaded row.
+function startComparison(fromSha, toRev, toLabel) {
+  const fromRow = layoutRows.find((r) => r.commit.sha === fromSha);
+  if (!fromRow) return;
+  const toRow = toRev === 'HEAD'
+    ? layoutRows.find((r) => r.commit.isHead)
+    : layoutRows.find((r) => r.commit.sha === toRev);
+  selectedSha = fromSha;
+  compareSha = toRev;
+  document.querySelectorAll('#graph-body tr.selected, #graph-body tr.compareSelected').forEach((r) =>
+    r.classList.remove('selected', 'compareSelected'));
+  const fromTr = document.querySelector('#graph-body tr[data-sha="' + cssEsc(fromSha) + '"]');
+  if (fromTr) fromTr.classList.add('selected');
+  if (toRow) {
+    const toTr = document.querySelector('#graph-body tr[data-sha="' + cssEsc(toRow.commit.sha) + '"]');
+    if (toTr) toTr.classList.add('compareSelected');
+  }
+  openComparison(fromSha, toRev, toLabel);
+  vscode.postMessage({ type: 'requestComparison', data: { from: fromSha, to: toRev } });
 }
 
 function openExpandedRow(commit, tr) {
@@ -1201,8 +1234,9 @@ function setFileViewMode(mode) {
   vscode.setState({ ...vscode.getState(), cdvFileViewMode: mode });
   syncFileViewButtons();
   if (cdvFilesCache) {
-    if (cdvFilesCache.toSha) renderComparisonFiles(cdvFilesCache.sha, cdvFilesCache.toSha, cdvFilesCache.files);
-    else renderFiles(cdvFilesCache.sha, cdvFilesCache.files);
+    const c = cdvFilesCache;
+    if (c.toSha) renderComparisonFiles(c.sha, c.toSha, c.files);
+    else renderFiles(c.sha, c.files, c.details, c.isMerge);
   }
 }
 function syncFileViewButtons() {
@@ -1213,16 +1247,19 @@ function syncFileViewButtons() {
 }
 
 // LEFT pane: commit metadata + message. Shows author AND committer (with their
-// respective dates), matching VsGit's commit detail.
-function renderSummary(commit) {
+// respective dates), matching VsGit's commit detail. `details` (full message and
+// e-mail addresses) arrives with the file list; until then the subject is shown.
+function renderSummary(commit, details) {
   const host = document.getElementById('cdvSummary');
   if (!host) return;
+  const who = (name, email) =>
+    esc(name || '') + (email ? ' &lt;<a class="cdvEmail" href="mailto:' + esc(email) + '">' + esc(email) + '</a>&gt;' : '');
   const authoredStr = commit.date ? formatLongDate(commit.date) : '';
   const committedStr = commit.committerDate ? formatLongDate(commit.committerDate) : '';
 
   const parents = (commit.parents || []).length
     ? (commit.parents || []).map((p) =>
-        '<span class="cdvInternalLink" data-sha="' + esc(p) + '">' + esc(p) + '</span>').join(', ')
+        '<span class="cdvInternalLink" data-sha="' + esc(p) + '" title="' + esc(p) + '">' + esc(p.slice(0, 10)) + '</span>').join(', ')
     : 'None';
 
   // Refs (branches / tags / remotes) pointing at this commit, so clicking a node
@@ -1233,15 +1270,18 @@ function renderSummary(commit) {
         esc(r.name) + '</span>').join(' ')
     : '';
 
+  const message = details && details.message ? details.message : commit.message;
   host.innerHTML =
     '<span class="cdvSummaryTop"><span class="cdvSummaryTopRow"><span class="cdvSummaryKeyValues">' +
-      '<b>Commit: </b>' + esc(commit.sha) + '<br>' +
+      '<b>Commit: </b>' + esc(commit.sha) + (commit.isHead ? ' <span class="cdvHeadBadge">HEAD</span>' : '') + '<br>' +
       '<b>Parents: </b>' + parents + '<br>' +
-      '<b>Author: </b>' + esc(commit.author || '') + ' &lt;' + esc(authoredStr) + '&gt;<br>' +
-      '<b>Committer: </b>' + esc(commit.committer || '') + ' &lt;' + esc(committedStr) + '&gt;' +
+      '<b>Author: </b>' + who(details ? details.authorName : commit.author, details && details.authorEmail) +
+        '<br><b>Authored: </b>' + esc(authoredStr) + '<br>' +
+      '<b>Committer: </b>' + who(details ? details.committerName : commit.committer, details && details.committerEmail) +
+        '<br><b>Committed: </b>' + esc(committedStr) +
       (refsHtml ? '<br><b>Refs: </b>' + refsHtml : '') +
     '</span></span></span><br><br>' +
-    '<span class="cdvBody">' + esc(commit.message) + '</span>';
+    '<span class="cdvBody">' + esc(message) + '</span>';
 
   host.querySelectorAll('.cdvInternalLink').forEach((a) => {
     a.addEventListener('click', () => selectShaIfPresent(a.dataset.sha));
@@ -1264,26 +1304,32 @@ function selectShaIfPresent(sha) {
 
 // RIGHT pane: the changed-file list, rendered as a folder tree or a flat list
 // per the current view-type toggle.
-function renderFiles(sha, files) {
-  if (selectedSha !== sha) return;
-  cdvFilesCache = { sha, files };
+function renderFiles(sha, files, details, isMerge) {
+  if (selectedSha !== sha || compareSha) return;
+  cdvFilesCache = { sha, files, details, isMerge };
+  if (details) {
+    const row = layoutRows.find((r) => r.commit.sha === sha);
+    if (row) renderSummary(row.commit, details);
+  }
   const host = document.getElementById('cdvFiles');
   if (!host) return;
-  renderFilePane(host, files, sha === '*uncommitted*' ? null : (f) => {
-    vscode.postMessage({ type: 'openFileDiff', data: { sha, path: f.path, origPath: f.origPath } });
-  });
+  renderFilePane(host, files, (f) => {
+    vscode.postMessage({ type: 'openFileDiff', data: { sha, path: f.path, origPath: f.origPath, status: f.status } });
+  }, sha === '*uncommitted*' ? 'No uncommitted changes.' : undefined,
+  isMerge ? 'Changes compared with the first parent' : undefined);
 }
 
 // Shared renderer for the changed-file pane (commit or comparison).
-function renderFilePane(host, files, onOpen, emptyText) {
+function renderFilePane(host, files, onOpen, emptyText, note) {
   if (!files || files.length === 0) {
-    host.innerHTML = '<div class="cdvFilesHead">' + (emptyText || 'No file changes.') + '</div>';
+    host.innerHTML = '<div class="cdvFilesHead">' + esc(emptyText || 'No file changes.') + '</div>';
     return;
   }
   host.innerHTML = '';
   const head = document.createElement('div');
   head.className = 'cdvFilesHead';
-  head.textContent = files.length + ' changed file' + (files.length === 1 ? '' : 's');
+  head.textContent = files.length + ' changed file' + (files.length === 1 ? '' : 's') +
+    (note ? ' · ' + note : '');
   host.appendChild(head);
   host.appendChild(cdvFileViewMode === 'tree' ? buildFileTree(files, onOpen) : buildFileList(files, onOpen));
 }
@@ -1297,6 +1343,7 @@ const CDV_STATUS_LABELS = {
   C: 'Copied',
   T: 'Type Changed',
   U: 'Conflicted',
+  '?': 'Untracked',
 };
 
 // File extension (lowercase, no dot) shown on the left of each row, or '•' when
@@ -1317,7 +1364,7 @@ function makeFileRow(f, onOpen, label) {
 
   // RIGHT: full change label (Modified, Added, …).
   const change = document.createElement('span');
-  change.className = 'file-change ' + code;
+  change.className = 'file-change ' + (code === '?' ? 'untracked' : code);
   change.textContent = CDV_STATUS_LABELS[code] || 'Modified';
 
   fileRow.appendChild(ext);
@@ -1432,30 +1479,57 @@ function placeMenu(menu, x, y) {
 function showCommitMenu(x, y, commit) {
   const sha = commit.sha;
   const send = (type, data) => vscode.postMessage({ type, data });
-  const menu = buildMenu([
-    { title: commit.shortSha },
-    { label: 'Checkout Commit…', action: () => send('checkout', sha) },
+  const isMerge = (commit.parents || []).length > 1;
+  const items = [
+    { title: commit.shortSha + (commit.isHead ? ' (HEAD)' : '') + (isMerge ? ' · merge' : '') },
+    { label: 'Checkout Commit (detached HEAD)…', action: () => send('checkout', sha) },
     { label: 'Create Branch Here…', action: () => send('createBranch', { sha }) },
     { label: 'Create Tag Here…', action: () => openCreateTagModal(commit) },
     { sep: true },
-    { label: 'Merge into Current Branch…', action: () => send('merge', sha) },
-    { label: 'Rebase Current Branch onto This…', action: () => send('rebase', sha) },
+  ];
+  if (!commit.isHead) {
+    items.push(
+      { label: 'Merge into Current Branch…', action: () => send('merge', sha) },
+      { label: 'Rebase Current Branch onto This…', action: () => send('rebase', sha) },
+      { sep: true },
+      { label: isMerge ? 'Cherry-Pick (choose parent)…' : 'Cherry-Pick', action: () => send('cherryPick', sha) },
+    );
+  }
+  items.push(
+    { label: isMerge ? 'Revert (choose parent)…' : 'Revert', action: () => send('revert', sha) },
+  );
+  if (!isMerge && (commit.parents || []).length === 1) {
+    items.push({ label: 'Drop Commit…', action: () => send('dropCommit', sha) });
+  }
+  items.push(
     { sep: true },
-    { label: 'Cherry-Pick', action: () => send('cherryPick', sha) },
-    { label: 'Revert', action: () => send('revert', sha) },
-    { label: 'Drop Commit…', action: () => send('dropCommit', sha) },
+    { label: 'Reset Current Branch → Soft', action: () => send('reset', { sha, mode: 'soft' }) },
+    { label: 'Reset Current Branch → Mixed', action: () => send('reset', { sha, mode: 'mixed' }) },
+    { label: 'Reset Current Branch → Hard…', action: () => send('reset', { sha, mode: 'hard' }) },
     { sep: true },
-    { label: 'Reset → Soft', action: () => send('reset', { sha, mode: 'soft' }) },
-    { label: 'Reset → Mixed', action: () => send('reset', { sha, mode: 'mixed' }) },
-    { label: 'Reset → Hard', action: () => send('reset', { sha, mode: 'hard' }) },
-    { sep: true },
-    { label: 'Compare with HEAD', action: () => send('compareWithHead', sha) },
-    { label: 'Compare with Another Commit…', action: () => send('compareWithAnother', sha) },
+  );
+  if (!commit.isHead) {
+    items.push({ label: 'Compare with HEAD', action: () => startComparison(sha, 'HEAD') });
+  }
+  items.push(
+    { label: 'Compare with Another Revision…', action: () => send('compareWithAnother', sha) },
     { sep: true },
     { label: 'Copy SHA (short)', action: () => send('copyCommitSha', commit.shortSha) },
     { label: 'Copy SHA (full)', action: () => send('copyCommitSha', sha) },
-  ]);
-  placeMenu(menu, x, y);
+    { label: 'Copy Commit Message', action: () => send('copyCommitMessage', sha) },
+  );
+  placeMenu(buildMenu(items), x, y);
+}
+
+// Actions for the synthetic "Uncommitted Changes" row.
+function showUncommittedMenu(x, y) {
+  const send = (type, data) => vscode.postMessage({ type, data });
+  placeMenu(buildMenu([
+    { title: 'Uncommitted Changes' },
+    { label: 'Open Commit View', action: () => send('commitOpen') },
+    { label: 'Stash Uncommitted Changes…', action: () => send('toolbarStash') },
+    { label: 'Create Branch from HEAD…', action: () => send('createBranchInteractive') },
+  ]), x, y);
 }
 
 function openCreateTagModal(commit) {
@@ -1495,27 +1569,52 @@ function syncCreateTagMessageState() {
 }
 function showRefMenu(x, y, ref) {
   const send = (type, data) => vscode.postMessage({ type, data });
+  const copy = { label: 'Copy Name', action: () => send('copyText', { text: ref.name, label: 'Ref name' }) };
   let items = [{ title: ref.name }];
-  if (ref.type === 'localBranch' || ref.type === 'head') {
+  if (ref.type === 'head' && ref.name === 'HEAD') {
+    // Detached HEAD: there is no branch to rename, delete, or push.
     items = items.concat([
-      { label: 'Checkout', action: () => send('checkout', ref.name) },
-      { label: 'Merge into Current…', action: () => send('merge', ref.name) },
-      { label: 'Rebase Current onto…', action: () => send('rebase', ref.name) },
+      { label: 'Create Branch Here…', action: () => send('createBranchInteractive') },
+    ]);
+  } else if (ref.type === 'head') {
+    // The checked-out branch.
+    items = items.concat([
+      { label: 'Push…', action: () => send('pushBranch', { name: ref.name }) },
+      { label: 'Rename…', action: () => send('renameBranch', { name: ref.name }) },
       { sep: true },
+      copy,
+    ]);
+  } else if (ref.type === 'localBranch') {
+    items = items.concat([
+      { label: 'Checkout', action: () => send('checkoutRef', { name: ref.name, type: ref.type }) },
+      { label: 'Merge into Current Branch…', action: () => send('merge', ref.name) },
+      { label: 'Rebase Current Branch onto…', action: () => send('rebase', ref.name) },
+      { sep: true },
+      { label: 'Push…', action: () => send('pushBranch', { name: ref.name }) },
       { label: 'Rename…', action: () => send('renameBranch', { name: ref.name }) },
       { label: 'Delete…', action: () => send('deleteBranch', { name: ref.name }) },
-      { label: 'Push…', action: () => send('pushBranch', { name: ref.name }) },
+      { sep: true },
+      copy,
     ]);
   } else if (ref.type === 'remoteBranch') {
     items = items.concat([
-      { label: 'Checkout', action: () => send('checkout', ref.name) },
+      { label: 'Checkout (create tracking branch)…', action: () => send('checkoutRef', { name: ref.name, type: ref.type }) },
+      { label: 'Merge into Current Branch…', action: () => send('merge', ref.name) },
+      { label: 'Rebase Current Branch onto…', action: () => send('rebase', ref.name) },
+      { sep: true },
       { label: 'Delete Remote Branch…', action: () => send('deleteRemoteBranch', { name: ref.name }) },
+      { sep: true },
+      copy,
     ]);
   } else if (ref.type === 'tag') {
     items = items.concat([
-      { label: 'Checkout', action: () => send('checkout', ref.name) },
-      { label: 'Delete Tag…', action: () => send('deleteTag', { name: ref.name }) },
+      { label: 'Checkout (detached HEAD)', action: () => send('checkoutRef', { name: ref.name, type: ref.type }) },
+      { label: 'Merge into Current Branch…', action: () => send('merge', ref.name) },
+      { sep: true },
       { label: 'Push Tag…', action: () => send('pushTag', { name: ref.name }) },
+      { label: 'Delete Tag…', action: () => send('deleteTag', { name: ref.name }) },
+      { sep: true },
+      copy,
     ]);
   } else if (ref.type === 'stash') {
     items = items.concat([
@@ -1706,18 +1805,22 @@ window.addEventListener('message', (event) => {
           const tr = document.querySelector('#graph-body tr[data-sha="' + cssEsc(selectedSha) + '"]');
           if (tr) {
             tr.classList.add('selected');
-            if (hadExpanded) {
+            if (hadExpanded && compareSha) {
+              startComparison(selectedSha, compareSha);
+            } else if (hadExpanded) {
               openExpandedRow(stillThere.commit, tr);
               vscode.postMessage({ type: 'requestFiles', data: selectedSha });
             }
           }
         } else {
           selectedSha = null;
+          compareSha = null;
         }
       }
       applyTrace();
       const commitCount = graphData.commits.filter((c) => c.kind !== 'uncommitted').length;
-      document.getElementById('commit-count').textContent = commitCount + ' commits';
+      document.getElementById('commit-count').textContent =
+        commitCount + (graphData.hasMore ? '+' : '') + ' commits';
       if (commitCount !== lastAnnouncedCommitCount) {
         lastAnnouncedCommitCount = commitCount;
         announce(`${commitCount} commits loaded.`);
@@ -1725,7 +1828,14 @@ window.addEventListener('message', (event) => {
       break;
     }
     case 'files':
-      renderFiles(msg.data.sha, msg.data.files);
+      renderFiles(msg.data.sha, msg.data.files, msg.data.details, msg.data.isMerge);
+      break;
+    case 'startComparison':
+      startComparison(msg.data.from, msg.data.to, msg.data.label);
+      break;
+    case 'loadFailed':
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('main').classList.remove('loading');
       break;
     case 'comparisonFiles':
       // Only render if the comparison is still the active one.
@@ -1873,7 +1983,13 @@ function wireControls() {
   // global keys
   document.addEventListener('keydown', (e) => {
     const typing = e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA');
+    const menu = document.getElementById('context-menu');
     if (e.key === 'Escape' && !createTagModal.hidden) { e.preventDefault(); closeCreateTagModal(); }
+    else if (e.key === 'Escape' && (menu.classList.contains('visible') || columnMenuOpen)) {
+      e.preventDefault();
+      menu.classList.remove('visible');
+      closeColumnsMenu();
+    }
     else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') { e.preventDefault(); openFind(); }
     else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r') { e.preventDefault(); document.getElementById('main').classList.add('loading'); send('refresh'); }
     else if (!typing && e.key === 'ArrowDown') { e.preventDefault(); moveSelection(1); }

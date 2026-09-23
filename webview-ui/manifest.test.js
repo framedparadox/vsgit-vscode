@@ -105,107 +105,43 @@ test('Git Graph column settings are contributed, sent, and rendered', () => {
   assert.ok(graphJs.includes('tb-columns'), 'graph.js wires the Columns toolbar button');
 });
 
-test('native SCM provider is registered and menu actions target resource groups', () => {
-  const pkg = JSON.parse(read('package.json'));
-  const extension = read('src/extension.ts');
-  const scmProvider = read('src/views/ScmProvider.ts');
-  const scmCommands = read('src/commands/scm.ts');
-  const resourceStateMenus = pkg.contributes?.menus?.['scm/resourceState/context'] ?? [];
-  const resourceGroupMenus = pkg.contributes?.menus?.['scm/resourceGroup/context'] ?? [];
-
-  assert.ok(extension.includes('new VsgitScmProvider(manager)'), 'SCM provider is activated');
-  assert.ok(scmProvider.includes('vscode.scm.createSourceControl('), 'SCM provider creates source controls');
-  assert.ok(scmProvider.includes('"index", "Staged Changes"'), 'SCM provider exposes staged group');
-  assert.ok(scmProvider.includes('"workingTree", "Changes"'), 'SCM provider exposes working tree group');
-  assert.ok(scmProvider.includes('"merge", "Merge Changes"'), 'SCM provider exposes merge group');
-  assert.ok(scmProvider.includes('vsgitChange: change'), 'SCM resources carry parsed status metadata');
-  assert.ok(scmProvider.includes('quickDiffProvider'), 'native SCM uses VsGit quick diff');
-  assert.ok(scmProvider.includes('new VsgitQuickDiffProvider(this.manager, repo.root)'), 'SCM provider reuses quick diff provider');
-  assert.ok(scmProvider.includes('acceptInputCommand'), 'native SCM input box can commit');
-  assert.ok(!extension.includes('vscode.scm.createSourceControl("vsgit", "VsGit")'), 'old empty SCM provider was removed');
-  assert.ok(scmCommands.includes('resourceGroup('), 'SCM commands inspect resource group metadata');
-  assert.ok(scmCommands.includes('resourceChange('), 'SCM commands inspect status metadata');
-  assert.ok(scmCommands.includes('discardPathSets('), 'SCM discard separates tracked and untracked paths');
-  assert.ok(scmCommands.includes('repo.discard(discard.tracked, discard.untracked)'), 'SCM discard cleans untracked paths');
-  assert.ok(scmCommands.includes('VSGIT_EMPTY_REF'), 'SCM diff can render deleted working-tree files');
-  assert.ok(scmCommands.includes('Index ↔ Working Tree'), 'SCM working-tree diffs compare index to working tree');
-  // Repo lookup moved into the shared commands/uriHelpers.ts; scm.ts resolves
-  // repositories through it while the helper performs the containment lookup.
-  const uriHelpers = read('src/commands/uriHelpers.ts');
-  assert.ok(scmCommands.includes('repoForUri('), 'SCM commands resolve repos via the shared helper');
-  assert.ok(uriHelpers.includes('manager.findByUri(uri)'), 'shared helper resolves repos by URI containment');
-
-  assert.strictEqual(
-    resourceStateMenus.find((item) => item.command === 'vsgit.scm.stage')?.when,
-    'scmProvider == vsgit && scmResourceGroup != index',
-  );
-  assert.strictEqual(
-    resourceStateMenus.find((item) => item.command === 'vsgit.scm.unstage')?.when,
-    'scmProvider == vsgit && scmResourceGroup == index',
-  );
-  assert.strictEqual(
-    resourceStateMenus.find((item) => item.command === 'vsgit.scm.discard')?.when,
-    'scmProvider == vsgit && scmResourceGroup != index',
-  );
-  assert.strictEqual(
-    resourceGroupMenus.find((item) => item.command === 'vsgit.scm.stageAll')?.when,
-    'scmProvider == vsgit && scmResourceGroup != index',
-  );
-  assert.strictEqual(
-    resourceGroupMenus.find((item) => item.command === 'vsgit.scm.unstageAll')?.when,
-    'scmProvider == vsgit && scmResourceGroup == index',
-  );
-  assert.strictEqual(
-    resourceGroupMenus.find((item) => item.command === 'vsgit.scm.discardAll')?.when,
-    'scmProvider == vsgit && scmResourceGroup != index',
-  );
-});
-
-test('VsGit submenu is attached to the native Git SCM menus', () => {
+test('VsGit stays out of the native Source Control view', () => {
   const pkg = JSON.parse(read('package.json'));
   const menus = pkg.contributes?.menus ?? {};
-  const submenus = pkg.contributes?.submenus ?? [];
   const shared = read('src/commands/shared.ts');
+  const sources = [
+    read('src/extension.ts'),
+    ...fs.readdirSync(path.join(root, 'src'), { recursive: true })
+      .filter((name) => String(name).endsWith('.ts') && !String(name).endsWith('.test.ts'))
+      .map((name) => read(path.join('src', String(name)))),
+  ].join('\n');
 
-  // Parent submenu exists and is labelled "VsGit".
-  const repoSubmenu = submenus.find((s) => s.id === 'vsgit.repo');
+  // No SourceControl provider, quick-diff provider, or SCM input box is registered.
+  assert.ok(!sources.includes('vscode.scm.createSourceControl'), 'no native SourceControl is created');
+  assert.ok(!sources.includes('QuickDiffProvider'), 'no native quick-diff provider is registered');
+  assert.ok(!fs.existsSync(path.join(root, 'src/views/ScmProvider.ts')), 'native SCM bridge was removed');
+  assert.ok(!fs.existsSync(path.join(root, 'src/commands/scm.ts')), 'native SCM commands were removed');
+
+  // No contribution targets any native SCM menu (neither a VsGit provider nor
+  // the built-in Git provider's repository/group/resource menus).
+  for (const menuId of Object.keys(menus)) {
+    assert.ok(!menuId.startsWith('scm/'), `${menuId} is not contributed`);
+  }
+  const everyWhen = Object.values(menus).flat().map((entry) => entry.when ?? '');
+  assert.ok(everyWhen.every((when) => !when.includes('scmProvider')), 'no menu is scoped to an SCM provider');
+  assert.ok(
+    (pkg.contributes?.commands ?? []).every((cmd) => !cmd.command.startsWith('vsgit.scm.')),
+    'no vsgit.scm.* commands are contributed',
+  );
+
+  // Operations report progress in VsGit's own surfaces, not the SCM view.
+  assert.ok(!sources.includes('ProgressLocation.SourceControl'), 'progress never targets the SCM view');
+  assert.ok(!shared.includes('nativeScmRootUri'), 'resolveRepo no longer handles native SCM arguments');
+
+  // The VsGit repository submenu is still available in VsGit's own views.
+  const repoSubmenu = (pkg.contributes?.submenus ?? []).find((s) => s.id === 'vsgit.repo');
   assert.ok(repoSubmenu, 'vsgit.repo submenu is declared');
-  assert.strictEqual(repoSubmenu.label, 'VsGit', 'native submenu is labelled VsGit');
-
-  // The submenu has a non-empty body of repo actions.
-  const repoItems = menus['vsgit.repo'] ?? [];
-  assert.ok(repoItems.length > 0, 'vsgit.repo submenu has entries');
-  assert.ok(
-    repoItems.some((item) => item.submenu === 'vsgit.repo.pushPull'),
-    'vsgit.repo submenu surfaces push/pull actions',
-  );
-
-  // Attached to the native repository node (right-click the repo header).
-  const sourceControlMenu = menus['scm/sourceControl'] ?? [];
-  const repoNodeEntry = sourceControlMenu.find((item) => item.submenu === 'vsgit.repo');
-  assert.ok(repoNodeEntry, 'vsgit.repo is attached to scm/sourceControl');
-  assert.strictEqual(
-    repoNodeEntry.when,
-    'scmProvider == git',
-    'native repo submenu targets the built-in git provider',
-  );
-
-  // Attached to the native "Changes" group ellipsis (working tree only).
-  const resourceGroupMenus = menus['scm/resourceGroup/context'] ?? [];
-  const changesEntry = resourceGroupMenus.find((item) => item.submenu === 'vsgit.repo');
-  assert.ok(changesEntry, 'vsgit.repo is attached to scm/resourceGroup/context');
-  assert.strictEqual(
-    changesEntry.when,
-    'scmProvider == git && scmResourceGroup == workingTree',
-    'native group submenu targets the working-tree (Changes) group',
-  );
-
-  // resolveRepo can map a native SourceControl rootUri to a repository.
-  assert.ok(shared.includes('nativeScmRootUri'), 'resolveRepo extracts a native rootUri');
-  assert.ok(
-    shared.includes('manager.get(rootUri.fsPath) ?? manager.findByUri(rootUri)'),
-    'resolveRepo maps the native rootUri to a repository',
-  );
+  assert.ok((menus['vsgit.repo'] ?? []).length > 0, 'vsgit.repo submenu has entries');
 });
 
 test('configured git path and command preview are wired through the shared executor', () => {
@@ -287,7 +223,6 @@ test('repository routing uses active repo and containment-aware URI lookup', () 
   const reflog = read('src/views/ReflogProvider.ts');
   const history = read('src/webviews/HistoryView.ts');
   const graph = read('src/webviews/graph/GraphPanel.ts');
-  const quickDiff = read('src/git/QuickDiffProvider.ts');
   const blame = read('src/decorations/BlameController.ts');
   const compare = read('src/commands/compare.ts');
 
@@ -304,7 +239,6 @@ test('repository routing uses active repo and containment-aware URI lookup', () 
   assert.ok(reflog.includes('const repo = this.manager.getActive();'), 'reflog view uses active repo');
   assert.ok(history.includes('repo ?? this.manager.getActive()'), 'history fallback uses active repo');
   assert.ok(graph.includes('initialRepo ?? manager.getActive()'), 'graph fallback uses active repo');
-  assert.ok(quickDiff.includes('this.manager.findByUri(uri)'), 'quick diff uses containment lookup');
   assert.ok(blame.includes('this.manager.findByUri(editor.document.uri)'), 'blame uses containment lookup');
   assert.ok(compare.includes('manager.findByUri(uri)'), 'compare uses containment lookup');
 });

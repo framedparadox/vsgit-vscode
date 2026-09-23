@@ -28,9 +28,13 @@ export function registerGerritCommands(
         if (!remote) {
           return;
         }
+        // Changes are normally reviewed against the branch being tracked
+        // (e.g. main), not the local topic branch's own name.
+        const head = repo.localBranches.find((b) => b.isHead);
+        const tracked = head?.upstream ? repo.splitRemoteBranch(head.upstream) : undefined;
         const target = await vscode.window.showInputBox({
           prompt: "Target branch for review",
-          value: repo.headName?.startsWith("(") ? "main" : repo.headName ?? "main",
+          value: tracked && tracked.remote === remote ? tracked.branch : head?.shortName ?? "main",
         });
         if (!target) {
           return;
@@ -65,12 +69,19 @@ async function installCommitMsgHook(repo: Repository): Promise<void> {
   // Minimal Change-Id hook: appends a stable Change-Id derived from a random id
   // if one is not already present. (Production setups fetch Gerrit's official
   // hook; this keeps us dependency-free.)
+  //
+  // The id mixes the message with the committer identity (which carries a
+  // timestamp) and random bytes, so two commits with the same message never
+  // share a Change-Id, and it is added as a proper trailer so Gerrit finds it
+  // in the footer even when Signed-off-by lines are already present.
   const hook = `#!/bin/sh
-# git-vscode Gerrit Change-Id hook
+# VsGit Gerrit Change-Id hook
 MSG="$1"
 if grep -q '^Change-Id:' "$MSG"; then exit 0; fi
-id=$(git hash-object "$MSG" 2>/dev/null | cut -c1-40)
-printf '\\nChange-Id: I%s\\n' "$id" >> "$MSG"
+# Leave an empty (aborted) commit message alone.
+if [ -z "$(git stripspace --strip-comments < "$MSG")" ]; then exit 0; fi
+id=$({ cat "$MSG"; git var GIT_COMMITTER_IDENT; date; head -c 32 /dev/urandom 2>/dev/null; } | git hash-object --stdin)
+git interpret-trailers --in-place --trailer "Change-Id: I$id" "$MSG"
 `;
   try {
     const hookPath = await repo.gitPath("hooks/commit-msg");

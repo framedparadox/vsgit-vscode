@@ -12,6 +12,9 @@ scripts/**
 esbuild.js
 tsconfig*.json
 **/*.map
+# README screenshots are served from GitHub (vsce rewrites the relative links
+# through package.json "repository"); shipping them would bloat the VSIX.
+docs/**
 **/*.ts
 **/*.test.js
 .gitignore

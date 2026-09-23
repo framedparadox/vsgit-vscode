@@ -27,19 +27,27 @@
   }
 })(typeof self !== 'undefined' ? self : this, function () {
   // ─── lane layout (two-half connected model, topological) ───────────────────
-  // Commits must arrive in --topo-order (child before parents). Returns one row
-  // per commit: { commit, col, colorIdx, incoming[], outgoing[], maxCols, ... }.
-  function buildLayout(commits) {
+  // Commits must arrive child-before-parents (--topo-order or --date-order).
+  // Returns one row per commit:
+  //   { commit, col, colorIdx, parentShas[], incoming[], outgoing[], maxCols, … }
+  //
+  // options.openParents: when the list is a truncated page of history, a parent
+  // that has not been loaded yet keeps its lane open to the bottom of the graph
+  // (so the line visibly continues) instead of silently ending at the commit.
+  // The synthetic uncommitted row never opens a lane.
+  function buildLayout(commits, options) {
+    const openParents = !!(options && options.openParents);
     const rowOf = new Map();
     commits.forEach((c, i) => rowOf.set(c.sha, i));
 
+    // lanes[col] = sha the lane flows toward; laneColors[col] = its colour.
+    // Colour belongs to the lane, not to whichever child reached a commit
+    // first, so a branch keeps one colour down its whole first-parent line
+    // even when another branch's lane joins it from the side.
     let lanes = [];
-    const lineColor = new Map();
+    let laneColors = [];
     let nextColor = 0;
-    const colorFor = (sha) => {
-      if (!lineColor.has(sha)) lineColor.set(sha, nextColor++);
-      return lineColor.get(sha);
-    };
+    const newColor = () => nextColor++;
     const firstFreeIn = (arr) => {
       for (let i = 0; i < arr.length; i++) if (arr[i] == null) return i;
       arr.push(null);
@@ -47,16 +55,23 @@
     };
 
     const rows = commits.map((commit) => {
-      const parentShas = (commit.parents || []).filter((p) => rowOf.has(p));
+      const keepMissing = openParents && commit.kind !== 'uncommitted';
+      const parentShas = (commit.parents || []).filter((p) => rowOf.has(p) || keepMissing);
       const top = lanes.slice();
+      const topColors = laneColors.slice();
       const bottom = top.slice();
+      const bottomColors = topColors.slice();
 
       let myCol = top.indexOf(commit.sha);
+      let myColorIdx;
       if (myCol === -1) {
+        // A branch tip: nothing flows into it, so it starts a new lane.
         myCol = firstFreeIn(bottom);
         if (myCol >= top.length) top[myCol] = null;
+        myColorIdx = newColor();
+      } else {
+        myColorIdx = topColors[myCol];
       }
-      const myColorIdx = colorFor(commit.sha);
 
       const incoming = [];
       top.forEach((sha, c) => {
@@ -64,29 +79,34 @@
         incoming.push({
           fromCol: c,
           toCol: sha === commit.sha ? myCol : c,
-          colorIdx: colorFor(sha),
+          colorIdx: topColors[c],
           toNode: sha === commit.sha,
         });
       });
 
       for (let c = 0; c < bottom.length; c++) {
-        if (bottom[c] === commit.sha) bottom[c] = null;
+        if (bottom[c] === commit.sha) {
+          bottom[c] = null;
+          bottomColors[c] = null;
+        }
       }
 
       const outgoing = [];
       parentShas.forEach((pSha, pi) => {
         if (pi === 0) {
+          // The first parent continues this commit's own lane and colour.
           bottom[myCol] = pSha;
-          if (!lineColor.has(pSha)) lineColor.set(pSha, myColorIdx);
+          bottomColors[myCol] = myColorIdx;
           outgoing.push({ fromCol: myCol, toCol: myCol, colorIdx: myColorIdx });
         } else {
+          // A merged-in parent joins its existing lane, or opens a new one.
           let targetCol = bottom.indexOf(pSha);
           if (targetCol === -1) {
             targetCol = firstFreeIn(bottom);
             bottom[targetCol] = pSha;
-            colorFor(pSha);
+            bottomColors[targetCol] = newColor();
           }
-          outgoing.push({ fromCol: myCol, toCol: targetCol, colorIdx: colorFor(pSha) });
+          outgoing.push({ fromCol: myCol, toCol: targetCol, colorIdx: bottomColors[targetCol] });
         }
       });
 
@@ -96,16 +116,21 @@
         if (bottom[c] !== sha) return;
         if (c === myCol) return;
         if (parentTargets.has(c)) return;
-        outgoing.push({ fromCol: c, toCol: c, colorIdx: colorFor(sha) });
+        outgoing.push({ fromCol: c, toCol: c, colorIdx: topColors[c] });
       });
 
-      while (bottom.length > 0 && bottom[bottom.length - 1] == null) bottom.pop();
+      while (bottom.length > 0 && bottom[bottom.length - 1] == null) {
+        bottom.pop();
+      }
+      bottomColors.length = bottom.length;
       lanes = bottom;
+      laneColors = bottomColors;
 
       return {
         commit,
         col: myCol,
         colorIdx: myColorIdx,
+        parentShas,
         incoming,
         outgoing,
         topCols: top.length,
@@ -169,26 +194,56 @@
     return d;
   }
 
+  // Path from a commit into its lane and straight down to `bottomY`, for a
+  // parent that lies beyond the loaded page of history.
+  function commitToOffPagePath(geom, commitCol, commitRow, laneCol, bottomY) {
+    const xc = geom.cx(commitCol), yc = geom.cyOf(commitRow);
+    const xl = geom.cx(laneCol);
+    const yNext = Math.min(geom.cyOf(commitRow + 1), bottomY);
+    let d = `M${xc},${yc} ` + transition(geom, xc, yc, xl, yNext);
+    if (bottomY > yNext) d += `L${xl},${bottomY} `;
+    return d;
+  }
+
   // Turn layout rows into plain edge descriptors: one per (commit → parent).
   // Each edge's lane column comes from this row's `outgoing` list (pi-th entry ==
   // pi-th parent), so the vertical run lands exactly on the parent's dot column.
+  // Edges to parents beyond the loaded page (see buildLayout's openParents) run
+  // to `geom.bottomY` and are flagged `offPage`; edges from the synthetic
+  // uncommitted row are flagged `dashed`.
   function computeEdges(rows, geom) {
     geom = geom && geom.cx ? geom : defaultGeom(geom);
     const rowOf = new Map();
     rows.forEach((r, i) => rowOf.set(r.commit.sha, i));
     const colByRow = rows.map((r) => r.col);
+    const bottomY = typeof geom.bottomY === 'number'
+      ? geom.bottomY
+      : geom.cyOf(rows.length - 1) + geom.ROW_H / 2;
     const edges = [];
     rows.forEach((row, i) => {
-      const parents = (row.commit.parents || []).filter((p) => rowOf.has(p));
+      const parents = row.parentShas || (row.commit.parents || []).filter((p) => rowOf.has(p));
+      const dashed = row.commit.kind === 'uncommitted';
       parents.forEach((pSha, pi) => {
-        const pRow = rowOf.get(pSha);
         const seg = row.outgoing[pi];
         const laneCol = seg ? seg.toCol : row.col;
-        const parentCol = colByRow[pRow];
         const colorIdx = seg ? seg.colorIdx : row.colorIdx;
+        if (!rowOf.has(pSha)) {
+          edges.push({
+            sha: row.commit.sha,
+            colorIdx,
+            dashed,
+            offPage: true,
+            d: commitToOffPagePath(geom, row.col, i, laneCol, bottomY),
+          });
+          return;
+        }
+        const pRow = rowOf.get(pSha);
+        const parentCol = colByRow[pRow];
         edges.push({
           sha: row.commit.sha,
           colorIdx,
+          dashed,
+          offPage: false,
           d: commitToParentPath(geom, row.col, i, laneCol, parentCol, pRow),
         });
       });
@@ -213,6 +268,7 @@
     defaultGeom,
     transition,
     commitToParentPath,
+    commitToOffPagePath,
     computeEdges,
     computeNodes,
   };

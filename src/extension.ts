@@ -25,7 +25,6 @@ import { registerSubmoduleCommands } from "./commands/submodule";
 import { registerCloneCommands } from "./commands/clone";
 import { registerGerritCommands } from "./commands/gerrit";
 import { registerLfsCommands } from "./commands/lfs";
-import { registerSCMCommands } from "./commands/scm";
 import { registerNotesCommands } from "./commands/notes";
 import { registerArchiveCommands } from "./commands/archive";
 import { registerSubtreeCommands } from "./commands/subtree";
@@ -46,14 +45,25 @@ import { GitWatcherService } from "./services/GitWatcherService";
 import { GraphStatusBarService } from "./services/GraphStatusBarService";
 import { registerAutoFetchCommands } from "./commands/autoFetch";
 import { registerCommitOpsCommands } from "./commands/commitOps";
-import { VsgitScmProvider } from "./views/ScmProvider";
 import { DocumentationProvider } from "./webviews/documentation/DocumentationProvider";
+import { AskpassServer } from "./util/AskpassServer";
+import { askpassHelper } from "./util/credentials";
 
 export async function activate(
   context: vscode.ExtensionContext,
 ): Promise<void> {
   const manager = new RepositoryManager();
   context.subscriptions.push(manager);
+
+  // Route credential prompts from every git command — not only the toolbar's
+  // fetch/pull/push, but also pushes from the graph, remote branch/tag deletes,
+  // submodule, subtree, and LFS transfers — to VS Code input boxes. Without a
+  // TTY, git would otherwise fail with "terminal prompts disabled".
+  const askpass = new AskpassServer();
+  context.subscriptions.push(askpass);
+  void Promise.all([askpassHelper(context), askpass.ready])
+    .then(([helper]) => manager.getGitExecutor().setBaseEnv(askpass.env(helper)))
+    .catch((err) => console.error("vsgit: credential prompts unavailable", err));
 
   // Gate the advanced sidebar sections (Staging, Reflog, Synchronize, Worktrees,
   // Conflicts, Compare) behind a setting so the panel defaults to just
@@ -73,6 +83,8 @@ export async function activate(
       }
       if (e.affectsConfiguration("vsgit.git.path")) {
         manager.updateGitPathFromConfiguration();
+        void manager.scan();
+      } else if (e.affectsConfiguration("vsgit.repositoryScanMaxDepth")) {
         void manager.scan();
       }
     }),
@@ -214,8 +226,6 @@ export async function activate(
 
   registerCompareCommands(context, manager, compareProvider);
 
-  context.subscriptions.push(new VsgitScmProvider(manager));
-
   registerSyncCommands(context, syncProvider);
   registerConfigCommands(context, manager);
   registerStashCommands(context, manager);
@@ -223,9 +233,6 @@ export async function activate(
   registerCloneCommands(context, manager);
   registerGerritCommands(context, manager);
   registerLfsCommands(context, manager);
-  
-  // Phase 5 — SCM view context menus
-  registerSCMCommands(context, manager);
 
   // Phase 6 — Advanced operations
   registerNotesCommands(context, manager);

@@ -7,6 +7,7 @@ import { GitContentProvider } from "../git/GitContentProvider";
 import { FileChange } from "../git/parsers/status";
 import { parseUnifiedDiff, buildHunkPatch } from "../git/parsers/diff";
 import { confirmDestructiveAction, DestructiveOperations } from "../util/confirmation";
+import { commitDefaults } from "../webviews/commit/CommitViewProvider";
 
 /**
  * Staging view commands: stage/unstage (file + all + hunk), discard, open diff,
@@ -221,16 +222,22 @@ async function commitFlow(
     return;
   }
 
+  const defaults = commitDefaults();
   const extras = await vscode.window.showQuickPick(
     [
-      { label: "Sign off (DCO)", picked: false, key: "signoff" },
-      { label: "GPG sign", picked: false, key: "signoff_gpg" },
+      { label: "Sign off (DCO)", picked: defaults.signoff, key: "signoff" },
+      { label: "GPG sign", picked: defaults.gpg, key: "signoff_gpg" },
     ],
     { canPickMany: true, placeHolder: "Optional commit options (Esc to skip)" },
   );
   const opts: { amend?: boolean; signoff?: boolean; signoff_gpg?: boolean } = {
     amend,
   };
+  if (extras === undefined) {
+    // Escaped the options picker: fall back to the configured defaults.
+    opts.signoff = defaults.signoff;
+    opts.signoff_gpg = defaults.gpg;
+  }
   for (const e of extras ?? []) {
     (opts as Record<string, boolean>)[e.key] = true;
   }

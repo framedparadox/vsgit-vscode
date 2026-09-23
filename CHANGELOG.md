@@ -1,5 +1,129 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **VsGit no longer appears in VS Code's native Source Control view.** The
+  per-repository "VsGit: <repo>" Source Control providers, their quick-diff
+  gutters and commit input box, the `vsgit.scm.*` resource menus, and the VsGit
+  submenus added to the built-in Git provider's repository and *Changes* menus
+  are gone. Everything lives in the VsGit activity-bar container; the
+  repository-actions submenu is now in the Repositories view's title-bar `…`
+  menu. Operation progress shows in the status bar and on the Repositories
+  view instead of the Source Control view.
+
+### Git Graph
+
+- Only branches, remote-tracking branches, and tags are walked. The stash's
+  internal "WIP on / index on" commits, notes, maintenance prefetch refs, replace
+  refs, and filter-branch backups no longer appear as commits, and `refs/stash`
+  is no longer shown as a local branch pill.
+- Ref pills are classified from full ref names, so a local branch named like a
+  remote branch (`origin/x`), or a branch and tag with the same name, is
+  labelled correctly; remote `HEAD` pointers are hidden.
+- *Show Remote Branches* off now leaves remote-only history out of the graph
+  instead of only hiding the pills.
+- The **Uncommitted Changes** row joins the commit HEAD points at (it previously
+  joined whichever commit happened to be listed first), with a dashed line.
+  Selecting it lists the working-tree files instead of failing with a
+  `git show` error, and each file opens a HEAD ↔ working tree diff.
+- The HEAD commit is marked with a ring and a bold message.
+- **Load More Commits**: `vsgit.graph.maxCommits` is now a page size; lanes to
+  commits beyond the page run off the bottom instead of stopping dead.
+- Lane colours belong to lanes, so a branch keeps one colour and a commit's
+  dot always matches the lane it sits in.
+- Commit details show the full message and author/committer e-mail. Merge
+  commits list their changes against the first parent (previously empty).
+- Cherry-pick and revert of a merge commit ask which parent to use (git
+  refuses them without `-m`). Drop Commit is only offered for single-parent
+  commits on the current branch.
+- Checking out a remote branch pill creates (or reuses) a local tracking
+  branch instead of detaching HEAD. Double-click a branch or tag pill to check
+  it out. Ref menus fit the ref: the current branch, a detached HEAD, remote
+  branches, and tags each get their own actions, plus Copy Name.
+- Compare with HEAD lists every file that differs between the two commits
+  (previously only the files the selected commit touched), in the graph's
+  comparison view.
+- New context menu on the Uncommitted Changes row, Copy Commit Message, Escape
+  closes context menus, and graph operations refresh every VsGit view — also
+  after a failure, so conflicts and in-progress banners appear immediately.
+- Settings edited while the graph is open apply immediately. New
+  `vsgit.graph.commitOrdering` (`topo` / `date` / `author-date`).
+
+### Fixed
+
+- **Credential prompts never reached VS Code.** `GIT_ASKPASS` was set to a
+  quoted `"node" "askpass.js"` command line, which git cannot execute, so every
+  HTTPS push/pull/fetch that needed a password failed with "terminal prompts
+  disabled". Git now runs a small launcher script (written atomically to the
+  extension's global storage) that starts VS Code's bundled Node runtime with
+  `ELECTRON_RUN_AS_NODE`. The shim also waits for its answer to flush before
+  exiting, which could hand git an empty password.
+- Credential prompts are wired into **every** git command, not only the
+  toolbar fetch/pull/push: pushes from the graph, remote branch/tag deletes,
+  tag pushes, submodule updates, subtree, and LFS transfers. SSH key
+  passphrases and host-key confirmations are routed to VS Code too (OpenSSH
+  8.4+, non-Windows); yes/no prompts are not masked.
+- **Pushing a new branch failed** with "The current branch has no upstream
+  branch" under git's default `push.default=simple`. Pushes now always name the
+  destination branch (the tracked one, or the same name).
+- **Views did not refresh on file edits.** Only changes inside `.git` triggered
+  a refresh, so editing, creating, deleting, or saving files never updated the
+  Commit/Staging views or decorations, and `git add` in a terminal was ignored.
+  A working-tree watcher and an index fingerprint check (which ignores VsGit's
+  own `git status` index rewrites) fix both without the old refresh loop.
+- **Continuing a paused rebase, merge, cherry-pick, or revert could hang** on a
+  terminal editor (or fail with "Terminal is dumb, but EDITOR unset"). Continue
+  and skip now keep Git's prepared message, and a stopped interactive rebase
+  with reword/squash steps left opens VsGit's message editor. The editor shim
+  also runs with `ELECTRON_RUN_AS_NODE`.
+- `git am` sessions are detected as *am* (previously reported as a rebase, so
+  Continue ran `git rebase --continue`). Merges can be continued from the
+  in-progress prompt; skipping a merge is refused with a clear message.
+- Success messages (LFS track/lock/pull/prune, notes, worktree
+  create/move/lock/unlock, subtree, archive, patch, gc, prune, GitHub PR fetch)
+  are no longer shown after the operation failed.
+- `vsgit.fetch.pruneOnFetch`, `vsgit.commit.signOff`, and
+  `vsgit.commit.gpgSign` had no effect; they now control fetch pruning and the
+  commit options' defaults. The pull picker lists `vsgit.defaultPullMode` first
+  and offers *Fast-forward only*.
+- The Gerrit commit-msg hook derived the Change-Id from the message alone (two
+  commits with the same message collided) and appended it outside the trailer
+  block; it now mixes in the committer identity, time, and randomness and adds
+  a proper trailer.
+- Repositories opened through a symlinked path were not matched to their
+  files; repositories one level below a non-repository workspace folder are
+  now discovered (`vsgit.repositoryScanMaxDepth`).
+- Remote-branch checkout from the tree and *Switch To* reuses an existing
+  tracking branch instead of failing with "already exists"; remote names that
+  contain `/` are split correctly everywhere.
+- The graph on an empty repository with remote branches hidden no longer
+  errors; stash file lists include untracked files; submodule paths with
+  spaces are parsed correctly; Squash refuses to fold staged changes into the
+  rewritten commit.
+- Git runs with English messages (`LC_ALL`/`LANGUAGE`) so error classification
+  and GPG verification work on localized systems.
+- A test read a maintainer-local, git-ignored checklist, failing `npm test` on
+  every fresh clone.
+- The packaged VSIX bundled every README screenshot (10 MiB, over the
+  `package:verify` limit). Screenshots are now served from GitHub, shrinking
+  the VSIX to under 0.5 MiB; the screenshots of the removed Source Control
+  integration were deleted.
+
+### Added
+
+- Stash modes *Keep staged changes in place* (`--keep-index`) and *Staged
+  changes only* (`--staged`).
+- Real-git behavioural tests for the repository layer, repository discovery,
+  and the askpass launcher; Extension Host tests for the Git Graph and the
+  absence of Source Control contributions.
+
+### Removed
+
+- `vsgit.graph.showSidebar` and `vsgit.graph.bottomPanelMode`, which had no
+  effect.
+
 ## [v0.0.7] - 2026-06-30
 
 ### Security

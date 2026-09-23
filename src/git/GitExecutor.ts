@@ -40,6 +40,21 @@ export class GitCommandCancelled extends Error {
 }
 
 const DEFAULT_MAX_OUTPUT_BYTES = 64 * 1024 * 1024;
+
+/**
+ * Defaults applied to every git process:
+ * - English messages, because error classification (`humanizeGitError`),
+ *   GPG verification, and conflict detection match git's English output.
+ * - No terminal prompts: the extension host has no TTY, so a prompt would
+ *   either fail with an unhelpful error or block forever. Credential prompts
+ *   are routed to VS Code through GIT_ASKPASS instead.
+ */
+export const GIT_BASE_ENV: Readonly<NodeJS.ProcessEnv> = Object.freeze({
+  LC_ALL: "en_US.UTF-8",
+  LANG: "en_US.UTF-8",
+  LANGUAGE: "en",
+  GIT_TERMINAL_PROMPT: "0",
+});
 const FORCE_KILL_DELAY_MS = 1_000;
 
 /**
@@ -48,6 +63,14 @@ const FORCE_KILL_DELAY_MS = 1_000;
  * stdin plumbing. Output is parsed by callers using machine-readable formats.
  */
 export class GitExecutor {
+  /**
+   * Environment merged into every git invocation (below per-call `env`). Holds
+   * the process-wide askpass wiring and locale so that any command which
+   * contacts a remote or prints parseable diagnostics behaves the same no
+   * matter which feature spawned it.
+   */
+  private baseEnv: NodeJS.ProcessEnv = { ...GIT_BASE_ENV };
+
   constructor(
     private gitPath: string = "git",
     private readonly preview?: GitCommandPreview,
@@ -55,6 +78,16 @@ export class GitExecutor {
 
   setGitPath(gitPath: string): void {
     this.gitPath = gitPath || "git";
+  }
+
+  /** Merge `env` into the environment every subsequent git command receives. */
+  setBaseEnv(env: NodeJS.ProcessEnv): void {
+    this.baseEnv = { ...this.baseEnv, ...env };
+  }
+
+  /** The environment a command with the given per-call overrides would see. */
+  environmentFor(overrides?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+    return { ...process.env, ...this.baseEnv, ...overrides };
   }
 
   /** Run git, throwing GitError on unexpected non-zero exit. */
@@ -88,7 +121,7 @@ export class GitExecutor {
     return new Promise((resolve, reject) => {
       const child = spawn(this.gitPath, args, {
         cwd: options.cwd,
-        env: { ...process.env, ...options.env },
+        env: this.environmentFor(options.env),
       });
 
       const stdoutChunks: Buffer[] = [];

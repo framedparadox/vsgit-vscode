@@ -37,6 +37,20 @@ suite("VsGit Extension Host", () => {
     await vscode.commands.executeCommand("vsgit.repositories.refresh");
   });
 
+  test("opens the Git Graph panel", async () => {
+    await vscode.commands.executeCommand("vsgit.graph.show");
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+  });
+
+  test("contributes nothing to the native Source Control view", () => {
+    const menus = (extension.packageJSON.contributes?.menus ?? {}) as Record<string, unknown>;
+    assert.deepStrictEqual(
+      Object.keys(menus).filter((id) => id.startsWith("scm/")),
+      [],
+    );
+  });
+
   test("opens the full documentation webview", async () => {
     await vscode.commands.executeCommand("vsgit.documentation.open");
     await new Promise((resolve) => setTimeout(resolve, 100));

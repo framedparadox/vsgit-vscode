@@ -9,7 +9,7 @@
 
 <p>
 Interactive commit graph &nbsp;&middot;&nbsp; Interactive rebase &nbsp;&middot;&nbsp; Worktrees &nbsp;&middot;&nbsp; LFS &nbsp;&middot;&nbsp; Gerrit &nbsp;&middot;&nbsp; Bisect &nbsp;&middot;&nbsp; Submodules &nbsp;&middot;&nbsp; Subtree<br />
-Native Source Control integration &nbsp;&middot;&nbsp; 173 commands across every Git workflow<br />
+Stays out of the native Source Control view &nbsp;&middot;&nbsp; 160 commands across every Git workflow<br />
 No libgit2, no JavaScript reimplementation of git — every operation is a genuine <code>git</code> invocation.
 </p>
 
@@ -75,7 +75,6 @@ aliases, and `.gitignore` rules apply. Nothing is approximated.
   - [Documentation](#documentation-view)
 - [Git Graph](#git-graph)
 - [History](#history)
-- [Native Source Control integration](#native-source-control-integration)
 - [Editor and Explorer integration](#editor-and-explorer-integration)
 - [Dialogs and editors](#dialogs-and-editors)
   - [Interactive rebase](#interactive-rebase)
@@ -132,7 +131,8 @@ VsGit fills that gap by driving the real `git` CLI:
 | 📜 **History view** | A searchable commit log with ref badges, message/author filtering, an all-branches toggle, per-commit details, and a Compare-Branches mode. |
 | ✍️ **Commit webview** | A Source-Control-style panel with a split **Commit / Commit & Push / Commit & Sync** button, amend / sign-off / GPG options behind a "more" menu, collapsible Staged/Changes groups, hunk-level staging, and a tree-or-list file view. |
 | 🗂️ **Rich sidebar** | Repositories, Commit, Git Repositories, Staging, Synchronize, Conflicts, Reflog, Worktrees, and Compare, all multi-root aware. |
-| 🔁 **Native Source Control integration** | VsGit publishes real SCM resource groups (staged / working tree / merge) so VS Code's built-in Source Control panel gets VsGit's menus, quick-diff gutters, and commit input. |
+| 🧹 **Its own space** | VsGit never registers a provider, menu, or progress indicator in VS Code's built-in Source Control view — the built-in Git panel stays exactly as it was. |
+| 🔑 **Prompts inside VS Code** | HTTPS passwords, SSH passphrases, and host-key confirmations from *any* VsGit operation (graph pushes, tag/branch deletes, submodules, LFS, subtree) arrive as VS Code input boxes; continuing a paused rebase or merge never waits on a terminal editor. |
 | 🧭 **Team menus everywhere** | Compare With, Replace With, and Team submenus on Explorer files and editors, plus EGit-style branch/tag/reference and commit pickers. |
 | 🎨 **Real VS Code icons** | The UI uses official VS Code **codicons** throughout, and file rows show the same **Seti file-type icons** you see in the Explorer (no hand-drawn SVGs). |
 | 🔧 **Everything else** | Interactive rebase, LFS, notes, bisect, subtree, archive, patch, Gerrit, submodules, maintenance, blame, tags, and a graphical git-config editor. |
@@ -155,7 +155,7 @@ A quick look at the main surfaces. Each one is described in detail further down.
 <td width="50%" valign="top"><a href="#conflicts"><img src="docs/images/merge-editor.png" alt="VS Code three-way merge editor opened from the VsGit Conflicts view" /></a><br/><sub><b>Conflicts</b> — straight into the 3-way merge editor</sub></td>
 </tr>
 <tr>
-<td width="50%" valign="top"><a href="#native-source-control-integration"><img src="docs/images/scm-diff.png" alt="Native Source Control panel with VsGit resource groups and a side-by-side diff" /></a><br/><sub><b>Native Source Control</b> — VsGit groups and diffs</sub></td>
+<td width="50%" valign="top"><a href="#commit"><img src="docs/images/commit-view.png" alt="VsGit Commit view with staged and unstaged changes and a commit message" /></a><br/><sub><b>Commit view</b> — staging and commit in the VsGit sidebar</sub></td>
 <td width="50%" valign="top"><a href="#documentation-library"><img src="docs/images/documentation-library.png" alt="VsGit reference library with Overview, Components, Git glossary, and Operations tabs" /></a><br/><sub><b>Documentation library</b> — components, glossary, operations</sub></td>
 </tr>
 </table>
@@ -338,7 +338,11 @@ A Source-Control-style commit panel that replaces the transient input box:
   inline stage / unstage / discard actions.
 - **Hunk-level staging** — stage and unstage individual hunks (forward/reverse
   patch apply against the index).
-- `Ctrl/Cmd+Enter` commits, matching the native SCM input.
+- `Ctrl/Cmd+Enter` commits.
+- **Sign off** and **GPG** start checked when `vsgit.commit.signOff` /
+  `vsgit.commit.gpgSign` are enabled.
+- The change list refreshes as you edit, create, delete, or save files, and
+  when the index changes outside VS Code (for example `git add` in a terminal).
 
 ### Staging
 
@@ -417,17 +421,34 @@ version — see [Documentation library](#documentation-library).
 
 ![Git Graph showing colour-coded lanes, branch, remote, stash, and tag pills, and an expanded commit with metadata and changed files](docs/images/git-graph.png)
 
-Open it with `⌘⇧G G` / `Ctrl+Shift+G G`, **VsGit: Show Git Graph**, the *Git
-Graph* status-bar button, or the Source Control title bar.
+Open it with `⌘⇧G G` / `Ctrl+Shift+G G`, **VsGit: Show Git Graph**, or the *Git
+Graph* status-bar button.
 
 - **SVG-rendered commit graph**: one overlay path system spanning every row, so
   branch edges never break apart between rows. Choose `rounded` or `angular`
   lines and your own lane colours in settings.
 - **Inline ref pills** for local branches, remote branches, tags, `HEAD`, and
-  stashes. The row for uncommitted changes sits at the top.
-- **Expand-at-selection details**: click a commit to open its metadata, parents
-  (clickable), refs, message, and changed files (tree or list) inline. Click a
-  file to open its diff.
+  stashes, classified from full ref names (so a local branch called
+  `origin/x`, or a branch and tag sharing a name, are labelled correctly).
+  Remote `HEAD` pointers are hidden.
+- **Only real history**: branches, remote-tracking branches, and tags are
+  walked; git's internal refs (the stash's "WIP on / index on" commits, notes,
+  maintenance prefetch refs, replace refs, and filter-branch backups) never
+  appear as commits. With *Show Remote Branches* off, remote-only history is
+  left out too.
+- **HEAD is marked** with a ring around its dot and a bold message. The
+  **Uncommitted Changes** row sits at the top and joins HEAD with a dashed
+  line; select it to list the working-tree files (staged, unstaged, untracked)
+  and open each one's HEAD ↔ working tree diff.
+- **Load More Commits**: the graph loads `vsgit.graph.maxCommits` commits per
+  page. When history continues, lanes run off the bottom of the page and a
+  **Load More Commits** button fetches the next page.
+- **Stable lane colours**: each lane keeps one colour from top to bottom, and a
+  commit's dot always matches the lane it sits in.
+- **Expand-at-selection details**: click a commit to open its metadata (author
+  and committer with e-mail), parents (clickable), refs, the full commit
+  message, and changed files (tree or list) inline. Merge commits list their
+  changes against the first parent. Click a file to open its diff.
 - Eclipse-Git-style columns: **Graph · Description · Author · Authored Date ·
   Committer · Committed Date · Commit**. Authored Date and Committer are hidden
   by default.
@@ -437,8 +458,8 @@ Graph* status-bar button, or the Source Control title bar.
 
 <table>
 <tr>
-<td width="50%" valign="top"><img src="docs/images/graph-context-menu.png" alt="Commit context menu in the Git Graph" /><br/><sub><b>Commit menu</b> — checkout, branch, tag, merge, rebase, cherry-pick, revert, drop, reset, compare, copy SHA</sub></td>
-<td width="50%" valign="top"><img src="docs/images/graph-ref-menu.png" alt="Ref pill context menu in the Git Graph" /><br/><sub><b>Ref pill menu</b> — checkout, merge, rebase onto, rename, delete, push</sub></td>
+<td width="50%" valign="top"><img src="docs/images/graph-context-menu.png" alt="Commit context menu in the Git Graph" /><br/><sub><b>Commit menu</b> — checkout, branch, tag, merge, rebase, cherry-pick, revert, drop, reset, compare, copy SHA or message. Merge commits ask which parent to cherry-pick or revert against.</sub></td>
+<td width="50%" valign="top"><img src="docs/images/graph-ref-menu.png" alt="Ref pill context menu in the Git Graph" /><br/><sub><b>Ref pill menu</b> — checkout (remote branches get a local tracking branch), merge, rebase onto, rename, delete, push, copy name</sub></td>
 </tr>
 <tr>
 <td width="50%" valign="top"><img src="docs/images/graph-find.png" alt="Git Graph find widget highlighting two matches for 'session'" /><br/><sub><b>Find</b> (<code>Ctrl/Cmd+F</code>) across message, author, hash, and ref names</sub></td>
@@ -460,6 +481,9 @@ Graph* status-bar button, or the Source Control title bar.
 | `Ctrl/Cmd`-click a second commit | Show every change between the two commits |
 | Right-click a commit, or `Shift+F10` | Commit action menu |
 | Right-click a ref pill | Branch / tag / stash actions |
+| Double-click a branch or tag pill | Check it out (a remote branch gets a local tracking branch) |
+| Right-click **Uncommitted Changes** | Open the Commit view, stash, or branch from HEAD |
+| **Load More Commits** | Load the next page of history |
 | `↑` / `↓`, `Home` / `End` | Move the selection |
 | `Ctrl/Cmd+F`, then `Enter` / `Shift+Enter` / `Esc` | Find, next, previous, close |
 | `Ctrl/Cmd+R` | Refresh |
@@ -490,7 +514,7 @@ editor tab:
   symmetric `A...B` range, with a banner and **Clear** button.
 - **Branch** (or **VsGit: Filter History by Branch…**) scopes the log to one
   branch.
-- **Show File History** from the Explorer, editor, or Source Control menus opens
+- **Show File History** from the Explorer or editor menus opens
   the same view scoped to a single file.
 - Per-commit actions: checkout (detached), create branch/tag, cherry-pick,
   revert, reset (soft / mixed / hard / keep / merge), compare with HEAD or
@@ -500,44 +524,16 @@ editor tab:
 
 ---
 
-## Native Source Control integration
-
-<table>
-<tr>
-<td width="50%" valign="top"><img src="docs/images/native-scm.png" alt="VS Code Source Control panel with VsGit providers for orbit-api and orbit-web" /></td>
-<td width="50%" valign="top"><img src="docs/images/scm-context-menu.png" alt="Source Control resource menu with Open Diff, Open File, Show History, Blame, Rename or Move, Discard Changes, Replace with HEAD, and Delete" /></td>
-</tr>
-</table>
-
-VsGit doesn't just live in its own container — it also publishes real
-`vscode.SourceControl` resource groups for **staged**, **working-tree**, and
-**merge** changes. That means the built-in Source Control panel shows VsGit's
-inline menus, supports quick-diff gutters, and routes commit-message input
-through VsGit. A `vsgit:` content provider feeds VS Code's diff editor with the
-correct blobs for any ref or index state.
-
-![Source Control panel with client.ts selected and its Index to Working Tree diff open](docs/images/scm-diff.png)
-
-Resource actions include **Open Diff**, **Open File**, **Show History**,
-**Blame**, **Rename / Move…**, **Discard Changes**, **Replace with HEAD**, and
-**Delete (git rm)**, plus stage/unstage/discard-all on each group. The Source
-Control title bar gets a **Show Git Graph** button.
-
-> Tip: if you use VsGit as your only Git integration, set `"git.enabled": false`
-> so the built-in Git provider doesn't show a second copy of each repository.
-
----
-
 ## Editor and Explorer integration
 
-![Editor with inline blame on line 13 reading 'Priya Nair · 2026-08-06 · Add API client with retry support' and a quick-diff marker on line 10](docs/images/inline-blame.png)
+![Editor with inline blame on line 13 reading 'Priya Nair · 2026-08-06 · Add API client with retry support' (the quick-diff marker on line 10 comes from VS Code's built-in Git)](docs/images/inline-blame.png)
 
 - **Inline blame** (`⌘⇧G A` / `Ctrl+Shift+G A`, or the editor title button)
   annotates the current line with author, date, and subject. Uncommitted lines
   read *You · Uncommitted changes*. Set `vsgit.blame.enabledByDefault` to turn
   it on for every file.
-- **Quick-diff gutters** mark added, modified, and deleted lines against the
-  index.
+- **Quick-diff gutters** come from VS Code's built-in Git support; VsGit does
+  not add a second set.
 - **File decorations** colour changed files and folders in the Explorer.
 
 <table>
@@ -858,42 +854,29 @@ Move changes between the working tree and index, inspect diffs, and discard or i
 | Add to .gitignore | `vsgit.file.ignore` | Context menu |
 | Amend Last Commit... | `vsgit.staging.commitAmend` | Palette |
 | Assume Unchanged | `vsgit.file.assumeUnchanged` | Context menu |
-| Blame | `vsgit.scm.blame` | Context menu |
 | Branch, Tag, or Reference... | `vsgit.replace.withRef` | Context menu |
 | Branch, Tag, or Reference... | `vsgit.replace.withBranchOrTag` | Context menu |
 | Clean Untracked Files... | `vsgit.clean` | Palette |
 | Commit... (`⌘⇧G C`) | `vsgit.staging.commit` | Palette |
 | Commit... | `vsgit.replace.withCommit` | Context menu |
-| Delete (git rm) | `vsgit.scm.delete` | Context menu |
-| Discard All Changes | `vsgit.scm.discardAll` | Context menu |
 | Discard Changes | `vsgit.staging.discard` | Context menu |
-| Discard Changes | `vsgit.scm.discard` | Context menu |
 | HEAD Revision | `vsgit.replace.withHead` | Context menu |
 | Index Revision | `vsgit.replace.withIndex` | Context menu |
 | Local History... | `vsgit.replace.withLocalHistory` | Context menu |
 | No Assume Unchanged | `vsgit.file.noAssumeUnchanged` | Context menu |
 | No Skip Worktree | `vsgit.file.noSkipWorktree` | Context menu |
 | Open Diff | `vsgit.staging.openDiff` | Context menu |
-| Open Diff | `vsgit.scm.openDiff` | Context menu |
-| Open File | `vsgit.scm.openFile` | Context menu |
 | Previous Revision | `vsgit.replace.withPrevious` | Context menu |
 | Refresh | `vsgit.staging.refresh` | Palette |
-| Rename / Move... | `vsgit.scm.rename` | Context menu |
-| Replace with HEAD | `vsgit.scm.replaceWithHead` | Context menu |
 | Show File History | `vsgit.file.showHistory` | Context menu |
-| Show History | `vsgit.scm.showHistory` | Context menu |
 | Skip Worktree | `vsgit.file.skipWorktree` | Context menu |
 | Stage | `vsgit.staging.stage` | Context menu |
 | Stage | `vsgit.file.stage` | Context menu |
 | Stage All | `vsgit.staging.stageAll` | Palette |
-| Stage All Changes | `vsgit.scm.stageAll` | Context menu |
-| Stage Changes | `vsgit.scm.stage` | Context menu |
 | Stage Hunk(s)... | `vsgit.staging.stageHunk` | Context menu |
 | Unstage | `vsgit.staging.unstage` | Context menu |
 | Unstage | `vsgit.file.unstage` | Context menu |
 | Unstage All | `vsgit.staging.unstageAll` | Palette |
-| Unstage All Changes | `vsgit.scm.unstageAll` | Context menu |
-| Unstage Changes | `vsgit.scm.unstage` | Context menu |
 | Unstage Hunk(s)... | `vsgit.staging.unstageHunk` | Context menu |
 | Untrack (Remove from Index) | `vsgit.file.untrack` | Context menu |
 
@@ -1144,9 +1127,9 @@ letter. Inside the Commit view, `Ctrl/Cmd+Enter` commits; inside the Git Graph,
 see the [interaction table](#git-graph).
 
 The Command Palette exposes **72** commands under the **VsGit** category. The
-other **101** contributed operations are intentionally context-only because they
-require a selected file, ref, commit, resource group, or view item. The
-Documentation library covers all **173** and identifies each entry point.
+other **88** contributed operations are intentionally context-only because they
+require a selected file, ref, commit, or view item. The
+Documentation library covers all **160** and identifies each entry point.
 
 ---
 
@@ -1160,10 +1143,11 @@ All 29 settings live under the `vsgit.*` namespace.
 |---|---|---|
 | `vsgit.showAdvancedViews` | `false` | Show advanced sidebar sections (Staging, Reflog, Synchronize, Worktrees, Conflicts, Compare). |
 | `vsgit.git.path` | `""` | Custom path to the `git` executable; empty uses `$PATH`. |
-| `vsgit.autoRefresh` | `true` | Refresh views automatically when the repo changes. |
+| `vsgit.repositoryScanMaxDepth` | `1` | When a workspace folder is not inside a repository, how many folder levels below it to search for repositories (`0` disables). |
+| `vsgit.autoRefresh` | `true` | Refresh views automatically when the repository or working tree changes (file edits and saves, external `git` commands). |
 | `vsgit.confirmDestructiveActions` | `true` | Confirm hard reset, clean, force-push, etc. |
 | `vsgit.showCommandPreview` | `false` | Preview mutating git commands before execution; read-only refresh/diff commands run without prompting. |
-| `vsgit.defaultPullMode` | `merge` | Pull strategy: `merge` or `rebase`. |
+| `vsgit.defaultPullMode` | `merge` | Pull strategy listed first in the Pull picker: `merge` or `rebase`. |
 
 ### Fetch & sync
 
@@ -1188,15 +1172,14 @@ All 29 settings live under the `vsgit.*` namespace.
 |---|---|---|
 | `vsgit.history.maxCommits` | `500` | Max commits to load in the History view. |
 | `vsgit.graph.pageSize` | `200` | Commits loaded per page in the History view. |
-| `vsgit.graph.maxCommits` | `500` | Max commits to load in the Git Graph. |
+| `vsgit.graph.maxCommits` | `500` | Commits the Git Graph loads per page (**Load More Commits** adds another page). |
+| `vsgit.graph.commitOrdering` | `topo` | Git Graph commit order: `topo` (keep branches together), `date`, or `author-date`. |
 | `vsgit.graph.sortOrder` | `date` | Commit sort order for the History view (`date` / `author-date` / `topo`). |
 | `vsgit.graph.style` | `rounded` | Branch line style: `rounded` curves or `angular` elbows. |
 | `vsgit.graph.colours` | 12-colour palette | Branch lane colours cycled through in the graph. |
 | `vsgit.graph.dateFormat` | `standard` | Date format in the graph (`relative` / `iso` / `standard`). |
 | `vsgit.graph.showRemoteBranches` | `true` | Show remote branches in the graph by default. |
-| `vsgit.graph.showSidebar` | `true` | Show the graph's left sidebar tree. |
 | `vsgit.graph.showStatusBarItem` | `true` | Show a *Git Graph* button in the status bar. |
-| `vsgit.graph.bottomPanelMode` | `editor` | How the graph opens a changed file's diff (`editor` / `inline`). |
 | `vsgit.graph.showIdColumn` | `true` | Show the Id (hash) column. |
 | `vsgit.graph.showAuthorColumn` | `true` | Show the Author column. |
 | `vsgit.graph.showAuthoredDateColumn` | `false` | Show the Authored Date column. |
@@ -1264,13 +1247,13 @@ Explorer (colourful, language-specific icons for JS/TS/JSON/Python/etc.).
 - A full-screen **VsGit: Open Documentation** command, also available from the
   Documentation view title and its **Open Full Library** button.
 - Detailed component guides covering Repositories, Commit, Staging, Graph,
-  History, Compare, Synchronize, Conflicts, Reflog, Worktrees, native Source
-  Control integration, configuration, blame, and background services.
+  History, Compare, Synchronize, Conflicts, Reflog, Worktrees, credential and
+  editor helpers, configuration, blame, and background services.
 - A searchable Git glossary with definitions, purpose, practical usage, and
   cautions for destructive or history-rewriting concepts.
-- A manifest-driven catalog of all **173 contributed operations**. It clearly
-  separates the **72 Command Palette operations** from **101 contextual actions**
-  that require a selected file, ref, commit, resource group, or view item.
+- A manifest-driven catalog of all **160 contributed operations**. It clearly
+  separates the **72 Command Palette operations** from **88 contextual actions**
+  that require a selected file, ref, commit, or view item.
 - The existing Git client surface: multi-root repositories, staging and commit,
   branch/tag/remote workflows, history and graph, synchronization, conflict
   resolution, worktrees, LFS, Gerrit, notes, patch/archive, submodules,
@@ -1306,8 +1289,8 @@ src/
     GitExecutor.ts        the ONLY place git is spawned (argv array, no shell)
     Repository.ts         per-repo cached state + all git operations
     RepositoryManager.ts  multi-root discovery + change notifications
+    discovery.ts          checkout scanning below non-repository folders
     GitContentProvider.ts vsgit: URIs that feed VS Code's diff editor
-    QuickDiffProvider.ts  gutter quick-diff against the index
     argGuard.ts           option-injection guards (safeRef / safeRemoteUrl)
     parsers/              pure, unit-tested output parsers
                           (log, graphLog, status, refs, diff, blame, config,
@@ -1315,14 +1298,16 @@ src/
   commands/               one module per workflow (branch, stash, tag, lfs,
                           notes, bisect, subtree, rebase, gerrit, …)
   decorations/            inline blame + Explorer file decorations
-  views/                  tree data providers + native Source Control bridge
+  views/                  tree data providers (VsGit never registers a native
+                          Source Control provider)
   webviews/               webview panels (Graph, History, Commit, Documentation,
                           Create Tag, Config, Interactive Rebase, ref/commit
                           pickers)
-  services/               auto-fetch, file-system watcher, status bar
-  util/                   IPC servers (askpass / editor), credential/editor
-                          plumbing, and shared helpers (HTML escaping, crypto
-                          token/nonce generation, command preview, confirmation)
+  services/               auto-fetch, working-tree + .git watchers, status bar
+  util/                   IPC servers (askpass / editor), the askpass launcher
+                          script, credential/editor plumbing, and shared
+                          helpers (HTML escaping, crypto token/nonce generation,
+                          command preview, confirmation)
 resources/                images only (icon.png/.svg, activity-bar logo)
 docs/images/              README screenshots (not shipped in the .vsix)
 webview-ui/               webview runtime assets, shipped in the .vsix
@@ -1479,9 +1464,17 @@ Staging, Reflog, Synchronize, Worktrees, Conflicts, and Compare.
 repository you want in the **Repositories** view; it becomes the *active*
 repository that the other views and commands follow.
 
-**Each repository appears twice in Source Control.** VS Code's built-in Git
-extension is also active. Set `"git.enabled": false` if you want VsGit to be the
-only provider.
+**Where is VsGit in the Source Control view?** Nowhere, by design. VsGit keeps
+everything in its own activity-bar container (Repositories, Commit, Git
+Repositories, …) and never registers a Source Control provider, SCM menus, or
+SCM progress, so VS Code's built-in Git panel is unchanged. Operation progress
+shows in the status bar and on the VsGit Repositories view.
+
+**A push, pull, or fetch fails with "terminal prompts disabled".** VsGit routes
+HTTPS credential prompts, SSH key passphrases, and SSH host-key confirmations to
+VS Code input boxes for every Git command it runs. If the prompt still fails,
+check that a credential helper or SSH agent is not rejecting the request first,
+and that Git can execute the launcher VsGit writes to its global storage folder.
 
 **VsGit is disabled in this folder.** The workspace is in Restricted Mode.
 Trust it (**Manage Workspace Trust**) — VsGit needs trust because Git runs the
@@ -1489,7 +1482,10 @@ repository's hooks and configuration.
 
 **`git rebase -i` or `git commit` wants a terminal editor.** Start the rebase
 from VsGit (**Interactive Rebase…**) so the editor shim is wired up; rebases
-started in a terminal use your configured `core.editor`.
+started in a terminal use your configured `core.editor`. Continuing or skipping
+a paused rebase, merge, cherry-pick, revert, or `git am` from VsGit never waits
+on a terminal editor: remaining reword/squash steps open VsGit's message editor,
+and everything else keeps the message Git prepared.
 
 **I want to see what VsGit runs.** Enable `vsgit.showCommandPreview` to preview
 every mutating `git` command before it executes.

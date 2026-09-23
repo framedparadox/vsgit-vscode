@@ -5,8 +5,7 @@ import { RepositoryManager } from "../git/RepositoryManager";
 
 /**
  * Shared URI plumbing for commands invoked from the Explorer, editor title,
- * or command palette. Previously duplicated across fileContext.ts, replace.ts
- * and scm.ts.
+ * or command palette. Shared by fileContext.ts and replace.ts.
  */
 
 /** The explicit URI argument, or the active editor's document as fallback. */

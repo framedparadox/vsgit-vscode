@@ -52,8 +52,10 @@ export class EditorServer implements vscode.Disposable {
 
   /** Env vars to inject so `git rebase -i` routes editors back here. */
   editorEnv(shimPath: string): NodeJS.ProcessEnv {
-    // Quote the shim path so paths with spaces work in git's editor parsing.
-    const cmd = `"${process.execPath}" "${shimPath}"`;
+    // Git runs the editor through `sh -c`, so quoting keeps paths with spaces
+    // intact and the leading assignment makes VS Code's executable run the shim
+    // as plain Node rather than opening another editor window.
+    const cmd = `ELECTRON_RUN_AS_NODE=1 "${process.execPath}" "${shimPath}"`;
     return {
       VSGIT_IPC_SOCK: this.sockPath,
       VSGIT_IPC_TOKEN: this.token,

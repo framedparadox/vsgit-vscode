@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>VsGit — The complete Git client for VS Code</title>
+  <meta name="description" content="VsGit is a complete, power-user Git client built into VS Code. Interactive commit graph, interactive rebase, worktrees, LFS, Gerrit, bisect, submodules and 173 commands — all driving the real git binary." />
+  <meta name="keywords" content="git, vs code, vscode extension, git graph, interactive rebase, worktrees, git lfs, gerrit, source control, egit" />
+  <meta name="author" content="framedparadox" />
+  <meta name="theme-color" content="#000000" />
+  <link rel="canonical" href="https://framedparadox.github.io/vsgit-vscode/" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="VsGit" />
+  <meta property="og:title" content="VsGit — The complete Git client for VS Code" />
+  <meta property="og:description" content="Interactive commit graph, interactive rebase, worktrees, LFS, Gerrit and 173 commands. Every operation is a genuine git invocation." />
+  <meta property="og:url" content="https://framedparadox.github.io/vsgit-vscode/" />
+  <meta property="og:image" content="https://framedparadox.github.io/vsgit-vscode/assets/screens/hero.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="VsGit — The complete Git client for VS Code" />
+  <meta name="twitter:description" content="All of Git, right where you code. Driving the real git binary." />
+  <meta name="twitter:image" content="https://framedparadox.github.io/vsgit-vscode/assets/screens/hero.png" />
+
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+  <link rel="icon" href="assets/icon.png" type="image/png" sizes="500x500" />
+  <link rel="apple-touch-icon" href="assets/icon.png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script>document.documentElement.classList.add("js")</script>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "VsGit",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Windows, macOS, Linux",
+    "softwareVersion": "0.0.8",
+    "description": "A complete, power-user Git client built into VS Code, driving the real git binary directly.",
+    "url": "https://framedparadox.github.io/vsgit-vscode/",
+    "downloadUrl": "https://marketplace.visualstudio.com/items?itemName=framedparadox.vsgit-vscode",
+    "license": "https://opensource.org/licenses/MIT",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "author": { "@type": "Organization", "name": "framedparadox" }
+  }
+  </script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <!-- ─────────────────────────── Navigation ─────────────────────────── -->
+  <header class="nav" id="nav">
+    <div class="nav__inner">
+      <a class="nav__brand" href="#top" aria-label="VsGit home">
+        <img src="assets/icon.svg" alt="" width="22" height="22" />
+        <span>VsGit</span>
+      </a>
+      <nav class="nav__links" aria-label="Primary">
+        <a href="#overview">Overview</a>
+        <a href="#graph">Graph</a>
+        <a href="#features">Features</a>
+        <a href="#security">Security</a>
+        <a href="#specs">Specs</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <div class="nav__actions">
+        <a class="nav__gh" href="https://github.com/framedparadox/vsgit-vscode" aria-label="VsGit on GitHub">
+          <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        </a>
+        <a class="pill pill--sm" href="#install">Install</a>
+        <button class="nav__toggle" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-menu">
+          <span></span><span></span>
+        </button>
+      </div>
+    </div>
+    <div class="nav__mobile" id="mobile-menu" hidden>
+      <a href="#overview">Overview</a>
+      <a href="#graph">Graph</a>
+      <a href="#features">Features</a>
+      <a href="#security">Security</a>
+      <a href="#specs">Specs</a>
+      <a href="#faq">FAQ</a>
+      <a href="https://github.com/framedparadox/vsgit-vscode">GitHub</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- ─────────────────────────── Hero ─────────────────────────── -->
+    <section class="hero dark" id="top">
+      <div class="hero__glow" aria-hidden="true"></div>
+      <div class="wrap hero__copy">
+        <p class="eyebrow reveal">VsGit for Visual Studio Code</p>
+        <h1 class="hero__title reveal">All of Git.<br /><span class="grad">Right where you code.</span></h1>
+        <p class="hero__lede reveal">A complete, power-user Git client built into VS Code — interactive graph, rebase, worktrees, LFS, Gerrit and more. Driving the real <code>git</code> binary. Nothing approximated.</p>
+        <div class="hero__cta reveal">
+          <a class="pill" href="https://marketplace.visualstudio.com/items?itemName=framedparadox.vsgit-vscode">Install free</a>
+          <a class="link-arrow" href="https://github.com/framedparadox/vsgit-vscode">View on GitHub</a>
+        </div>
+        <button class="cmd reveal" data-copy="code --install-extension framedparadox.vsgit-vscode" aria-label="Copy install command">
+          <span class="cmd__prompt">$</span>
+          <span class="cmd__text">code --install-extension framedparadox.vsgit-vscode</span>
+          <span class="cmd__icon" aria-hidden="true">
+            <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M4 4V1.5A1.5 1.5 0 015.5 0h8A1.5 1.5 0 0115 1.5v8a1.5 1.5 0 01-1.5 1.5H11v2.5A1.5 1.5 0 019.5 15h-8A1.5 1.5 0 010 13.5v-8A1.5 1.5 0 011.5 4H4zm1.5 0h4A1.5 1.5 0 0111 5.5v4h2.5V1.5h-8V4zm-4 1.5v8h8v-8h-8z"/></svg>
+          </span>
+          <span class="cmd__done" aria-live="polite"></span>
+        </button>
+      </div>
+      <div class="hero__stage">
+        <figure class="window hero__window" id="heroWindow">
+          <div class="window__bar" aria-hidden="true"><i></i><i></i><i></i><span>orbit-web — VsGit Graph</span></div>
+          <img src="assets/screens/hero.png" width="1800" height="973" alt="VsGit in VS Code: the sidebar with Repositories and Commit views next to the Git Graph, with a commit expanded to show its changed files" fetchpriority="high" />
+        </figure>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────── Statement ─────────────────────────── -->
+    <section class="statement dark" id="overview" aria-label="Philosophy">
+      <div class="wrap">
+        <p class="statement__text" data-scrub>
+          Every operation is a genuine <em>git</em> invocation. The same config. The same hooks. The same credential helpers, aliases and <em>.gitignore</em> rules. No libgit2. No JavaScript reimplementation. Just Git — beautifully surfaced.
+        </p>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────── Numbers ─────────────────────────── -->
+    <section class="numbers light" aria-label="VsGit by the numbers">
+      <div class="wrap">
+        <h2 class="section-title reveal">Breadth, by the numbers.</h2>
+        <div class="numbers__grid">
+          <div class="stat reveal"><span class="stat__n" data-count="173">173</span><span class="stat__l">contributed Git operations</span></div>
+          <div class="stat reveal"><span class="stat__n" data-count="72">72</span><span class="stat__l">Command Palette commands</span></div>
+          <div class="stat reveal"><span class="stat__n" data-count="10">10</span><span class="stat__l">multi-root aware sidebar views</span></div>
+          <div class="stat reveal"><span class="stat__n" data-count="29">29</span><span class="stat__l"><code>vsgit.*</code> settings to tune</span></div>
+          <div class="stat reveal"><span class="stat__n">0</span><span class="stat__l">shells spawned. Ever.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────── Graph ─────────────────────────── -->
+    <section class="graph dark" id="graph">
+      <div class="wrap">
+        <p class="eyebrow eyebrow--grad reveal">Git Graph</p>
+        <h2 class="section-title section-title--xl reveal">See every branch.<br />Shape every commit.</h2>
+        <p class="section-lede reveal">An SVG-rendered DAG with colour-coded lanes, inline ref pills, expand-in-place commit details, flow tracing and fuzzy find. Open it with <kbd class="os-mod">⌘⇧G</kbd> <kbd>G</kbd>.</p>
+
+        <div class="seg reveal" role="tablist" aria-label="Git Graph capabilities">
+          <button role="tab" aria-selected="true" data-img="git-graph" data-cap="Lanes, branch, remote, stash and tag pills — with an expanded commit showing metadata and changed files.">Overview</button>
+          <button role="tab" aria-selected="false" data-img="graph-find" data-cap="Find (Ctrl/Cmd+F) across message, author, hash and ref names — Enter and Shift+Enter to step through matches.">Find</button>
+          <button role="tab" aria-selected="false" data-img="graph-trace" data-cap="Trace cycles off → ancestors → both, dimming everything outside the selected commit's history.">Trace</button>
+          <button role="tab" aria-selected="false" data-img="graph-compare" data-cap="Ctrl/Cmd-click a second commit to list every file changed between the two.">Compare</button>
+          <button role="tab" aria-selected="false" data-img="graph-context-menu" data-cap="Checkout, branch, tag, merge, rebase, cherry-pick, revert, drop, reset, compare, copy SHA — one right-click away.">Actions</button>
+          <button role="tab" aria-selected="false" data-img="graph-columns" data-cap="Eclipse-Git-style columns: Graph · Description · Author · Authored Date · Committer · Committed Date · Commit.">Columns</button>
+        </div>
+
+        <figure class="window graph__window reveal">
+          <div class="window__bar" aria-hidden="true"><i></i><i></i><i></i><span>VsGit Graph</span></div>
+          <img id="graphImg" src="assets/screens/git-graph.png" alt="Git Graph showing colour-coded lanes and an expanded commit" loading="lazy" />
+        </figure>
+        <p class="graph__cap" id="graphCap" aria-live="polite">Lanes, branch, remote, stash and tag pills — with an expanded commit showing metadata and changed files.</p>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────── Bento ─────────────────────────── -->
+    <section class="features light" id="features">
+      <div class="wrap">
+        <p class="eyebrow eyebrow--grad reveal">Features</p>
+        <h2 class="section-title section-title--xl reveal">Everyday flow.<br />And the long tail.</h2>
+
+        <div class="bento">
+          <article class="tile tile--wide tile--dark reveal">
+            <div class="tile__copy">
+              <h3>Interactive rebase, <span class="muted">without the text file.</span></h3>
+              <p>Reorder, pick, reword, squash and fixup in a real form. The editor shim is wired up for you over authenticated IPC.</p>
+            </div>
+            <button class="tile__shot" data-zoom="interactive-rebase" aria-label="Enlarge interactive rebase screenshot"><img src="assets/screens/interactive-rebase.png" alt="Interactive rebase editor with pick, fixup and reword actions" loading="lazy" /></button>
+          </article>
+
+          <article class="tile reveal">
+            <div class="tile__copy">
+              <h3>History that answers questions.</h3>
+              <p>A searchable log with ref badges, author and message filters, an all-branches toggle and Compare-Branches mode.</p>
+            </div>
+            <button class="tile__shot" data-zoom="history-details" aria-label="Enlarge history screenshot"><img src="assets/screens/history-details.png" alt="History panel with a commit selected and its changed files" loading="lazy" /></button>
+          </article>
+
+          <article class="tile reveal">
+            <div class="tile__copy">
+              <h3>Conflicts, calmly resolved.</h3>
+              <p>Go straight from the Conflicts view into VS Code's three-way merge editor. Continue, skip or abort from a banner.</p>
+            </div>
+            <button class="tile__shot" data-zoom="merge-editor" aria-label="Enlarge merge editor screenshot"><img src="assets/screens/merge-editor.png" alt="Three-way merge editor opened from the Conflicts view" loading="lazy" /></button>
+          </article>
+
+          <article class="tile tile--tall reveal">
+            <div class="tile__copy">
+              <h3>A commit panel that means business.</h3>
+              <p>Split <b>Commit / Commit &amp; Push / Commit &amp; Sync</b>, amend, sign-off and GPG options, hunk-level staging, tree or list.</p>
+            </div>
+            <button class="tile__shot tile__shot--contain" data-zoom="commit-view" aria-label="Enlarge commit view screenshot"><img src="assets/screens/commit-view.png" alt="VsGit Commit webview with staged and unstaged changes" loading="lazy" /></button>
+          </article>
+
+
+          <article class="tile reveal">
+            <div class="tile__copy">
+              <h3>Inline blame.</h3>
+              <p>Who changed this line, and why — right in the editor. Toggle with <kbd class="os-mod">⌘⇧G</kbd> <kbd>A</kbd>.</p>
+            </div>
+            <button class="tile__shot" data-zoom="inline-blame" aria-label="Enlarge inline blame screenshot"><img src="assets/screens/inline-blame.png" alt="Inline blame annotation shown at the end of an editor line" loading="lazy" /></button>
+          </article>
+
+          <article class="tile tile--grad reveal">
+            <div class="tile__copy">
+              <h3>Worktrees, first-class.</h3>
+              <p>Add, open, lock and prune linked worktrees from their own view — work on two branches without stashing a thing.</p>
+            </div>
+            <button class="tile__shot tile__shot--contain" data-zoom="worktrees-view" aria-label="Enlarge worktrees screenshot"><img src="assets/screens/worktrees-view.png" alt="Worktrees view listing linked worktrees" loading="lazy" /></button>
+          </article>
+
+          <article class="tile reveal">
+            <div class="tile__copy">
+              <h3>A git-config editor.</h3>
+              <p>Edit repository and global config, browse system scope — every write validated against an allow-list.</p>
+            </div>
+            <button class="tile__shot" data-zoom="config-editor" aria-label="Enlarge config editor screenshot"><img src="assets/screens/config-editor.png" alt="Graphical Git config editor" loading="lazy" /></button>
+          </article>
+
+          <article class="tile tile--wide reveal">
+            <div class="tile__copy">
+              <h3>Native Source Control. <span class="muted">Supercharged.</span></h3>
+              <p>VsGit publishes real SCM resource groups, so VS Code's own Source Control panel gets VsGit's menus, quick-diff gutters and commit input.</p>
+            </div>
+            <button class="tile__shot" data-zoom="scm-diff" aria-label="Enlarge native Source Control screenshot"><img src="assets/screens/scm-diff.png" alt="Native Source Control panel with VsGit resource groups and a side-by-side diff" loading="lazy" /></button>
+          </article>
+
+          <article class="tile tile--wide-md reveal">
+            <div class="tile__copy">
+              <h3>Every repository, at a glance.</h3>
+              <p>Multi-root aware views with branch and ahead/behind counts. Pick an active repository and every panel follows.</p>
+            </div>
+            <button class="tile__shot tile__shot--contain" data-zoom="sidebar-overview" aria-label="Enlarge sidebar screenshot"><img src="assets/screens/sidebar-overview.png" alt="VsGit activity-bar container with Repositories, Commit and Git Repositories views" loading="lazy" /></button>
+          </article>
+
+          <article class="tile tile--full tile--dark reveal">
+            <div class="tile__copy">
+              <h3>A library, built in.</h3>
+              <p>A searchable reference for every VsGit component, a Git glossary with cautions for history-rewriting concepts, and all 173 operations with their entry points.</p>
+            </div>
+            <button class="tile__shot" data-zoom="documentation-library" aria-label="Enlarge documentation library screenshot"><img src="assets/screens/documentation-library.png" alt="VsGit documentation library with Overview, Components, Glossary and Operations tabs" loading="lazy" /></button>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────── Long tail marquee ─────────────────────────── -->
+    <section class="tail light-alt" aria-label="Supported Git operations">
+      <div class="wrap">
+        <h2 class="section-title reveal">If Git can do it,<br />VsGit has a place for it.</h2>
+        <p class="section-lede section-lede--dark reveal">Rebase, LFS, notes, bisect, subtree, archive, patch, Gerrit, submodules, maintenance — no terminal required.</p>
+      </div>
+      <div class="marquee" aria-hidden="true">
+        <div class="marquee__row">
+          <span>Interactive rebase</span><span>Cherry-pick</span><span>Revert</span><span>Reset</span><span>Stash</span><span>Worktrees</span><span>Git LFS</span><span>Gerrit</span><span>Bisect</span><span>Submodules</span><span>Subtree</span><span>Notes</span>
+          <span>Interactive rebase</span><span>Cherry-pick</span><span>Revert</span><span>Reset</span><span>Stash</span><span>Worktrees</span><span>Git LFS</span><span>Gerrit</span><span>Bisect</span><span>Submodules</span><span>Subtree</span><span>Notes</span>
+        </div>
+        <div class="marquee__row marquee__row--rev">
+          <span>Annotated &amp; signed tags</span><span>Reflog</span><span>Archive</span><span>Patch</span><span>Maintenance</span><span>Blame</span><span>Remotes</span><span>Fetch &amp; prune</span><span>Push &amp; pull</span><span>Clone</span><span>Merge</span><span>Compare</span><span>Git config</span>
+          <span>Annotated &amp; signed tags</span><span>Reflog</span><span>Archive</span><span>Patch</span><span>Maintenance</span><span>Blame</span><span>Remotes</span><span>Fetch &amp; prune</span><span>Push &amp; pull</span><span>Clone</span><span>Merge</span><span>Compare</span><span>Git config</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────── EGit / Team menus ─────────────────────────── -->
+    <section class="split light">
+      <div class="wrap split__inner">
+        <div class="split__copy">
+          <p class="eyebrow eyebrow--grad reveal">Coming from Eclipse?</p>
+          <h2 class="section-title reveal">Feels like home.</h2>
+          <p class="section-lede section-lede--dark reveal">Team, Compare With and Replace With menus on every Explorer file and editor. A reference picker with Local, Remote Tracking, Tags and References sections. A Git Graph with Eclipse-style columns. Familiar to anyone coming from EGit, gitk, git-cola or GitKraken.</p>
+          <ul class="checks reveal">
+            <li>Multi-root workspaces with a single active repository</li>
+            <li>Right-click actions on repositories, branches, tags, commits and files</li>
+            <li>Official VS Code codicons and Seti file-type icons throughout</li>
+            <li>Keyboard and screen-reader semantics, forced-colour support</li>
+          </ul>
+        </div>
+        <div class="split__media reveal">
+          <button class="shot" data-zoom="ref-picker" aria-label="Enlarge reference picker screenshot"><img src="assets/screens/ref-picker.png" alt="EGit-style picker to compare a file with a branch, tag or reference, grouped into Local, Remote Tracking, Tags, Stashed Changes and References" loading="lazy" /></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────── Shortcuts ─────────────────────────── -->
+    <section class="keys dark" aria-labelledby="keys-title">
+      <div class="wrap">
+        <p class="eyebrow eyebrow--grad reveal">Keyboard first</p>
+        <h2 class="section-title reveal" id="keys-title">Two keystrokes to anything.</h2>
+        <p class="section-lede reveal">Shortcuts are chords: press <kbd class="os-mod">⌘⇧G</kbd>, release, then the letter.</p>
+
+        <div class="seg seg--sm reveal" role="group" aria-label="Keyboard platform">
+          <button aria-pressed="true" data-os="mac">macOS</button>
+          <button aria-pressed="false" data-os="win">Windows &amp; Linux</button>
+        </div>
+
+        <ul class="keys__grid reveal">
+          <li><span class="chord"><kbd class="os-mod">⌘⇧G</kbd><kbd>G</kbd></span><span>Show Git Graph</span></li>
+          <li><span class="chord"><kbd class="os-mod">⌘⇧G</kbd><kbd>C</kbd></span><span>Commit</span></li>
+          <li><span class="chord"><kbd class="os-mod">⌘⇧G</kbd><kbd>P</kbd></span><span>Push</span></li>
+          <li><span class="chord"><kbd class="os-mod">⌘⇧G</kbd><kbd>F</kbd></span><span>Fetch</span></li>
+          <li><span class="chord"><kbd class="os-mod">⌘⇧G</kbd><kbd>L</kbd></span><span>Show History</span></li>
+          <li><span class="chord"><kbd class="os-mod">⌘⇧G</kbd><kbd>B</kbd></span><span>Switch To Branch/Tag</span></li>
+          <li><span class="chord"><kbd class="os-mod">⌘⇧G</kbd><kbd>A</kbd></span><span>Toggle Inline Blame</span></li>
+          <li><span class="chord"><kbd class="os-mod">⌘⇧G</kbd><kbd>K</kbd></span><span>Cherry-Pick Commit</span></li>
+          <li><span class="chord"><kbd class="os-mod">⌘⇧G</kbd><kbd>,</kbd></span><span>Open Git Config Panel</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────── Security ─────────────────────────── -->
+    <section class="security dark" id="security">
+      <div class="wrap">
+        <p class="eyebrow eyebrow--grad reveal">Security</p>
+        <h2 class="section-title section-title--xl reveal">Safe by construction.</h2>
+        <p class="section-lede reveal">Your repository runs hooks and holds credentials. VsGit treats that with the seriousness it deserves.</p>
+
+        <div class="sec__grid">
+          <div class="sec reveal">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17l6-6-6-6M12 19h8"/><path d="M3 3l18 18" class="strike"/></svg>
+            <h3>No shell. Ever.</h3>
+            <p>Git is spawned with an argv array, so <code>;</code>, <code>|</code>, <code>$()</code> and backticks are inert.</p>
+          </div>
+          <div class="sec reveal">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.4-8 9-4.6-.6-8-4.5-8-9V6l8-3z"/><path d="M9 12h6"/></svg>
+            <h3>Option-injection guards</h3>
+            <p>Refs and URLs starting with <code>-</code> are rejected, as are the <code>ext::</code> and <code>fd::</code> transports.</p>
+          </div>
+          <div class="sec reveal">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+            <h3>Authenticated IPC</h3>
+            <p>Credential and editor channels require a per-session 256-bit token, compared in constant time over <code>0600</code> sockets.</p>
+          </div>
+          <div class="sec reveal">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><path d="M4 20L20 4"/></svg>
+            <h3>Secret redaction</h3>
+            <p>User-info and <code>token</code>/<code>password</code> query parameters are stripped from any URL shown in the UI.</p>
+          </div>
+          <div class="sec reveal">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h6"/><path d="M17 15l3 3-3 3"/></svg>
+            <h3>Bounded output</h3>
+            <p>Retained git output is capped at 64&nbsp;MB, and hung processes escalate from <code>SIGTERM</code> to <code>SIGKILL</code>.</p>
+          </div>
+          <div class="sec reveal">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 14l2 2 4-4"/></svg>
+            <h3>Strict webview CSP</h3>
+            <p>Only nonce'd scripts and bundled assets run. Every inbound message is validated before any write.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────── Install ─────────────────────────── -->
+    <section class="install light" id="install">
+      <div class="wrap">
+        <p class="eyebrow eyebrow--grad reveal">Get started</p>
+        <h2 class="section-title section-title--xl reveal">Up and running<br />in under a minute.</h2>
+
+        <ol class="steps">
+          <li class="step reveal">
+            <span class="step__n">1</span>
+            <h3>Install</h3>
+            <p>Open the Extensions view, search for <b>VsGit</b> and click Install. Or use the command in the hero above.</p>
+          </li>
+          <li class="step reveal">
+            <span class="step__n">2</span>
+            <h3>Open &amp; trust</h3>
+            <p>Open a folder with a Git repository and trust the workspace — Git runs your hooks and config.</p>
+          </li>
+          <li class="step reveal">
+            <span class="step__n">3</span>
+            <h3>Pick a repository</h3>
+            <p>Click the VsGit icon in the activity bar and choose your active repository. Everything follows it.</p>
+          </li>
+        </ol>
+
+        <div class="sources">
+          <a class="source reveal" href="https://marketplace.visualstudio.com/items?itemName=framedparadox.vsgit-vscode">
+            <span class="source__tag">Recommended</span>
+            <h3>VS Code Marketplace</h3>
+            <p>The official home for VS Code extensions.</p>
+            <span class="link-arrow">Get it on the Marketplace</span>
+          </a>
+          <a class="source reveal" href="https://open-vsx.org/extension/framedparadox/vsgit-vscode">
+            <h3>Open VSX</h3>
+            <p>For VSCodium, Gitpod, Eclipse Theia and other builds.</p>
+            <span class="link-arrow">Get it on Open VSX</span>
+          </a>
+          <a class="source reveal" href="https://github.com/framedparadox/vsgit-vscode/releases">
+            <h3>GitHub Releases</h3>
+            <p>Download the <code>.vsix</code> and use Install from VSIX….</p>
+            <span class="link-arrow">Browse releases</span>
+          </a>
+        </div>
+
+        <div class="tip reveal">
+          <p><b>Want every view?</b> Staging, Reflog, Synchronize, Worktrees, Conflicts and Compare appear when you enable advanced views:</p>
+          <pre><code><span class="c">// settings.json</span>
+{ <span class="k">"vsgit.showAdvancedViews"</span>: <span class="b">true</span> }</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────── Specs ─────────────────────────── -->
+    <section class="specs light-alt" id="specs">
+      <div class="wrap">
+        <h2 class="section-title reveal">Tech specs</h2>
+        <dl class="spec-list">
+          <div class="spec reveal"><dt>Version</dt><dd><b>0.0.8</b><span>See the <a href="https://github.com/framedparadox/vsgit-vscode/blob/develop/CHANGELOG.md">changelog</a> for release notes.</span></dd></div>
+          <div class="spec reveal"><dt>Requirements</dt><dd><b>VS Code 1.85 or later</b><span><code>git</code> 2.20+ on <code>$PATH</code> (or <code>vsgit.git.path</code>)</span><span><code>git-lfs</code> for LFS commands (optional)</span><span>A trusted, local workspace</span></dd></div>
+          <div class="spec reveal"><dt>Platforms</dt><dd><b>macOS, Windows, Linux</b><span>VS Code, VSCodium, Gitpod, Eclipse Theia via Open VSX</span></dd></div>
+          <div class="spec reveal"><dt>Sidebar views</dt><dd><b>10 views</b><span>Repositories · Commit · Git Repositories · Staging · Synchronize · Reflog · Worktrees · Conflicts · Compare · Documentation</span></dd></div>
+          <div class="spec reveal"><dt>Editors &amp; panels</dt><dd><b>Graph, History and more</b><span>Git Graph · History · Interactive Rebase · Create Tag · Git Config editor · Branch, tag and commit pickers · Documentation library</span></dd></div>
+          <div class="spec reveal"><dt>Commands</dt><dd><b>173 operations</b><span>72 in the Command Palette under <b>VsGit</b>, 101 contextual actions on files, refs, commits and views</span></dd></div>
+          <div class="spec reveal"><dt>Integrations</dt><dd><b>Native Source Control</b><span>SCM resource groups, quick-diff gutters, Explorer decorations, Team / Compare With / Replace With menus</span></dd></div>
+          <div class="spec reveal"><dt>Architecture</dt><dd><b>Real <code>git</code> CLI</b><span>Single argv-only executor · pure, unit-tested output parsers · no libgit2</span></dd></div>
+          <div class="spec reveal"><dt>Accessibility</dt><dd><b>Keyboard &amp; screen reader</b><span>Semantics across tree and webview surfaces, forced-colour support</span></dd></div>
+          <div class="spec reveal"><dt>Price &amp; license</dt><dd><b>Free &amp; open source</b><span>MIT License</span></dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────── FAQ ─────────────────────────── -->
+    <section class="faq light" id="faq">
+      <div class="wrap wrap--narrow">
+        <h2 class="section-title reveal">Questions? Answers.</h2>
+        <div class="faq__list">
+          <details class="reveal">
+            <summary>Does VsGit replace VS Code's built-in Git?</summary>
+            <p>It can sit alongside it. VsGit publishes its own Source Control provider, so you may see each repository twice. If you want VsGit to be the only provider, set <code>"git.enabled": false</code>.</p>
+          </details>
+          <details class="reveal">
+            <summary>VsGit can't find my repository.</summary>
+            <p>VsGit discovers repositories from your open workspace folders. Make sure the folder containing <code>.git</code> is open, or run <b>VsGit: Refresh</b>.</p>
+          </details>
+          <details class="reveal">
+            <summary>Git isn't found, or it's the wrong version.</summary>
+            <p>Set <code>vsgit.git.path</code> to the absolute path of your <code>git</code> binary, then reload the window. VsGit needs Git 2.20 or later.</p>
+          </details>
+          <details class="reveal">
+            <summary>Where are Staging, Reflog, Worktrees and the other views?</summary>
+            <p>They're hidden until you enable <code>vsgit.showAdvancedViews</code> in your settings.</p>
+          </details>
+          <details class="reveal">
+            <summary>Why is VsGit disabled in this folder?</summary>
+            <p>The workspace is in Restricted Mode. VsGit needs trust because Git runs the repository's hooks and configuration. Use <b>Manage Workspace Trust</b> to trust it. Virtual workspaces aren't supported for the same reason.</p>
+          </details>
+          <details class="reveal">
+            <summary>How do credentials work?</summary>
+            <p>VsGit uses your existing git credential helper through <code>GIT_ASKPASS</code>. If a remote needs authentication you get a native VS Code prompt, delivered over an authenticated, token-protected IPC channel.</p>
+          </details>
+          <details class="reveal">
+            <summary>Can I see exactly what VsGit runs?</summary>
+            <p>Yes. Enable <code>vsgit.showCommandPreview</code> to preview every mutating <code>git</code> command before it executes.</p>
+          </details>
+          <details class="reveal">
+            <summary>Is it free?</summary>
+            <p>Completely. VsGit is open source under the MIT License. Contributions, issues and ideas are welcome on <a href="https://github.com/framedparadox/vsgit-vscode">GitHub</a>.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────── Final CTA ─────────────────────────── -->
+    <section class="final dark">
+      <div class="hero__glow hero__glow--low" aria-hidden="true"></div>
+      <div class="wrap final__inner">
+        <img class="final__icon reveal" src="assets/icon.svg" alt="" width="96" height="96" />
+        <h2 class="section-title section-title--xl reveal">Git, the way<br /><span class="grad">it was meant to feel.</span></h2>
+        <p class="section-lede reveal">Free. Open source. Ready when you are.</p>
+        <div class="hero__cta reveal">
+          <a class="pill" href="https://marketplace.visualstudio.com/items?itemName=framedparadox.vsgit-vscode">Install VsGit</a>
+          <a class="link-arrow" href="https://github.com/framedparadox/vsgit-vscode">Star on GitHub</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ─────────────────────────── Footer ─────────────────────────── -->
+  <footer class="footer">
+    <div class="wrap">
+      <div class="footer__cols">
+        <div>
+          <h4>Product</h4>
+          <a href="#graph">Git Graph</a>
+          <a href="#features">Features</a>
+          <a href="#security">Security</a>
+          <a href="#specs">Tech specs</a>
+        </div>
+        <div>
+          <h4>Install</h4>
+          <a href="https://marketplace.visualstudio.com/items?itemName=framedparadox.vsgit-vscode">VS Code Marketplace</a>
+          <a href="https://open-vsx.org/extension/framedparadox/vsgit-vscode">Open VSX</a>
+          <a href="https://github.com/framedparadox/vsgit-vscode/releases">GitHub Releases</a>
+        </div>
+        <div>
+          <h4>Resources</h4>
+          <a href="https://github.com/framedparadox/vsgit-vscode#readme">Documentation</a>
+          <a href="https://github.com/framedparadox/vsgit-vscode/blob/develop/CHANGELOG.md">Changelog</a>
+          <a href="#faq">FAQ &amp; troubleshooting</a>
+        </div>
+        <div>
+          <h4>Project</h4>
+          <a href="https://github.com/framedparadox/vsgit-vscode">Source code</a>
+          <a href="https://github.com/framedparadox/vsgit-vscode/issues">Report an issue</a>
+          <a href="https://github.com/framedparadox/vsgit-vscode/blob/develop/CONTRIBUTING.md">Contributing</a>
+          <a href="https://github.com/framedparadox/vsgit-vscode/blob/develop/LICENSE">MIT License</a>
+        </div>
+      </div>
+      <div class="footer__legal">
+        <p>Copyright © <span id="year">2026</span> framedparadox. Released under the MIT License.</p>
+        <p>Visual Studio Code is a trademark of Microsoft Corporation. Git and the Git logo are trademarks of Software Freedom Conservancy. VsGit is an independent project and is not affiliated with either.</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Lightbox -->
+  <dialog class="lightbox" id="lightbox" aria-label="Screenshot">
+    <button class="lightbox__close" aria-label="Close">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <img alt="" />
+  </dialog>
+
+  <script src="main.js" defer></script>
+</body>
+</html>

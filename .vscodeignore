@@ -24,3 +24,6 @@ docs/**
 .claude/**
 CLAUDE.md
 graphify-out/**
+
+# Marketing website (deployed to GitHub Pages separately)
+website/**

@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>VsGit — The complete Git client for VS Code</title>
-  <meta name="description" content="VsGit is a complete, power-user Git client built into VS Code. Interactive commit graph, interactive rebase, worktrees, LFS, Gerrit, bisect, submodules and 173 commands — all driving the real git binary." />
+  <meta name="description" content="VsGit is a complete, power-user Git client built into VS Code. Interactive commit graph, interactive rebase, worktrees, LFS, Gerrit, bisect, submodules and 160 commands — all driving the real git binary." />
   <meta name="keywords" content="git, vs code, vscode extension, git graph, interactive rebase, worktrees, git lfs, gerrit, source control, egit" />
   <meta name="author" content="framedparadox" />
   <meta name="theme-color" content="#000000" />
@@ -13,7 +13,7 @@
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="VsGit" />
   <meta property="og:title" content="VsGit — The complete Git client for VS Code" />
-  <meta property="og:description" content="Interactive commit graph, interactive rebase, worktrees, LFS, Gerrit and 173 commands. Every operation is a genuine git invocation." />
+  <meta property="og:description" content="Interactive commit graph, interactive rebase, worktrees, LFS, Gerrit and 160 commands. Every operation is a genuine git invocation." />
   <meta property="og:url" content="https://framedparadox.github.io/vsgit-vscode/" />
   <meta property="og:image" content="https://framedparadox.github.io/vsgit-vscode/assets/screens/hero.png" />
   <meta name="twitter:card" content="summary_large_image" />
@@ -130,7 +130,7 @@
       <div class="wrap">
         <h2 class="section-title reveal">Breadth, by the numbers.</h2>
         <div class="numbers__grid">
-          <div class="stat reveal"><span class="stat__n" data-count="173">173</span><span class="stat__l">contributed Git operations</span></div>
+          <div class="stat reveal"><span class="stat__n" data-count="160">160</span><span class="stat__l">contributed Git operations</span></div>
           <div class="stat reveal"><span class="stat__n" data-count="72">72</span><span class="stat__l">Command Palette commands</span></div>
           <div class="stat reveal"><span class="stat__n" data-count="10">10</span><span class="stat__l">multi-root aware sidebar views</span></div>
           <div class="stat reveal"><span class="stat__n" data-count="29">29</span><span class="stat__l"><code>vsgit.*</code> settings to tune</span></div>
@@ -229,10 +229,10 @@
 
           <article class="tile tile--wide reveal">
             <div class="tile__copy">
-              <h3>Native Source Control. <span class="muted">Supercharged.</span></h3>
-              <p>VsGit publishes real SCM resource groups, so VS Code's own Source Control panel gets VsGit's menus, quick-diff gutters and commit input.</p>
+              <h3>Compare anything. <span class="muted">With anything.</span></h3>
+              <p>Symmetric <code>A...B</code> branch ranges in History, and Compare With HEAD, the index, a previous revision, any branch, tag or commit, the clipboard or local history.</p>
             </div>
-            <button class="tile__shot" data-zoom="scm-diff" aria-label="Enlarge native Source Control screenshot"><img src="assets/screens/scm-diff.png" alt="Native Source Control panel with VsGit resource groups and a side-by-side diff" loading="lazy" /></button>
+            <button class="tile__shot" data-zoom="history-compare" aria-label="Enlarge compare branches screenshot"><img src="assets/screens/history-compare.png" alt="History panel comparing release/1.2 with feature/search" loading="lazy" /></button>
           </article>
 
           <article class="tile tile--wide-md reveal">
@@ -246,7 +246,7 @@
           <article class="tile tile--full tile--dark reveal">
             <div class="tile__copy">
               <h3>A library, built in.</h3>
-              <p>A searchable reference for every VsGit component, a Git glossary with cautions for history-rewriting concepts, and all 173 operations with their entry points.</p>
+              <p>A searchable reference for every VsGit component, a Git glossary with cautions for history-rewriting concepts, and all 160 operations with their entry points.</p>
             </div>
             <button class="tile__shot" data-zoom="documentation-library" aria-label="Enlarge documentation library screenshot"><img src="assets/screens/documentation-library.png" alt="VsGit documentation library with Overview, Components, Glossary and Operations tabs" loading="lazy" /></button>
           </article>
@@ -282,6 +282,7 @@
           <ul class="checks reveal">
             <li>Multi-root workspaces with a single active repository</li>
             <li>Right-click actions on repositories, branches, tags, commits and files</li>
+            <li>Its own space — the built-in Source Control view stays exactly as it was</li>
             <li>Official VS Code codicons and Seti file-type icons throughout</li>
             <li>Keyboard and screen-reader semantics, forced-colour support</li>
           </ul>
@@ -421,8 +422,8 @@
           <div class="spec reveal"><dt>Platforms</dt><dd><b>macOS, Windows, Linux</b><span>VS Code, VSCodium, Gitpod, Eclipse Theia via Open VSX</span></dd></div>
           <div class="spec reveal"><dt>Sidebar views</dt><dd><b>10 views</b><span>Repositories · Commit · Git Repositories · Staging · Synchronize · Reflog · Worktrees · Conflicts · Compare · Documentation</span></dd></div>
           <div class="spec reveal"><dt>Editors &amp; panels</dt><dd><b>Graph, History and more</b><span>Git Graph · History · Interactive Rebase · Create Tag · Git Config editor · Branch, tag and commit pickers · Documentation library</span></dd></div>
-          <div class="spec reveal"><dt>Commands</dt><dd><b>173 operations</b><span>72 in the Command Palette under <b>VsGit</b>, 101 contextual actions on files, refs, commits and views</span></dd></div>
-          <div class="spec reveal"><dt>Integrations</dt><dd><b>Native Source Control</b><span>SCM resource groups, quick-diff gutters, Explorer decorations, Team / Compare With / Replace With menus</span></dd></div>
+          <div class="spec reveal"><dt>Commands</dt><dd><b>160 operations</b><span>72 in the Command Palette under <b>VsGit</b>, 88 contextual actions on files, refs, commits and views</span></dd></div>
+          <div class="spec reveal"><dt>Integrations</dt><dd><b>Explorer &amp; editor</b><span>Team / Compare With / Replace With menus, inline blame, Explorer file decorations</span><span>Leaves VS Code's built-in Source Control view untouched</span></dd></div>
           <div class="spec reveal"><dt>Architecture</dt><dd><b>Real <code>git</code> CLI</b><span>Single argv-only executor · pure, unit-tested output parsers · no libgit2</span></dd></div>
           <div class="spec reveal"><dt>Accessibility</dt><dd><b>Keyboard &amp; screen reader</b><span>Semantics across tree and webview surfaces, forced-colour support</span></dd></div>
           <div class="spec reveal"><dt>Price &amp; license</dt><dd><b>Free &amp; open source</b><span>MIT License</span></dd></div>
@@ -436,8 +437,8 @@
         <h2 class="section-title reveal">Questions? Answers.</h2>
         <div class="faq__list">
           <details class="reveal">
-            <summary>Does VsGit replace VS Code's built-in Git?</summary>
-            <p>It can sit alongside it. VsGit publishes its own Source Control provider, so you may see each repository twice. If you want VsGit to be the only provider, set <code>"git.enabled": false</code>.</p>
+            <summary>Does VsGit change VS Code's built-in Source Control view?</summary>
+            <p>No, by design. VsGit keeps everything in its own activity-bar container and never registers a Source Control provider, SCM menus or SCM progress, so the built-in Git panel is unchanged. Operation progress shows in the status bar and on the VsGit Repositories view.</p>
           </details>
           <details class="reveal">
             <summary>VsGit can't find my repository.</summary>
@@ -457,7 +458,7 @@
           </details>
           <details class="reveal">
             <summary>How do credentials work?</summary>
-            <p>VsGit uses your existing git credential helper through <code>GIT_ASKPASS</code>. If a remote needs authentication you get a native VS Code prompt, delivered over an authenticated, token-protected IPC channel.</p>
+            <p>VsGit uses your existing credential helper and SSH agent. When Git still needs input, HTTPS passwords, SSH key passphrases and host-key confirmations arrive as VS Code input boxes, for every Git command VsGit runs, over an authenticated, token-protected IPC channel.</p>
           </details>
           <details class="reveal">
             <summary>Can I see exactly what VsGit runs?</summary>

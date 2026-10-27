@@ -77,9 +77,10 @@ export function registerRemoteCommands(
     if (!remoteName) {
       return;
     }
-    await withProgress(manager, `Prune ${remoteName}`, () =>
+    const ok = await withProgress(manager, `Prune ${remoteName}`, () =>
       repo.pruneRemote(remoteName as string),
     );
+    if (!ok) return;
     vscode.window.setStatusBarMessage(`Pruned stale refs for ${remoteName}`, 3000);
   });
 

@@ -49,29 +49,12 @@ export function humanizeGitError(err: unknown): string {
 }
 
 /**
- * Pull a `rootUri` out of an argument passed by VS Code's native Git SCM menus.
- * `scm/sourceControl` items receive a `SourceControl` with a `.rootUri`; some
- * native objects nest it under `.provider`. Returns undefined for shapes that
- * carry no root (e.g. a `SourceControlResourceGroup`).
- */
-function nativeScmRootUri(arg: unknown): vscode.Uri | undefined {
-  if (!arg || typeof arg !== "object") {
-    return undefined;
-  }
-  const candidate =
-    (arg as { rootUri?: unknown }).rootUri ??
-    (arg as { provider?: { rootUri?: unknown } }).provider?.rootUri;
-  return candidate instanceof vscode.Uri ? candidate : undefined;
-}
-
-/**
  * Resolve the repository for a command invocation.
  *
- * Handles three argument sources:
- * - VsGit tree nodes (carry a `.repo`).
- * - VS Code native Git SCM menus (carry a `.rootUri`, mapped via the manager).
- * - The command palette / native resource-group menus (no usable target):
- *   single repo, otherwise a quick-pick.
+ * Handles two argument sources:
+ * - VsGit tree nodes and webview payloads (carry a `.repo`).
+ * - The command palette (no usable target): single repo, the active editor's
+ *   repo, otherwise a quick-pick.
  */
 export async function resolveRepo(
   manager: RepositoryManager,
@@ -79,14 +62,6 @@ export async function resolveRepo(
 ): Promise<Repository | undefined> {
   if (node && typeof node === "object" && "repo" in node) {
     return (node as { repo: Repository }).repo;
-  }
-
-  const rootUri = nativeScmRootUri(node);
-  if (rootUri) {
-    const byRoot = manager.get(rootUri.fsPath) ?? manager.findByUri(rootUri);
-    if (byRoot) {
-      return byRoot;
-    }
   }
 
   const repos = manager.getAll();
@@ -98,8 +73,8 @@ export async function resolveRepo(
     return repos[0];
   }
 
-  // No explicit target (native "Changes" group ellipsis or the palette): in a
-  // multi-repo workspace, prefer the repo for the active editor before asking.
+  // No explicit target (the palette): in a multi-repo workspace, prefer the
+  // repo for the active editor before asking.
   const activeDoc = vscode.window.activeTextEditor?.document.uri;
   const byActiveDoc = activeDoc ? manager.findByUri(activeDoc) : undefined;
   if (byActiveDoc) {
@@ -113,6 +88,23 @@ export async function resolveRepo(
   return pick?.repo;
 }
 
+/**
+ * Show progress for a git operation in VsGit's own surfaces: a spinner with
+ * the title in the status bar, plus the busy indicator on the Repositories
+ * view (and the VsGit activity-bar icon). VsGit deliberately stays out of the
+ * native Source Control view.
+ */
+export function showGitProgress<T>(title: string, fn: () => Promise<T>): Thenable<T> {
+  return vscode.window.withProgress(
+    { location: vscode.ProgressLocation.Window, title },
+    () =>
+      vscode.window.withProgress(
+        { location: { viewId: "vsgit.repositoriesList" } },
+        fn,
+      ),
+  );
+}
+
 /** Run an operation, refresh views, and surface errors uniformly. */
 export async function withProgress(
   manager: RepositoryManager,
@@ -120,10 +112,7 @@ export async function withProgress(
   fn: () => Promise<void>,
 ): Promise<boolean> {
   try {
-    await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.SourceControl, title },
-      fn,
-    );
+    await showGitProgress(title, fn);
     await manager.refreshAll();
     return true;
   } catch (e) {
@@ -135,4 +124,67 @@ export async function withProgress(
     await manager.refreshAll();
     return false;
   }
+}
+
+/**
+ * Cherry-picking or reverting a merge commit needs a mainline parent (git's
+ * `-m <n>`). Returns undefined for an ordinary commit, the chosen 1-based
+ * parent number for a merge, or null when the user cancels the choice.
+ */
+export async function pickMainline(
+  repo: Repository,
+  sha: string,
+  action: string,
+): Promise<number | undefined | null> {
+  const parents = await repo.commitParents(sha);
+  if (parents.length < 2) {
+    return undefined;
+  }
+  const subjects = await Promise.all(
+    parents.map((parent) => repo.commitSubject(parent).catch(() => "")),
+  );
+  const pick = await vscode.window.showQuickPick(
+    parents.map((parent, i) => ({
+      label: `Parent ${i + 1}: ${parent.slice(0, 8)}`,
+      description: subjects[i],
+      detail: i === 0 ? "The branch that was merged into — the usual choice" : undefined,
+      mainline: i + 1,
+    })),
+    { placeHolder: `${sha.slice(0, 8)} is a merge commit. ${action} relative to which parent?` },
+  );
+  return pick ? pick.mainline : null;
+}
+
+/**
+ * Check out a remote-tracking branch as a local branch. Reuses a local branch
+ * that already tracks it (a second `checkout -b` would fail with "already
+ * exists"), otherwise asks for the new branch's name.
+ */
+export async function checkoutRemoteBranchInteractive(
+  manager: RepositoryManager,
+  repo: Repository,
+  remoteBranch: string,
+): Promise<void> {
+  const tracking = repo.localBranches.find((b) => b.upstream === remoteBranch);
+  if (tracking) {
+    await withProgress(manager, `Checkout ${tracking.shortName}`, () =>
+      repo.checkoutRef(tracking.shortName),
+    );
+    return;
+  }
+  const suggested = repo.splitRemoteBranch(remoteBranch)?.branch ?? remoteBranch;
+  const localName = await vscode.window.showInputBox({
+    prompt: `Local branch name (will track ${remoteBranch})`,
+    value: suggested,
+    validateInput: (v) =>
+      v.trim() === ""
+        ? "Required"
+        : repo.localBranches.some((b) => b.shortName === v.trim())
+          ? `A local branch named '${v.trim()}' already exists`
+          : undefined,
+  });
+  if (!localName) return;
+  await withProgress(manager, `Checkout ${remoteBranch} → ${localName.trim()}`, () =>
+    repo.checkoutRemoteBranch(remoteBranch, localName.trim()),
+  );
 }

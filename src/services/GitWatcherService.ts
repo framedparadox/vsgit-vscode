@@ -1,50 +1,60 @@
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
+import { isInsideGitDir } from "../git/discovery";
 
 /**
- * Watches for VS Code-level filesystem events on .git sentinel files.
- * Complements RepositoryManager's node:fs.watch with glob-based detection
- * of branch switches, merge starts, and external commits.
+ * VS Code-level change detection that complements RepositoryManager's
+ * node:fs watchers on the Git directories:
+ *
+ * - `.git` sentinel files (HEAD, MERGE_HEAD, …) catch branch switches, merge
+ *   starts, and external commits.
+ * - Working-tree files: creating, editing, deleting, or saving a file changes
+ *   `git status`, but touches nothing inside `.git`, so without this the
+ *   Commit/Staging views and file decorations would only update on a manual
+ *   refresh.
+ *
+ * Every event funnels into the manager's single debounced refresh.
  */
 export class GitWatcherService implements vscode.Disposable {
   private readonly disposables: vscode.Disposable[] = [];
-  private debounceTimer: NodeJS.Timeout | undefined;
 
   constructor(
     _context: vscode.ExtensionContext,
     private readonly manager: RepositoryManager,
   ) {
-    const watcher = vscode.workspace.createFileSystemWatcher(
+    const sentinels = vscode.workspace.createFileSystemWatcher(
       "**/.git/{HEAD,MERGE_HEAD,COMMIT_EDITMSG,CHERRY_PICK_HEAD,REVERT_HEAD}",
     );
+    sentinels.onDidChange(() => this.manager.requestRefresh(), this, this.disposables);
+    sentinels.onDidCreate(() => this.manager.requestRefresh(), this, this.disposables);
+    sentinels.onDidDelete(() => this.manager.requestRefresh(), this, this.disposables);
+    this.disposables.push(sentinels);
 
-    watcher.onDidChange(() => this.scheduleRefresh(), this, this.disposables);
-    watcher.onDidCreate(() => this.scheduleRefresh(), this, this.disposables);
-    watcher.onDidDelete(() => this.scheduleRefresh(), this, this.disposables);
-
-    this.disposables.push(watcher);
+    // Honours `files.watcherExclude`, so dependency and build folders the user
+    // has excluded never cause a status refresh.
+    const workingTree = vscode.workspace.createFileSystemWatcher("**/*");
+    const onWorkingTreeEvent = (uri: vscode.Uri) => this.onWorkingTreeEvent(uri);
+    workingTree.onDidChange(onWorkingTreeEvent, this, this.disposables);
+    workingTree.onDidCreate(onWorkingTreeEvent, this, this.disposables);
+    workingTree.onDidDelete(onWorkingTreeEvent, this, this.disposables);
+    this.disposables.push(
+      workingTree,
+      vscode.workspace.onDidSaveTextDocument((doc) => this.onWorkingTreeEvent(doc.uri)),
+    );
   }
 
-  private scheduleRefresh(): void {
-    const autoRefresh = vscode.workspace
-      .getConfiguration("vsgit")
-      .get<boolean>("autoRefresh", true);
-    if (!autoRefresh) {
+  private onWorkingTreeEvent(uri: vscode.Uri): void {
+    // Changes inside the Git directory are handled (and loop-filtered) by
+    // RepositoryManager's own watchers.
+    if (uri.scheme !== "file" || isInsideGitDir(uri.fsPath)) {
       return;
     }
-    if (this.debounceTimer) {
-      clearTimeout(this.debounceTimer);
+    if (this.manager.findByUri(uri)) {
+      this.manager.requestRefresh();
     }
-    this.debounceTimer = setTimeout(() => {
-      this.debounceTimer = undefined;
-      void this.manager.refreshAll();
-    }, 500);
   }
 
   dispose(): void {
-    if (this.debounceTimer) {
-      clearTimeout(this.debounceTimer);
-    }
     for (const d of this.disposables) {
       d.dispose();
     }

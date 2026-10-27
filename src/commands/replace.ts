@@ -1,11 +1,20 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
-import { Repository } from "../git/Repository";
 import { RepositoryManager } from "../git/RepositoryManager";
-import { withProgress } from "./shared";
+import { errMsg, withProgress } from "./shared";
 import { CommitPickerView } from "../webviews/CommitPickerView";
 import { RefPickerView } from "../webviews/RefPickerView";
 import { confirmDestructiveAction, DestructiveOperations } from "../util/confirmation";
+import { shortRefLabel } from "../util/revisionDiff";
+import {
+  dirtyTargetsWarning,
+  filesInRepo,
+  repoForUri,
+  resolveUri,
+  resolveUris,
+  revertDirtyTargets,
+  withoutFailed,
+} from "./uriHelpers";
 
 /**
  * "Replace With" operations — restore a file's content from a known ref.
@@ -27,11 +36,12 @@ export function registerReplaceCommands(
   });
 
   reg("vsgit.replace.withPrevious", async (uriArg, allUris) => {
-    await replaceWith(manager, resolveUris(uriArg, allUris), "HEAD~1");
+    await replaceWithPrevious(manager, resolveUris(uriArg, allUris));
   });
 
-  // "Branch, Tag, or Reference…" — full VsGit-style ref picker
-  reg("vsgit.replace.withBranchOrTag", async (uriArg, allUris) => {
+  // "Branch, Tag, or Reference…" — full VsGit-style ref picker.
+  // vsgit.replace.withRef is the legacy id kept for old menu bindings.
+  const replaceWithPickedRef = async (uriArg: unknown, allUris: unknown) => {
     const uris = resolveUris(uriArg, allUris);
     if (uris.length === 0) return;
     const repo = repoForUri(manager, uris[0]);
@@ -43,7 +53,9 @@ export function registerReplaceCommands(
     });
     if (!ref) return;
     await replaceWith(manager, uris, ref);
-  });
+  };
+  reg("vsgit.replace.withBranchOrTag", replaceWithPickedRef);
+  reg("vsgit.replace.withRef", replaceWithPickedRef);
 
   // "Commit…" — rich webview commit picker
   reg("vsgit.replace.withCommit", async (uriArg, allUris) => {
@@ -54,21 +66,6 @@ export function registerReplaceCommands(
     const sha = await CommitPickerView.pick(repo, context.extensionUri);
     if (!sha) return;
     await replaceWith(manager, uris, sha);
-  });
-
-  // Legacy — delegates to the same rich picker
-  reg("vsgit.replace.withRef", async (uriArg, allUris) => {
-    const uris = resolveUris(uriArg, allUris);
-    if (uris.length === 0) return;
-    const repo = repoForUri(manager, uris[0]);
-    if (!repo) return;
-    const fileName = uris.length === 1 ? path.basename(uris[0].fsPath) : `${uris.length} files`;
-    const ref = await RefPickerView.pick(repo, {
-      title: `Replace '${fileName}' with a Branch, Tag, or Reference`,
-      subtitle: "Select a branch, tag, or reference to restore the resource from",
-    });
-    if (!ref) return;
-    await replaceWith(manager, uris, ref);
   });
 
   // "Local History" — delegate to VS Code's built-in timeline/local-history panel
@@ -89,37 +86,6 @@ export function registerReplaceCommands(
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-function resolveUri(uriArg: unknown): vscode.Uri | undefined {
-  if (uriArg instanceof vscode.Uri) return uriArg;
-  return vscode.window.activeTextEditor?.document.uri;
-}
-
-function resolveUris(uriArg: unknown, allUris: unknown): vscode.Uri[] {
-  if (Array.isArray(allUris) && allUris.length > 0 && allUris[0] instanceof vscode.Uri) {
-    return allUris as vscode.Uri[];
-  }
-  const single = resolveUri(uriArg);
-  return single ? [single] : [];
-}
-
-function repoForUri(manager: RepositoryManager, uri: vscode.Uri) {
-  const repo = manager.findByUri(uri);
-  if (!repo) {
-    vscode.window.showWarningMessage("File is not in a known Git repository.");
-  }
-  return repo;
-}
-
-function relativePaths(
-  manager: RepositoryManager,
-  repo: Repository,
-  uris: vscode.Uri[],
-): string[] {
-  return uris
-    .filter((uri) => manager.uriBelongsTo(repo, uri))
-    .map((uri) => manager.relativePath(repo, uri));
-}
-
 async function replaceWith(
   manager: RepositoryManager,
   uris: vscode.Uri[],
@@ -128,22 +94,107 @@ async function replaceWith(
   if (uris.length === 0) return;
   const repo = repoForUri(manager, uris[0]);
   if (!repo) return;
-  const label = uris.length === 1
-    ? `Replace with ${ref}: ${path.basename(uris[0].fsPath)}`
-    : `Replace ${uris.length} file(s) with ${ref}`;
+  // Filter to this repo up front so the label, the confirmation, and the git
+  // call all agree on the same file set (a cross-repo multi-select would
+  // otherwise confirm more files than actually get replaced).
+  const target = filesInRepo(manager, repo, uris);
+  const rels = target.rels;
+  if (rels.length === 0) return;
+  const refLabel = shortRefLabel(ref);
+  const label = rels.length === 1
+    ? `Replace with ${refLabel}: ${path.basename(rels[0])}`
+    : `Replace ${rels.length} file(s) with ${refLabel}`;
   const confirmed = await confirmDestructiveAction({
     operation: DestructiveOperations.DISCARD_CHANGES,
-    message: `${label}? Local changes will be lost.`,
-    items: relativePaths(manager, repo, uris),
+    message: `${label}? Local changes will be lost.${dirtyTargetsWarning(target.uris)}`,
+    items: rels,
   });
   if (!confirmed) return;
-  await withProgress(manager, label, async () => {
-    for (const uri of uris) {
-      if (!manager.uriBelongsTo(repo, uri)) continue;
-      const rel = manager.relativePath(repo, uri);
-      await repo.replaceWithRef(rel, ref);
+  const failed: string[] = [];
+  const ok = await withProgress(manager, label, async () => {
+    failed.push(...(await repo.replaceWithRef(rels, ref)));
+  });
+  if (!ok) return;
+  // Files that did not exist at `ref` were left alone, so keep their buffers.
+  await revertDirtyTargets(withoutFailed(target.uris, rels, failed));
+  if (failed.length > 0) {
+    vscode.window.showWarningMessage(
+      `Restored ${rels.length - failed.length} file(s) from ${refLabel}; ${failed.length} did not exist at that revision.`,
+    );
+  }
+}
+
+async function replaceWithPrevious(
+  manager: RepositoryManager,
+  uris: vscode.Uri[],
+): Promise<void> {
+  if (uris.length === 0) return;
+  const repo = repoForUri(manager, uris[0]);
+  if (!repo) return;
+  const target = filesInRepo(manager, repo, uris);
+  const bySha = new Map<string, { uris: vscode.Uri[]; rels: string[] }>();
+  const skipped: string[] = [];
+  for (const [i, uri] of target.uris.entries()) {
+    const rel = target.rels[i];
+    try {
+      const commits = await repo.log({ file: rel, limit: 2 });
+      if (commits.length < 2) {
+        skipped.push(path.basename(rel));
+        continue;
+      }
+      const sha = commits[1].sha;
+      const group = bySha.get(sha) ?? { uris: [], rels: [] };
+      group.uris.push(uri);
+      group.rels.push(rel);
+      bySha.set(sha, group);
+    } catch (e) {
+      vscode.window.showErrorMessage(
+        `Replace with previous failed for ${path.basename(rel)}: ${errMsg(e)}`,
+      );
+      return;
+    }
+  }
+  if (bySha.size === 0) {
+    vscode.window.showInformationMessage(
+      skipped.length === 1
+        ? `${skipped[0]} has no earlier revision to restore.`
+        : "None of the selected files have an earlier revision to restore.",
+    );
+    return;
+  }
+  const allRels = [...bySha.values()].flatMap((g) => g.rels);
+  const allUris = [...bySha.values()].flatMap((g) => g.uris);
+  const label = allRels.length === 1
+    ? `Replace with previous: ${path.basename(allRels[0])}`
+    : `Replace ${allRels.length} file(s) with previous revision`;
+  const confirmed = await confirmDestructiveAction({
+    operation: DestructiveOperations.DISCARD_CHANGES,
+    message: `${label}? Local changes will be lost.${dirtyTargetsWarning(allUris)}`,
+    items: allRels,
+  });
+  if (!confirmed) return;
+  const failed: string[] = [];
+  const restored: vscode.Uri[] = [];
+  const ok = await withProgress(manager, label, async () => {
+    for (const [sha, group] of bySha) {
+      const groupFailed = await repo.replaceWithRef(group.rels, sha);
+      failed.push(...groupFailed);
+      restored.push(...withoutFailed(group.uris, group.rels, groupFailed));
     }
   });
+  // Groups restored before a later group threw still changed on disk.
+  await revertDirtyTargets(restored);
+  if (!ok) return;
+  if (skipped.length > 0) {
+    vscode.window.showWarningMessage(
+      `Skipped ${skipped.length} file(s) with no earlier revision: ${skipped.slice(0, 3).join(", ")}${skipped.length > 3 ? ", …" : ""}`,
+    );
+  }
+  if (failed.length > 0) {
+    vscode.window.showWarningMessage(
+      `${failed.length} file(s) could not be restored from their previous revision.`,
+    );
+  }
 }
 
 async function replaceWithIndex(
@@ -153,19 +204,19 @@ async function replaceWithIndex(
   if (uris.length === 0) return;
   const repo = repoForUri(manager, uris[0]);
   if (!repo) return;
-  const label = uris.length === 1
-    ? `Replace with Index: ${path.basename(uris[0].fsPath)}`
-    : `Replace ${uris.length} file(s) with Index`;
+  const target = filesInRepo(manager, repo, uris);
+  const rels = target.rels;
+  if (rels.length === 0) return;
+  const label = rels.length === 1
+    ? `Replace with Index: ${path.basename(rels[0])}`
+    : `Replace ${rels.length} file(s) with Index`;
   const confirmed = await confirmDestructiveAction({
     operation: DestructiveOperations.DISCARD_CHANGES,
-    message: `${label}? Unstaged changes will be lost.`,
-    items: relativePaths(manager, repo, uris),
+    message: `${label}? Unstaged changes will be lost.${dirtyTargetsWarning(target.uris)}`,
+    items: rels,
   });
   if (!confirmed) return;
-  await withProgress(manager, label, async () => {
-    const rels = uris
-      .filter((u) => manager.uriBelongsTo(repo, u))
-      .map((u) => manager.relativePath(repo, u));
-    await repo.discard(rels, []);
-  });
+  if (await withProgress(manager, label, () => repo.discard(rels, []))) {
+    await revertDirtyTargets(target.uris);
+  }
 }

@@ -261,6 +261,7 @@ function render(q) {
   groups.forEach(g => {
     const items = lq
       ? g.items.filter(it =>
+          (it.label || it.ref).toLowerCase().includes(lq) ||
           it.ref.toLowerCase().includes(lq) ||
           (it.subject || '').toLowerCase().includes(lq) ||
           (it.shortSha || '').toLowerCase().includes(lq)
@@ -294,16 +295,17 @@ function render(q) {
     childrenEl.className = 'group-children' + (collapsed ? ' collapsed' : '');
 
     items.forEach(it => {
+      const display = it.label || it.ref;
       const leaf = document.createElement('div');
       leaf.className = 'leaf' + (it.ref === selectedRef ? ' selected' : '');
       leaf.dataset.ref = it.ref;
       leaf.tabIndex = 0;
       leaf.setAttribute('role', 'treeitem');
       leaf.setAttribute('aria-selected', String(it.ref === selectedRef));
-      leaf.setAttribute('aria-label', it.ref + (it.isHead ? ', current HEAD' : '') + (it.shortSha ? ', commit ' + it.shortSha : ''));
+      leaf.setAttribute('aria-label', display + (it.isHead ? ', current HEAD' : '') + (it.shortSha ? ', commit ' + it.shortSha : ''));
 
       let html = \`<span class="leaf-icon">\${it.icon || '📄'}</span>\`;
-      html += \`<span class="leaf-name">\${esc(it.ref)}</span>\`;
+      html += \`<span class="leaf-name">\${esc(display)}</span>\`;
       if (it.isHead) html += \`<span class="head-badge">HEAD</span>\`;
       if (it.shortSha) html += \`<span class="sha">\${esc(it.shortSha)}</span>\`;
       if (it.subject)  html += \`<span class="subject">\${esc(it.subject)}</span>\`;

@@ -1,9 +1,10 @@
 import * as vscode from "vscode";
 import { RepositoryManager } from "../git/RepositoryManager";
 import { VsgitNode } from "../views/RepositoriesProvider";
-import { resolveRepo, withProgress, errMsg } from "./shared";
+import { checkoutRemoteBranchInteractive, resolveRepo, withProgress, errMsg, pickMainline } from "./shared";
 import { confirmDestructiveAction } from "../util/confirmation";
 import { Credentials } from "../util/credentials";
+import { runSequencerAction } from "./interactiveRebase";
 
 interface BranchItem extends vscode.QuickPickItem {
   branchName: string;
@@ -29,10 +30,8 @@ export function registerCommitOpsCommands(
     const repo = n && "repo" in n ? n.repo : await resolveRepo(manager, undefined);
     if (!repo) return;
 
-    let sha: string | undefined;
-    if (n && n.type === "stash") {
-      sha = n.ref;
-    } else {
+    let sha = shaFromNode(n);
+    if (!sha) {
       const commits = await repo.log({ limit: 200, all: true });
       const pick = await vscode.window.showQuickPick(
         commits.map((c) => ({
@@ -47,9 +46,13 @@ export function registerCommitOpsCommands(
       sha = pick.sha;
     }
 
-    await withProgress(manager, `Cherry-pick ${sha.slice(0, 8)}`, async () => {
-      await repo.cherryPick(sha!);
-    });
+    const target = sha;
+    // Stash entries and merges are merge commits: git needs a mainline parent.
+    const mainline = await pickMainline(repo, target, "Cherry-pick");
+    if (mainline === null) return;
+    await withProgress(manager, `Cherry-pick ${target.slice(0, 8)}`, () =>
+      repo.cherryPick(target, { mainline }),
+    );
   });
 
   // ── Revert ───────────────────────────────────────────────────────────────
@@ -77,9 +80,11 @@ export function registerCommitOpsCommands(
     });
     if (!confirmed) return;
 
-    await withProgress(manager, `Revert ${pick.sha.slice(0, 8)}`, async () => {
-      await repo.revert(pick.sha);
-    });
+    const mainline = await pickMainline(repo, pick.sha, "Revert");
+    if (mainline === null) return;
+    await withProgress(manager, `Revert ${pick.sha.slice(0, 8)}`, () =>
+      repo.revert(pick.sha, { mainline }),
+    );
   });
 
   // ── Squash commits ───────────────────────────────────────────────────────
@@ -95,8 +100,16 @@ export function registerCommitOpsCommands(
       return;
     }
 
+    const squashable = commits.slice(1).filter((c) => c.parents.length > 0);
+    if (squashable.length === 0) {
+      vscode.window.showWarningMessage(
+        "Cannot squash: the remaining history is a root commit with no parent.",
+      );
+      return;
+    }
+
     const picks = await vscode.window.showQuickPick(
-      commits.slice(1).map((c) => ({
+      squashable.map((c) => ({
         label: `$(git-commit) ${c.shortSha}`,
         description: c.subject,
         detail: `${c.authorName}  ${new Date(c.authorDate * 1000).toLocaleDateString()}`,
@@ -104,15 +117,24 @@ export function registerCommitOpsCommands(
         picked: false,
       })),
       {
-        placeHolder: "Select the base commit to squash into HEAD (all commits above it will be squashed)",
+        placeHolder: "Select the oldest commit to include in the squash (it and every newer commit become one)",
         canPickMany: false,
       },
     );
     if (!picks) return;
 
+    // The squash re-commits whatever is staged; don't silently fold unrelated
+    // staged work into the rewritten commit.
+    if (repo.stagedChanges.length > 0) {
+      vscode.window.showWarningMessage(
+        "Commit, unstage, or stash your staged changes before squashing commits.",
+      );
+      return;
+    }
+
     const confirmed = await confirmDestructiveAction({
       operation: "squashCommits",
-      message: `Squash all commits since ${picks.sha.slice(0, 8)} into HEAD?\nThis rewrites history — only do this on unpublished commits.`,
+      message: `Squash ${picks.sha.slice(0, 8)} and every newer commit into one?\nThis rewrites history — only do this on unpublished commits.`,
     });
     if (!confirmed) return;
 
@@ -188,11 +210,12 @@ export function registerCommitOpsCommands(
     const prRefspec = `refs/pull/*/head:refs/remotes/${remoteName}/pr/*`;
     const prTarget = `+refs/pull/*/head:refs/remotes/${remoteName}/pr/*`;
 
-    await withProgress(manager, `Fetching GitHub PRs from ${remoteName}`, async () => {
+    const ok = await withProgress(manager, `Fetching GitHub PRs from ${remoteName}`, async () => {
       await creds.withAskpass((env) =>
         repo.fetchRefspec(remoteName, prTarget, env),
       );
     });
+    if (!ok) return;
 
     vscode.window.showInformationMessage(
       `GitHub PRs fetched. Local refs: refs/remotes/${remoteName}/pr/<number>`,
@@ -214,7 +237,7 @@ export function registerCommitOpsCommands(
         branchName: b.shortName,
         branchKind: "local" as const,
       })),
-      ...repo.remoteBranches.map((b) => ({
+      ...repo.remoteBranches.filter((b) => !b.shortName.endsWith("/HEAD")).map((b) => ({
         label: `$(cloud) ${b.shortName}`,
         description: "remote",
         branchName: b.shortName,
@@ -235,16 +258,7 @@ export function registerCommitOpsCommands(
     if (!pick) return;
 
     if (pick.branchKind === "remote") {
-      const localName = pick.branchName.replace(/^[^/]+\//, "");
-      const proposedName = await vscode.window.showInputBox({
-        prompt: "Local branch name",
-        value: localName,
-        validateInput: (v) => (v.trim() === "" ? "Required" : undefined),
-      });
-      if (!proposedName) return;
-      await withProgress(manager, `Checkout ${pick.branchName} → ${proposedName}`, async () => {
-        await repo.checkoutRemoteBranch(pick.branchName, proposedName.trim());
-      });
+      await checkoutRemoteBranchInteractive(manager, repo, pick.branchName);
     } else {
       await withProgress(manager, `Switch to ${pick.branchName}`, async () => {
         await repo.checkoutRef(pick.branchName);
@@ -310,39 +324,7 @@ export function registerCommitOpsCommands(
   // ── Merge Tool (per-file) ─────────────────────────────────────────────────
 
   reg("vsgit.mergeTool", async (node) => {
-    const n = node as VsgitNode | undefined;
-    const repo = n && "repo" in n ? n.repo : await resolveRepo(manager, undefined);
-    if (!repo) return;
-
-    const conflicted = repo.conflictedPaths;
-    if (conflicted.length === 0) {
-      vscode.window.showInformationMessage("No conflicts to resolve.");
-      return;
-    }
-
-    const picks = await vscode.window.showQuickPick(
-      conflicted.map((p) => ({ label: `$(warning) ${p}`, path: p })),
-      { placeHolder: "Select file to open in merge tool", canPickMany: false },
-    );
-    if (!picks) return;
-
-    const absPath = `${repo.root}/${picks.path}`;
-    const uri = vscode.Uri.file(absPath);
-
-    // Use VS Code built-in merge editor if available, otherwise open file
-    try {
-      await vscode.commands.executeCommand(
-        "mergeEditor.acceptAllCurrentAndGoNext",
-        uri,
-      );
-    } catch {
-      // Fall back: open the conflicted file, let the user resolve manually
-      const doc = await vscode.workspace.openTextDocument(uri);
-      await vscode.window.showTextDocument(doc);
-      vscode.window.showInformationMessage(
-        `Resolve conflicts in ${picks.path}, then run "Mark Resolved" (vsgit.conflict.markResolved).`,
-      );
-    }
+    await vscode.commands.executeCommand("vsgit.conflict.openMergeEditor", node);
   });
 
   // ── Rebase live progress status bar ──────────────────────────────────────
@@ -358,14 +340,9 @@ export function registerCommitOpsCommands(
       return;
     }
 
-    const actions: string[] = [];
-    if (op === "rebase" || op === "cherry-pick") {
-      actions.push("Continue", "Skip", "Abort");
-    } else if (op === "merge") {
-      actions.push("Abort");
-    } else if (op === "revert") {
-      actions.push("Continue", "Abort");
-    }
+    // Every paused operation can be continued (after resolving conflicts) or
+    // aborted; all but a merge can also skip the current step.
+    const actions = op === "merge" ? ["Continue", "Abort"] : ["Continue", "Skip", "Abort"];
 
     const choice = await vscode.window.showInformationMessage(
       `${op.charAt(0).toUpperCase() + op.slice(1)} in progress. What would you like to do?`,
@@ -375,10 +352,23 @@ export function registerCommitOpsCommands(
     if (!choice) return;
 
     const action = choice.toLowerCase() as "continue" | "skip" | "abort";
-    if (op === "rebase" || op === "merge" || op === "cherry-pick" || op === "revert") {
-      await withProgress(manager, `${op} --${action}`, async () => {
-        await repo.sequencerAction(op, action);
-      });
-    }
+    await withProgress(manager, `${op} --${action}`, () =>
+      runSequencerAction(repo, op, action),
+    );
   });
+}
+
+/** SHA from a stash, compare-view commit, or synchronize-view commit node. */
+function shaFromNode(node: unknown): string | undefined {
+  if (!node || typeof node !== "object") {
+    return undefined;
+  }
+  const n = node as { type?: string; ref?: string; commit?: { sha?: string } };
+  if (n.type === "stash" && typeof n.ref === "string") {
+    return n.ref;
+  }
+  if (typeof n.commit?.sha === "string") {
+    return n.commit.sha;
+  }
+  return undefined;
 }

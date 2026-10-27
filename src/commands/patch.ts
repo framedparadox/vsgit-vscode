@@ -68,12 +68,13 @@ export function registerPatchCommands(
     });
     if (!folder || folder.length === 0) return;
     try {
-      await withProgress(manager, `Create patch (last ${n} commits)`, async () => {
+      const ok = await withProgress(manager, `Create patch (last ${n} commits)`, async () => {
         await git.run(
           ["format-patch", `-${n}`, "--output-directory", folder[0].fsPath],
           { cwd: repo.root },
         );
       });
+      if (!ok) return;
       vscode.window.showInformationMessage(
         `Patch file(s) written to ${folder[0].fsPath}`,
       );

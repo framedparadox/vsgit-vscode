@@ -25,15 +25,21 @@ export function registerStashCommands(
     if (message === undefined) {
       return;
     }
-    const untracked = await vscode.window.showQuickPick(
-      ["Tracked changes only", "Include untracked files"],
+    const mode = await vscode.window.showQuickPick(
+      [
+        { label: "Tracked changes only", opts: {} },
+        { label: "Include untracked files", detail: "--include-untracked", opts: { untracked: true } },
+        { label: "Keep staged changes in place", detail: "--keep-index", opts: { keepIndex: true } },
+        { label: "Staged changes only", detail: "--staged (Git 2.35+)", opts: { staged: true } },
+      ],
       { placeHolder: "What to stash" },
     );
-    if (!untracked) {
+    if (!mode) {
       return;
     }
+    const opts = mode.opts as { untracked?: boolean; keepIndex?: boolean; staged?: boolean };
     await withProgress(manager, "Stash", () =>
-      repo.stashPush(message || undefined, untracked === "Include untracked files"),
+      repo.stashPush(message || undefined, opts.untracked === true, opts),
     );
   });
 

@@ -4,6 +4,7 @@ import * as vscode from "vscode";
 import { GitExecutor } from "./GitExecutor";
 import { Repository } from "./Repository";
 import { shouldRunGitCommand } from "../util/commandPreview";
+import { findGitCheckouts } from "./discovery";
 
 /**
  * Discovers git repositories across the workspace, keeps a registry of
@@ -16,6 +17,9 @@ export class RepositoryManager implements vscode.Disposable {
 
   private readonly repositories = new Map<string, Repository>();
   private readonly watchers = new Map<string, fs.FSWatcher[]>();
+  /** Each repository's index file, and its stat stamp after our last refresh. */
+  private readonly indexPaths = new Map<string, string>();
+  private readonly indexStamps = new Map<string, string>();
   private readonly git = new GitExecutor(configuredGitPath(), shouldRunGitCommand);
   private activeRoot: string | undefined;
   private scanInFlight: Promise<void> | undefined;
@@ -138,9 +142,9 @@ export class RepositoryManager implements vscode.Disposable {
     const found = new Set<string>();
     this.lastScanFolderCount = folders.length;
 
-    const discoveredRoots = await Promise.all(
-      folders.map((folder) => this.discoverRoot(folder.uri.fsPath)),
-    );
+    const discoveredRoots = (
+      await Promise.all(folders.map((folder) => this.discoverRoots(folder.uri.fsPath)))
+    ).flat();
     const newRoots: string[] = [];
     for (const root of discoveredRoots) {
       if (root) {
@@ -193,6 +197,39 @@ export class RepositoryManager implements vscode.Disposable {
     while (this.refreshPending && !this.disposed) {
       this.refreshPending = false;
       await this.performRefresh();
+      // `git status` may rewrite the index while refreshing. Remember the
+      // index as we left it so only later (external) writes trigger a refresh.
+      this.recordIndexStamps();
+    }
+  }
+
+  /**
+   * Debounced refresh for change notifications (file saves, working-tree and
+   * `.git` watcher events). Honours `vsgit.autoRefresh`.
+   */
+  requestRefresh(): void {
+    this.scheduleRefresh();
+  }
+
+  private recordIndexStamps(): void {
+    for (const [root, indexPath] of this.indexPaths) {
+      this.indexStamps.set(root, statStamp(indexPath));
+    }
+  }
+
+  /**
+   * An index write is either our own `git status` refreshing stat data (noise
+   * that would loop forever if it triggered a refresh) or an external change
+   * such as `git add` in a terminal. Only the latter moves the index past the
+   * stamp recorded after our last refresh.
+   */
+  private onIndexEvent(root: string): void {
+    if (this.refreshInFlight) {
+      return; // the in-flight refresh records the resulting stamp
+    }
+    const indexPath = this.indexPaths.get(root);
+    if (indexPath && statStamp(indexPath) !== this.indexStamps.get(root)) {
+      this.scheduleRefresh();
     }
   }
 
@@ -209,16 +246,46 @@ export class RepositoryManager implements vscode.Disposable {
     }
   }
 
+  /**
+   * Repositories for one workspace folder: the repository containing it, or —
+   * when the folder is not inside a repository (a directory of checkouts) —
+   * repositories in its subfolders up to `vsgit.repositoryScanMaxDepth`.
+   */
+  private async discoverRoots(folder: string): Promise<string[]> {
+    const own = await this.discoverRoot(folder);
+    if (own) {
+      return [own];
+    }
+    const maxDepth = Math.max(
+      0,
+      Math.min(
+        5,
+        vscode.workspace.getConfiguration("vsgit").get<number>("repositoryScanMaxDepth", 1),
+      ),
+    );
+    const candidates = await findGitCheckouts(folder, maxDepth);
+    const roots = await Promise.all(candidates.map((dir) => this.discoverRoot(dir)));
+    return [...new Set(roots.filter((root): root is string => root !== undefined))];
+  }
+
   private async discoverRoot(start: string): Promise<string | undefined> {
     try {
-      const out = await this.git.stdout(
-        ["rev-parse", "--show-toplevel"],
-        { cwd: start },
-      );
-      const root = out.trim();
-      return root === "" ? undefined : root;
+      // `--show-cdup` is relative to `start`, so the root keeps the workspace's
+      // own spelling of the path. `--show-toplevel` resolves symlinks, which
+      // would make every editor URI under a symlinked workspace look like it
+      // is outside the repository.
+      const cdup = (
+        await this.git.stdout(["rev-parse", "--show-cdup"], { cwd: start })
+      ).trim();
+      return path.resolve(start, cdup);
     } catch {
-      return undefined;
+      try {
+        const out = await this.git.stdout(["rev-parse", "--show-toplevel"], { cwd: start });
+        const root = out.trim();
+        return root === "" ? undefined : path.resolve(root);
+      } catch {
+        return undefined;
+      }
     }
   }
 
@@ -241,6 +308,8 @@ export class RepositoryManager implements vscode.Disposable {
       watcher.close();
     }
     this.watchers.delete(root);
+    this.indexPaths.delete(root);
+    this.indexStamps.delete(root);
   }
 
   private autoRefreshEnabled(): boolean {
@@ -294,6 +363,8 @@ export class RepositoryManager implements vscode.Disposable {
       .stdout(["rev-parse", "--git-common-dir"], { cwd: root })
       .then((out) => resolveGitPath(root, out.trim()))
       .catch(() => gitDir);
+    // Linked worktrees keep their own index under their private git dir.
+    this.indexPaths.set(root, path.join(gitDir, "index"));
 
     return uniqueExistingPaths([
       gitDir,
@@ -305,17 +376,23 @@ export class RepositoryManager implements vscode.Disposable {
 
   private watchGitPath(root: string, watchPath: string): fs.FSWatcher | undefined {
     const onChange = (_event: string, filename: string | Buffer | null) => {
-      // Ignore index/lock churn. `git status` (run on every refresh)
-      // opportunistically rewrites `.git/index`, and git briefly creates
-      // `*.lock` files; reacting to those would bounce straight back into
-      // another refresh, producing a continuous refresh loop ("twitching").
+      // Ignore lock churn and filter index writes. `git status` (run on every
+      // refresh) opportunistically rewrites `.git/index`, and git briefly
+      // creates `*.lock` files; reacting to those blindly would bounce straight
+      // back into another refresh ("twitching"). External index writes such as
+      // `git add` in a terminal still refresh (see onIndexEvent).
       const name =
         typeof filename === "string"
           ? filename
           : filename
             ? Buffer.from(filename).toString()
             : "";
-      if (name && RepositoryManager.IGNORED_GIT_FILES.test(path.basename(name))) {
+      const base = path.basename(name);
+      if (name && base.toLowerCase() === "index") {
+        this.onIndexEvent(root);
+        return;
+      }
+      if (name && RepositoryManager.IGNORED_GIT_FILES.test(base)) {
         return;
       }
       this.scheduleRefresh();
@@ -354,6 +431,16 @@ function resolveGitPath(root: string, value: string): string {
     return path.join(root, ".git");
   }
   return path.isAbsolute(value) ? value : path.resolve(root, value);
+}
+
+/** mtime+size fingerprint of a file ("" when it is missing). */
+function statStamp(file: string): string {
+  try {
+    const st = fs.statSync(file);
+    return `${st.mtimeMs}:${st.size}`;
+  } catch {
+    return "";
+  }
 }
 
 function uniqueExistingPaths(values: string[]): string[] {

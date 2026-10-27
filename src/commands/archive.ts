@@ -64,11 +64,12 @@ export function registerArchiveCommands(
         });
 
         try {
-          await withProgress(
+          const ok = await withProgress(
             manager,
             `Creating ${format} archive from ${ref}`,
             () => repo.archive(ref, format, outputUri.fsPath, prefix || undefined)
           );
+          if (!ok) return;
           
           const action = await vscode.window.showInformationMessage(
             `Archive created: ${outputUri.fsPath}`,

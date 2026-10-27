@@ -52,8 +52,10 @@ export class EditorServer implements vscode.Disposable {
 
   /** Env vars to inject so `git rebase -i` routes editors back here. */
   editorEnv(shimPath: string): NodeJS.ProcessEnv {
-    // Quote the shim path so paths with spaces work in git's editor parsing.
-    const cmd = `"${process.execPath}" "${shimPath}"`;
+    // Git runs the editor through `sh -c`, so quoting keeps paths with spaces
+    // intact and the leading assignment makes VS Code's executable run the shim
+    // as plain Node rather than opening another editor window.
+    const cmd = `ELECTRON_RUN_AS_NODE=1 "${process.execPath}" "${shimPath}"`;
     return {
       VSGIT_IPC_SOCK: this.sockPath,
       VSGIT_IPC_TOKEN: this.token,
@@ -66,7 +68,11 @@ export class EditorServer implements vscode.Disposable {
     this.sockets.add(socket);
     socket.once("close", () => this.sockets.delete(socket));
     let buf = "";
+    let handled = false;
     socket.on("data", (chunk) => {
+      if (handled) {
+        return;
+      }
       buf += chunk.toString("utf8");
       // Bound the buffer so a peer that never sends a newline can't grow memory.
       if (buf.length > 8 * 1024 * 1024) {
@@ -77,6 +83,9 @@ export class EditorServer implements vscode.Disposable {
       if (nl === -1) {
         return;
       }
+      // Each connection carries exactly one request; ignore any further data so
+      // a chunked or chatty peer can't open a second editor round-trip.
+      handled = true;
       const line = buf.slice(0, nl);
       void this.respond(socket, line);
     });

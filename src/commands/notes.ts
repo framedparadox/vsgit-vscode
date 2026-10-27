@@ -31,9 +31,10 @@ export function registerNotesCommands(
     if (!message) return;
 
     try {
-      await withProgress(manager, `Adding note to ${ref}`, () =>
+      const ok = await withProgress(manager, `Adding note to ${ref}`, () =>
         repo.notesAdd(ref, message)
       );
+      if (!ok) return;
       vscode.window.showInformationMessage(`Note added to ${ref}.`);
     } catch (e) {
       vscode.window.showErrorMessage(`Failed to add note: ${errMsg(e)}`);
@@ -62,9 +63,10 @@ export function registerNotesCommands(
     if (!message) return;
 
     try {
-      await withProgress(manager, `Editing note for ${ref}`, () =>
+      const ok = await withProgress(manager, `Editing note for ${ref}`, () =>
         repo.notesEdit(ref, message)
       );
+      if (!ok) return;
       vscode.window.showInformationMessage(`Note updated for ${ref}.`);
     } catch (e) {
       vscode.window.showErrorMessage(`Failed to edit note: ${errMsg(e)}`);
@@ -90,9 +92,10 @@ export function registerNotesCommands(
     if (!confirmed) return;
 
     try {
-      await withProgress(manager, `Removing note from ${ref}`, () =>
+      const ok = await withProgress(manager, `Removing note from ${ref}`, () =>
         repo.notesRemove(ref)
       );
+      if (!ok) return;
       vscode.window.showInformationMessage(`Note removed from ${ref}.`);
     } catch (e) {
       vscode.window.showErrorMessage(`Failed to remove note: ${errMsg(e)}`);

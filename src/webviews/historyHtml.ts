@@ -278,8 +278,8 @@ function makeFileRow(sha, f, label) {
   row.setAttribute('role', 'button');
   row.setAttribute('aria-label', f.path + ', status ' + code + ', open diff');
   row.innerHTML = '<span class="st">' + esc(code) + '</span><span class="fp">' + esc(label) + '</span>';
-  row.addEventListener('click', () => vscode.postMessage({ type: 'openFile', sha, path: f.path }));
-  keyboardClick(row, () => vscode.postMessage({ type: 'openFile', sha, path: f.path }));
+  row.addEventListener('click', () => vscode.postMessage({ type: 'openFile', sha, path: f.path, origPath: f.origPath }));
+  keyboardClick(row, () => vscode.postMessage({ type: 'openFile', sha, path: f.path, origPath: f.origPath }));
   return row;
 }
 

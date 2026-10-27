@@ -34,7 +34,7 @@ export function registerHistoryCommands(
           vscode.window.showWarningMessage("No Git repositories found.");
           return;
         }
-        const repo = repos[0];
+        const repo = view.currentRepo ?? manager.getActive() ?? repos[0];
         const allRefs = [
           ...repo.localBranches.map((b) => b.shortName),
           ...repo.remoteBranches.map((b) => b.shortName),
@@ -62,7 +62,7 @@ export function registerHistoryCommands(
           vscode.window.showWarningMessage("No Git repositories found.");
           return;
         }
-        const repo = repos[0];
+        const repo = view.currentRepo ?? manager.getActive() ?? repos[0];
         const branches = [
           "All branches",
           ...repo.localBranches.map((b) => b.shortName),

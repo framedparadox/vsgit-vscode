@@ -33,7 +33,8 @@ Development Host with `F5`.
 - `src/commands/` — command registration grouped by workflow.
 - `src/views/` — native VS Code tree and Source Control providers.
 - `src/webviews/` — webview hosts and inline HTML generators.
-- `resources/` — webview clients, styles, fonts, pure helpers, and static tests.
+- `resources/` — image assets (icons) packaged with the extension.
+- `webview-ui/` — webview clients, styles, fonts, pure helpers, and static tests.
 - `src/test/` — tests that run inside a real VS Code Extension Host.
 
 All Git child processes must go through `GitExecutor`. Do not construct shell
@@ -79,7 +80,7 @@ version, required runtime files, size, and absence of source/test artifacts.
 - Parser changes need focused input/output unit tests.
 - Repository methods need argv and option-injection coverage.
 - Manifest, menu, documentation, and resource contracts belong in
-  `resources/*.test.js`.
+  `webview-ui/**/*.test.js`.
 - VS Code lifecycle and command-registration behavior belongs in
   `src/test/*.integration.test.ts`.
 - A bug fix should include a test that fails without the fix.
@@ -112,5 +113,5 @@ should explain:
 5. Screenshots or a short recording for material UI changes.
 
 Update `README.md`, `CHANGELOG.md`, and
-`docs/IMPLEMENTATION_PLAN.md` whenever implementation status or public behavior
+`img/IMPLEMENTATION_PLAN.md` whenever implementation status or public behavior
 changes.

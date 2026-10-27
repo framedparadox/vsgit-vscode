@@ -5,6 +5,7 @@ import { VsgitNode } from "../views/RepositoriesProvider";
 import { Credentials } from "../util/credentials";
 import { resolveRepo, withProgress } from "./shared";
 import { confirmDestructiveAction, DestructiveOperations } from "../util/confirmation";
+import { runSequencerAction } from "./interactiveRebase";
 
 /** Fetch / Pull / Push (with a push dialog) plus merge and rebase. */
 export function registerTransportCommands(
@@ -24,11 +25,14 @@ export function registerTransportCommands(
     if (remote === undefined) {
       return;
     }
+    const prune = vscode.workspace
+      .getConfiguration("vsgit")
+      .get<boolean>("fetch.pruneOnFetch", true);
     await withProgress(manager, "Fetch", () =>
       creds.withAskpass((env) =>
         repo.fetch(remote === "<all>" ? undefined : remote, {
           all: remote === "<all>",
-          prune: true,
+          prune,
           tags: true,
           env,
         }),
@@ -44,21 +48,29 @@ export function registerTransportCommands(
     const defaultMode = vscode.workspace
       .getConfiguration("vsgit")
       .get<string>("defaultPullMode", "merge");
-    const mode = await vscode.window.showQuickPick(
-      [
-        { label: "Merge", picked: defaultMode !== "rebase" },
-        { label: "Rebase", picked: defaultMode === "rebase" },
-      ],
-      {
+    // A single-select quick pick ignores `picked`, so list the configured
+    // default first to make Enter choose it.
+    const strategies = [
+      { label: "Merge", description: defaultMode !== "rebase" ? "default" : undefined },
+      { label: "Rebase", description: defaultMode === "rebase" ? "default" : undefined },
+      { label: "Fast-forward only", description: "--ff-only" },
+    ];
+    if (defaultMode === "rebase") {
+      [strategies[0], strategies[1]] = [strategies[1], strategies[0]];
+    }
+    const mode = await vscode.window.showQuickPick(strategies, {
       placeHolder: "Pull strategy",
-      },
-    );
+    });
     if (!mode) {
       return;
     }
     await withProgress(manager, "Pull", () =>
       creds.withAskpass((env) =>
-        repo.pull({ rebase: mode.label === "Rebase", env }),
+        repo.pull({
+          rebase: mode.label === "Rebase",
+          ffOnly: mode.label === "Fast-forward only",
+          env,
+        }),
       ),
     );
   });
@@ -131,7 +143,7 @@ async function seq(
     return;
   }
   await withProgress(manager, `${kind} --${action}`, () =>
-    repo.sequencerAction(kind, action),
+    runSequencerAction(repo, kind, action),
   );
 }
 
@@ -144,7 +156,13 @@ async function pushDialog(
   if (remote === undefined || remote === "<all>") {
     return;
   }
-  const branch = repo.headName ?? "HEAD";
+  const branch = currentBranch(repo);
+  if (!branch) {
+    vscode.window.showWarningMessage(
+      "HEAD is detached. Check out a branch (or create one here) before pushing.",
+    );
+    return;
+  }
   const flags = await vscode.window.showQuickPick(
     [
       { label: "Set upstream (-u)", key: "setUpstream", picked: true },
@@ -159,12 +177,13 @@ async function pushDialog(
   }
   const opts: {
     remote: string;
+    refspec?: string;
     setUpstream?: boolean;
     force?: boolean;
     forceWithLease?: boolean;
     tags?: boolean;
     env?: NodeJS.ProcessEnv;
-  } = { remote };
+  } = { remote, refspec: repo.pushRefspec(branch, remote) };
   const selected = new Set(flags.map((f) => f.key));
   opts.setUpstream = selected.has("setUpstream");
   opts.tags = selected.has("tags");
@@ -184,6 +203,11 @@ async function pushDialog(
   await withProgress(manager, `Push to ${remote}`, () =>
     creds.withAskpass((env) => repo.push({ ...opts, env })),
   );
+}
+
+/** The checked-out branch name, or undefined when HEAD is detached. */
+function currentBranch(repo: Repository): string | undefined {
+  return repo.localBranches.find((b) => b.isHead)?.shortName;
 }
 
 async function pickRemote(

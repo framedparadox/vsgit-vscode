@@ -34,11 +34,12 @@ export function registerSubtreeCommands(
     });
 
     try {
-      await withProgress(
+      const ok = await withProgress(
         manager,
         `Adding subtree from ${repository}`,
         () => repo.subtreeAdd(prefix, repository, ref || undefined),
       );
+      if (!ok) return;
       vscode.window.showInformationMessage(
         `Subtree added at ${prefix} from ${repository}.`,
       );
@@ -70,11 +71,12 @@ export function registerSubtreeCommands(
     });
 
     try {
-      await withProgress(
+      const ok = await withProgress(
         manager,
         `Pulling subtree updates from ${repository}`,
         () => repo.subtreePull(prefix, repository, ref || undefined),
       );
+      if (!ok) return;
       vscode.window.showInformationMessage(
         `Subtree ${prefix} updated from ${repository}.`,
       );
@@ -113,11 +115,12 @@ export function registerSubtreeCommands(
     if (confirm !== "Push") return;
 
     try {
-      await withProgress(
+      const ok = await withProgress(
         manager,
         `Pushing subtree to ${repository}`,
         () => repo.subtreePush(prefix, repository, ref || undefined),
       );
+      if (!ok) return;
       vscode.window.showInformationMessage(
         `Subtree ${prefix} pushed to ${repository}.`,
       );

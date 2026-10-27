@@ -172,7 +172,7 @@
   a single shared `ESC_SCRIPT` definition, which also fixed inconsistent handling
   of nullish values (some copies rendered `"undefined"`/`"null"` as literal text).
 - Scoped `.gitignore` to ignore only the intended local-only docs rather than the
-  whole `docs/` folder, so newly added documentation is no longer silently
+  whole `img/` folder, so newly added documentation is no longer silently
   untracked.
 - Unit suite grows to 189 passing tests, adding coverage for slash-named branch
   classification and the resolved subtree default branch.
@@ -247,9 +247,9 @@
 
 ### Docs
 - Rewrote the README with a detailed feature reference, settings table,
-  architecture and security sections, and illustrated `docs/` diagrams of the
+  architecture and security sections, and illustrated `img/` diagrams of the
   Git Graph panel and the activity-bar trees.
-- Added `CONTRIBUTING.md` and `docs/MARKETPLACE_CHECKLIST.md`.
+- Added `CONTRIBUTING.md` and `img/MARKETPLACE_CHECKLIST.md`.
 
 ## [0.1.0] - 2026-06-01
 

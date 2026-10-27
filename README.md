@@ -46,7 +46,7 @@ Because every operation is a genuine `git` invocation with an argv array, VsGit
 behaves *exactly* like your shell: the same config, hooks, credential helpers,
 aliases, and `.gitignore` rules apply. Nothing is approximated.
 
-![VsGit in VS Code: the VsGit sidebar with the Repositories and Commit views next to the Git Graph, with a commit selected and its changed files expanded inline](docs/images/hero.png)
+![VsGit in VS Code: the VsGit sidebar with the Repositories and Commit views next to the Git Graph, with a commit selected and its changed files expanded inline](img/images/hero.png)
 
 > **About the screenshots.** Every image in this README is a real capture of
 > VsGit 0.0.8 running in VS Code 1.126 (Default Dark Modern theme). They were
@@ -147,16 +147,16 @@ A quick look at the main surfaces. Each one is described in detail further down.
 
 <table>
 <tr>
-<td width="50%" valign="top"><a href="#git-graph"><img src="docs/images/git-graph.png" alt="Git Graph panel with colour-coded lanes, ref pills, and an expanded commit" /></a><br/><sub><b>Git Graph</b> — lanes, ref pills, inline commit details</sub></td>
-<td width="50%" valign="top"><a href="#history"><img src="docs/images/history-details.png" alt="History panel with a commit selected and its changed files" /></a><br/><sub><b>History</b> — filterable log with commit details</sub></td>
+<td width="50%" valign="top"><a href="#git-graph"><img src="img/images/git-graph.png" alt="Git Graph panel with colour-coded lanes, ref pills, and an expanded commit" /></a><br/><sub><b>Git Graph</b> — lanes, ref pills, inline commit details</sub></td>
+<td width="50%" valign="top"><a href="#history"><img src="img/images/history-details.png" alt="History panel with a commit selected and its changed files" /></a><br/><sub><b>History</b> — filterable log with commit details</sub></td>
 </tr>
 <tr>
-<td width="50%" valign="top"><a href="#interactive-rebase"><img src="docs/images/interactive-rebase.png" alt="Interactive rebase editor with pick, fixup, and reword actions" /></a><br/><sub><b>Interactive rebase</b> — edit the todo list in a form</sub></td>
-<td width="50%" valign="top"><a href="#conflicts"><img src="docs/images/merge-editor.png" alt="VS Code three-way merge editor opened from the VsGit Conflicts view" /></a><br/><sub><b>Conflicts</b> — straight into the 3-way merge editor</sub></td>
+<td width="50%" valign="top"><a href="#interactive-rebase"><img src="img/images/interactive-rebase.png" alt="Interactive rebase editor with pick, fixup, and reword actions" /></a><br/><sub><b>Interactive rebase</b> — edit the todo list in a form</sub></td>
+<td width="50%" valign="top"><a href="#conflicts"><img src="img/images/merge-editor.png" alt="VS Code three-way merge editor opened from the VsGit Conflicts view" /></a><br/><sub><b>Conflicts</b> — straight into the 3-way merge editor</sub></td>
 </tr>
 <tr>
-<td width="50%" valign="top"><a href="#commit"><img src="docs/images/commit-view.png" alt="VsGit Commit view with staged and unstaged changes and a commit message" /></a><br/><sub><b>Commit view</b> — staging and commit in the VsGit sidebar</sub></td>
-<td width="50%" valign="top"><a href="#documentation-library"><img src="docs/images/documentation-library.png" alt="VsGit reference library with Overview, Components, Git glossary, and Operations tabs" /></a><br/><sub><b>Documentation library</b> — components, glossary, operations</sub></td>
+<td width="50%" valign="top"><a href="#commit"><img src="img/images/commit-view.png" alt="VsGit Commit view with staged and unstaged changes and a commit message" /></a><br/><sub><b>Commit view</b> — staging and commit in the VsGit sidebar</sub></td>
+<td width="50%" valign="top"><a href="#documentation-library"><img src="img/images/documentation-library.png" alt="VsGit reference library with Overview, Components, Git glossary, and Operations tabs" /></a><br/><sub><b>Documentation library</b> — components, glossary, operations</sub></td>
 </tr>
 </table>
 
@@ -235,7 +235,7 @@ run `npm run watch`, then press `F5`.
 
 <table>
 <tr>
-<td width="44%" valign="top"><img src="docs/images/sidebar-overview.png" alt="VsGit activity-bar container with Repositories, Commit, Git Repositories, and the collapsed advanced views" /></td>
+<td width="44%" valign="top"><img src="img/images/sidebar-overview.png" alt="VsGit activity-bar container with Repositories, Commit, Git Repositories, and the collapsed advanced views" /></td>
 <td valign="top">
 
 A dedicated **VsGit** container in the activity bar holds every view:
@@ -263,7 +263,7 @@ without a repository. The advanced views appear when
 
 ### Repositories
 
-<img src="docs/images/repositories-view.png" alt="Repositories view listing orbit-api and the active orbit-web repository with ahead/behind counts" width="360" />
+<img src="img/images/repositories-view.png" alt="Repositories view listing orbit-api and the active orbit-web repository with ahead/behind counts" width="360" />
 
 - Lists every repository in the workspace with its current branch and
   ahead/behind counts (`↑2 ↓2` means two commits to push and two to pull).
@@ -275,7 +275,7 @@ without a repository. The advanced views appear when
   Branch, and Initialize Repository.
 - Right-click a repository for the full **VsGit** menu:
 
-<img src="docs/images/repo-context-menu.png" alt="Repository context menu with Push/Pull, History, Merge, Rebase, the Reset submenu showing soft, mixed, hard, keep, and merge modes, and submenus for Remote, Submodule, Patch, Bisect, Notes, Subtree, Git LFS, Gerrit, Maintenance, Prune, and Config" width="733" />
+<img src="img/images/repo-context-menu.png" alt="Repository context menu with Push/Pull, History, Merge, Rebase, the Reset submenu showing soft, mixed, hard, keep, and merge modes, and submenus for Remote, Submodule, Patch, Bisect, Notes, Subtree, Git LFS, Gerrit, Maintenance, Prune, and Config" width="733" />
 
 The **Reset** submenu exposes all five `git reset` modes — soft, mixed, hard,
 keep, and merge. Each one asks for a target ref and confirms before a
@@ -286,8 +286,8 @@ Abort) during a rebase, merge, cherry-pick, or revert.
 
 <table>
 <tr>
-<td width="50%" valign="top"><img src="docs/images/repositories-tree.png" alt="Git Repositories tree with Local Branches, Remote Branches, Tags, Remotes, and Stashes expanded" /></td>
-<td width="50%" valign="top"><img src="docs/images/branch-context-menu.png" alt="Branch context menu with Interactive Rebase, Push, Checkout, Merge, Rebase, Rename Branch, Configure Upstream, Reset HEAD, Compare Branch with, and Delete Branch" /></td>
+<td width="50%" valign="top"><img src="img/images/repositories-tree.png" alt="Git Repositories tree with Local Branches, Remote Branches, Tags, Remotes, and Stashes expanded" /></td>
+<td width="50%" valign="top"><img src="img/images/branch-context-menu.png" alt="Branch context menu with Interactive Rebase, Push, Checkout, Merge, Rebase, Rename Branch, Configure Upstream, Reset HEAD, Compare Branch with, and Delete Branch" /></td>
 </tr>
 </table>
 
@@ -308,12 +308,12 @@ Abort) during a rebase, merge, cherry-pick, or revert.
 
 <table>
 <tr>
-<td width="50%" valign="top"><img src="docs/images/commit-view.png" alt="Commit view with a message, the Commit button, and Staged Changes and Changes groups in tree layout" /><br/><sub>Tree layout with staged and unstaged groups</sub></td>
-<td width="50%" valign="top"><img src="docs/images/commit-menu.png" alt="Commit split-button menu with Commit, Commit and Push, Commit and Sync, Commit Amend, and Commit Signed Off" /><br/><sub>Split-button commit actions</sub></td>
+<td width="50%" valign="top"><img src="img/images/commit-view.png" alt="Commit view with a message, the Commit button, and Staged Changes and Changes groups in tree layout" /><br/><sub>Tree layout with staged and unstaged groups</sub></td>
+<td width="50%" valign="top"><img src="img/images/commit-menu.png" alt="Commit split-button menu with Commit, Commit and Push, Commit and Sync, Commit Amend, and Commit Signed Off" /><br/><sub>Split-button commit actions</sub></td>
 </tr>
 <tr>
-<td width="50%" valign="top"><img src="docs/images/commit-options.png" alt="Commit view with the Amend, Sign off, and GPG options revealed" /><br/><sub>Amend / Sign off / GPG toggles</sub></td>
-<td width="50%" valign="top"><img src="docs/images/commit-list.png" alt="Commit view in flat list layout showing folder paths next to file names" /><br/><sub>Flat list layout</sub></td>
+<td width="50%" valign="top"><img src="img/images/commit-options.png" alt="Commit view with the Amend, Sign off, and GPG options revealed" /><br/><sub>Amend / Sign off / GPG toggles</sub></td>
+<td width="50%" valign="top"><img src="img/images/commit-list.png" alt="Commit view in flat list layout showing folder paths next to file names" /><br/><sub>Flat list layout</sub></td>
 </tr>
 </table>
 
@@ -346,7 +346,7 @@ A Source-Control-style commit panel that replaces the transient input box:
 
 ### Staging
 
-<img src="docs/images/staging-view.png" alt="Staging view with Staged Changes and Unstaged Changes groups" width="360" />
+<img src="img/images/staging-view.png" alt="Staging view with Staged Changes and Unstaged Changes groups" width="360" />
 
 A tree-view alternative to the Commit webview. Right-click a file to **Stage**,
 **Unstage**, **Stage Hunk(s)…**, **Unstage Hunk(s)…**, **Discard Changes**,
@@ -355,7 +355,7 @@ Commit, Stage All, and Refresh.
 
 ### Synchronize
 
-<img src="docs/images/synchronize-view.png" alt="Synchronize view listing two incoming and two outgoing commits" width="360" />
+<img src="img/images/synchronize-view.png" alt="Synchronize view listing two incoming and two outgoing commits" width="360" />
 
 Incoming (behind) and outgoing (ahead) commits compared with the configured
 upstream. Right-click an incoming commit to **Cherry-Pick Commit**, **Checkout
@@ -364,14 +364,14 @@ Commit (Detached)**, or **Show Commit Details**. Turn on
 
 ### Reflog
 
-<img src="docs/images/reflog-view.png" alt="Reflog view listing HEAD@{0} through HEAD@{22} with checkout, commit, merge, and reset entries" width="360" />
+<img src="img/images/reflog-view.png" alt="Reflog view listing HEAD@{0} through HEAD@{22} with checkout, commit, merge, and reset entries" width="360" />
 
 Browse `git reflog` and **Checkout This Entry** or **Reset HEAD to Entry…** — your
 safety net for recovering commits after a reset, rebase, or deleted branch.
 
 ### Worktrees
 
-<img src="docs/images/worktrees-view.png" alt="Worktrees view showing each repository with its main worktree and a linked hotfix worktree" width="250" />
+<img src="img/images/worktrees-view.png" alt="Worktrees view showing each repository with its main worktree and a linked hotfix worktree" width="250" />
 
 List, create (**Add Worktree…**), open in a new window or the current one, lock,
 unlock, move, remove, prune, and reveal linked worktrees. Each entry shows its
@@ -381,8 +381,8 @@ checked-out branch or detached commit.
 
 <table>
 <tr>
-<td width="50%" valign="top"><img src="docs/images/conflicts-view.png" alt="Conflicts view listing README.md and src/main.go as conflicted" /><br/><br/><img src="docs/images/conflicts-menu.png" alt="Conflict context menu with HEAD Revision, Use Ours, Use Theirs, Open Merge Editor, Mark Resolved, and Open Merge Tool" /></td>
-<td width="50%" valign="top"><img src="docs/images/sequencer-menu.png" alt="Repository menu In Progress submenu with Continue, Skip, Abort, Abort Merge, and Show Rebase/Merge Progress" /></td>
+<td width="50%" valign="top"><img src="img/images/conflicts-view.png" alt="Conflicts view listing README.md and src/main.go as conflicted" /><br/><br/><img src="img/images/conflicts-menu.png" alt="Conflict context menu with HEAD Revision, Use Ours, Use Theirs, Open Merge Editor, Mark Resolved, and Open Merge Tool" /></td>
+<td width="50%" valign="top"><img src="img/images/sequencer-menu.png" alt="Repository menu In Progress submenu with Continue, Skip, Abort, Abort Merge, and Show Rebase/Merge Progress" /></td>
 </tr>
 </table>
 
@@ -396,11 +396,11 @@ offer **Continue**, **Skip**, and **Abort**.
 **Open Merge Editor** uses VS Code's built-in 3-way merge editor, with *Current
 (HEAD, ours)* and *Incoming (MERGE_HEAD)* inputs:
 
-![VS Code three-way merge editor for src/main.go showing Current and Incoming changes and the Result pane](docs/images/merge-editor.png)
+![VS Code three-way merge editor for src/main.go showing Current and Incoming changes and the Result pane](img/images/merge-editor.png)
 
 ### Compare
 
-<img src="docs/images/compare-view.png" alt="Compare view for release/1.2 against main showing commits only in each side and changed files versus the merge base" width="360" />
+<img src="img/images/compare-view.png" alt="Compare view for release/1.2 against main showing commits only in each side and changed files versus the merge base" width="360" />
 
 Run **VsGit: Start Branch/Tag Comparison…**, pick two refs, and the Compare view
 lists the commits unique to each side plus every file changed since the merge
@@ -409,7 +409,7 @@ Comparison** are in the view title bar.
 
 ### Documentation view
 
-<img src="docs/images/documentation-sidebar.png" alt="Documentation sidebar view with the reference library heading, Open Full Library button, search box, and section tabs" width="360" />
+<img src="img/images/documentation-sidebar.png" alt="Documentation sidebar view with the reference library heading, Open Full Library button, search box, and section tabs" width="360" />
 
 The Documentation view stays at the bottom of the VsGit sidebar and works
 without an active repository. **Open Full Library** opens the wider editor
@@ -419,7 +419,7 @@ version — see [Documentation library](#documentation-library).
 
 ## Git Graph
 
-![Git Graph showing colour-coded lanes, branch, remote, stash, and tag pills, and an expanded commit with metadata and changed files](docs/images/git-graph.png)
+![Git Graph showing colour-coded lanes, branch, remote, stash, and tag pills, and an expanded commit with metadata and changed files](img/images/git-graph.png)
 
 Open it with `⌘⇧G G` / `Ctrl+Shift+G G`, **VsGit: Show Git Graph**, or the *Git
 Graph* status-bar button.
@@ -458,20 +458,20 @@ Graph* status-bar button.
 
 <table>
 <tr>
-<td width="50%" valign="top"><img src="docs/images/graph-context-menu.png" alt="Commit context menu in the Git Graph" /><br/><sub><b>Commit menu</b> — checkout, branch, tag, merge, rebase, cherry-pick, revert, drop, reset, compare, copy SHA or message. Merge commits ask which parent to cherry-pick or revert against.</sub></td>
-<td width="50%" valign="top"><img src="docs/images/graph-ref-menu.png" alt="Ref pill context menu in the Git Graph" /><br/><sub><b>Ref pill menu</b> — checkout (remote branches get a local tracking branch), merge, rebase onto, rename, delete, push, copy name</sub></td>
+<td width="50%" valign="top"><img src="img/images/graph-context-menu.png" alt="Commit context menu in the Git Graph" /><br/><sub><b>Commit menu</b> — checkout, branch, tag, merge, rebase, cherry-pick, revert, drop, reset, compare, copy SHA or message. Merge commits ask which parent to cherry-pick or revert against.</sub></td>
+<td width="50%" valign="top"><img src="img/images/graph-ref-menu.png" alt="Ref pill context menu in the Git Graph" /><br/><sub><b>Ref pill menu</b> — checkout (remote branches get a local tracking branch), merge, rebase onto, rename, delete, push, copy name</sub></td>
 </tr>
 <tr>
-<td width="50%" valign="top"><img src="docs/images/graph-find.png" alt="Git Graph find widget highlighting two matches for 'session'" /><br/><sub><b>Find</b> (<code>Ctrl/Cmd+F</code>) across message, author, hash, and ref names</sub></td>
-<td width="50%" valign="top"><img src="docs/images/graph-trace.png" alt="Git Graph trace mode dimming commits that are not ancestors of the selected commit" /><br/><sub><b>Trace</b> — dim everything except the ancestors (or ancestors and descendants)</sub></td>
+<td width="50%" valign="top"><img src="img/images/graph-find.png" alt="Git Graph find widget highlighting two matches for 'session'" /><br/><sub><b>Find</b> (<code>Ctrl/Cmd+F</code>) across message, author, hash, and ref names</sub></td>
+<td width="50%" valign="top"><img src="img/images/graph-trace.png" alt="Git Graph trace mode dimming commits that are not ancestors of the selected commit" /><br/><sub><b>Trace</b> — dim everything except the ancestors (or ancestors and descendants)</sub></td>
 </tr>
 <tr>
-<td width="50%" valign="top"><img src="docs/images/graph-compare.png" alt="Git Graph comparing two commits and listing the files changed between them" /><br/><sub><b>Compare</b> — <code>Ctrl/Cmd</code>-click a second commit</sub></td>
-<td width="50%" valign="top"><img src="docs/images/graph-columns.png" alt="Git Graph columns menu with Commit, Author, Authored Date, Committer, and Committed Date toggles" /><br/><sub><b>Columns</b> — toggle metadata columns</sub></td>
+<td width="50%" valign="top"><img src="img/images/graph-compare.png" alt="Git Graph comparing two commits and listing the files changed between them" /><br/><sub><b>Compare</b> — <code>Ctrl/Cmd</code>-click a second commit</sub></td>
+<td width="50%" valign="top"><img src="img/images/graph-columns.png" alt="Git Graph columns menu with Commit, Author, Authored Date, Committer, and Committed Date toggles" /><br/><sub><b>Columns</b> — toggle metadata columns</sub></td>
 </tr>
 <tr>
-<td width="50%" valign="top"><img src="docs/images/graph-create-tag.png" alt="Create Tag dialog opened from a commit in the Git Graph" /><br/><sub><b>Create Tag Here</b> — annotated, signed, forced, or pushed</sub></td>
-<td width="50%" valign="top"><img src="docs/images/graph-inprogress.png" alt="Git Graph showing a Merge in progress banner with Continue and Abort buttons" /><br/><sub><b>In-progress banner</b> — Continue / Skip / Abort</sub></td>
+<td width="50%" valign="top"><img src="img/images/graph-create-tag.png" alt="Create Tag dialog opened from a commit in the Git Graph" /><br/><sub><b>Create Tag Here</b> — annotated, signed, forced, or pushed</sub></td>
+<td width="50%" valign="top"><img src="img/images/graph-inprogress.png" alt="Git Graph showing a Merge in progress banner with Continue and Abort buttons" /><br/><sub><b>In-progress banner</b> — Continue / Skip / Abort</sub></td>
 </tr>
 </table>
 
@@ -497,8 +497,8 @@ Graph* status-bar button.
 
 <table>
 <tr>
-<td width="50%" valign="top"><img src="docs/images/history-details.png" alt="History panel with the feature/auth commit selected and its two changed files" /></td>
-<td width="50%" valign="top"><img src="docs/images/history-compare.png" alt="History panel comparing release/1.2 with feature/search" /></td>
+<td width="50%" valign="top"><img src="img/images/history-details.png" alt="History panel with the feature/auth commit selected and its two changed files" /></td>
+<td width="50%" valign="top"><img src="img/images/history-compare.png" alt="History panel comparing release/1.2 with feature/search" /></td>
 </tr>
 </table>
 
@@ -526,7 +526,7 @@ editor tab:
 
 ## Editor and Explorer integration
 
-![Editor with inline blame on line 13 reading 'Priya Nair · 2026-08-06 · Add API client with retry support' (the quick-diff marker on line 10 comes from VS Code's built-in Git)](docs/images/inline-blame.png)
+![Editor with inline blame on line 13 reading 'Priya Nair · 2026-08-06 · Add API client with retry support' (the quick-diff marker on line 10 comes from VS Code's built-in Git)](img/images/inline-blame.png)
 
 - **Inline blame** (`⌘⇧G A` / `Ctrl+Shift+G A`, or the editor title button)
   annotates the current line with author, date, and subject. Uncommitted lines
@@ -538,12 +538,12 @@ editor tab:
 
 <table>
 <tr>
-<td width="50%" valign="top"><img src="docs/images/explorer-compare-menu.png" alt="Explorer context menu with the Compare With submenu open" /><br/><sub><b>Compare With</b> — HEAD, Index, Previous Revision, a branch/tag/reference, a commit, the clipboard, each other, or local history</sub></td>
-<td width="50%" valign="top"><img src="docs/images/explorer-team-menu.png" alt="Explorer context menu with the Team submenu open" /><br/><sub><b>Team</b> — stage, unstage, ignore, file history, patch from staged changes, and an Advanced submenu</sub></td>
+<td width="50%" valign="top"><img src="img/images/explorer-compare-menu.png" alt="Explorer context menu with the Compare With submenu open" /><br/><sub><b>Compare With</b> — HEAD, Index, Previous Revision, a branch/tag/reference, a commit, the clipboard, each other, or local history</sub></td>
+<td width="50%" valign="top"><img src="img/images/explorer-team-menu.png" alt="Explorer context menu with the Team submenu open" /><br/><sub><b>Team</b> — stage, unstage, ignore, file history, patch from staged changes, and an Advanced submenu</sub></td>
 </tr>
 </table>
 
-![Editor context menu with Toggle Inline Blame, Compare With, Replace With, Show File History, Stage, Unstage, and Add to .gitignore](docs/images/editor-context-menu.png)
+![Editor context menu with Toggle Inline Blame, Compare With, Replace With, Show File History, Stage, Unstage, and Add to .gitignore](img/images/editor-context-menu.png)
 
 The same **Compare With** / **Replace With** submenus appear in the editor
 context menu. **Replace With** restores a file from HEAD, the index, the
@@ -557,7 +557,7 @@ Worktree, Untrack (Remove from Index), and Clean Untracked Files.
 
 ### Interactive rebase
 
-![Interactive Rebase editor listing four commits with pick, fixup, reword, and pick actions](docs/images/interactive-rebase.png)
+![Interactive Rebase editor listing four commits with pick, fixup, reword, and pick actions](img/images/interactive-rebase.png)
 
 **VsGit: Interactive Rebase…** (or **Interactive Rebase…** on a branch) asks for
 a base — a branch or "the last N commits" — and starts `git rebase -i`. The todo
@@ -574,7 +574,7 @@ This works through a small editor shim wired to `GIT_SEQUENCE_EDITOR` /
 
 ### Create Tag
 
-<img src="docs/images/create-tag-dialog.png" alt="Create Tag dialog with tag name v1.2.0, the annotated option, a message, and push after creation checked" width="460" />
+<img src="img/images/create-tag-dialog.png" alt="Create Tag dialog with tag name v1.2.0, the annotated option, a message, and push after creation checked" width="460" />
 
 **VsGit: Create Tag…**, **Create Tag…** on a repository, or **Create Tag Here…**
 in the graph opens one form for the name, target commit, message, and the
@@ -583,7 +583,7 @@ after creation** options.
 
 ### Git Config editor
 
-![Git Config editor on the Local (repo) tab listing keys and values with delete buttons and an Add row](docs/images/config-editor.png)
+![Git Config editor on the Local (repo) tab listing keys and values with delete buttons and an Add row](img/images/config-editor.png)
 
 **VsGit: Open Git Config Panel…** (`⌘⇧G ,` / `Ctrl+Shift+G ,`) edits
 configuration without memorising keys:
@@ -596,8 +596,8 @@ configuration without memorising keys:
 
 <table>
 <tr>
-<td width="50%" valign="top"><img src="docs/images/config-remotes.png" alt="Git Config editor Remotes tab with origin and its fetch and push URLs" /></td>
-<td width="50%" valign="top"><img src="docs/images/config-extension.png" alt="Git Config editor Extension Settings tab with refresh, auto fetch, safety, and pull settings" /></td>
+<td width="50%" valign="top"><img src="img/images/config-remotes.png" alt="Git Config editor Remotes tab with origin and its fetch and push URLs" /></td>
+<td width="50%" valign="top"><img src="img/images/config-extension.png" alt="Git Config editor Extension Settings tab with refresh, auto fetch, safety, and pull settings" /></td>
 </tr>
 </table>
 
@@ -605,12 +605,12 @@ configuration without memorising keys:
 
 <table>
 <tr>
-<td width="50%" valign="top"><img src="docs/images/ref-picker.png" alt="Reference picker with Local, Remote Tracking, Tags, Stashed Changes, and References sections" /><br/><sub><b>Reference picker</b> — used by Compare/Replace With › Branch, Tag, or Reference</sub></td>
-<td width="50%" valign="top"><img src="docs/images/commit-picker.png" alt="Commit picker listing commits with a mini graph, ids, messages, authors, and dates" /><br/><sub><b>Commit picker</b> — used by Compare/Replace With › Commit</sub></td>
+<td width="50%" valign="top"><img src="img/images/ref-picker.png" alt="Reference picker with Local, Remote Tracking, Tags, Stashed Changes, and References sections" /><br/><sub><b>Reference picker</b> — used by Compare/Replace With › Branch, Tag, or Reference</sub></td>
+<td width="50%" valign="top"><img src="img/images/commit-picker.png" alt="Commit picker listing commits with a mini graph, ids, messages, authors, and dates" /><br/><sub><b>Commit picker</b> — used by Compare/Replace With › Commit</sub></td>
 </tr>
 <tr>
-<td width="50%" valign="top"><img src="docs/images/switch-to.png" alt="Switch branch quick pick listing local branches, remote branches, and tags" /><br/><sub><b>Switch To</b> (<code>⌘⇧G B</code>) — branches, remote branches, and tags</sub></td>
-<td width="50%" valign="top"><img src="docs/images/command-palette.png" alt="Command Palette filtered to VsGit commands" /><br/><sub><b>Command Palette</b> — 72 VsGit commands</sub></td>
+<td width="50%" valign="top"><img src="img/images/switch-to.png" alt="Switch branch quick pick listing local branches, remote branches, and tags" /><br/><sub><b>Switch To</b> (<code>⌘⇧G B</code>) — branches, remote branches, and tags</sub></td>
+<td width="50%" valign="top"><img src="img/images/command-palette.png" alt="Command Palette filtered to VsGit commands" /><br/><sub><b>Command Palette</b> — 72 VsGit commands</sub></td>
 </tr>
 </table>
 
@@ -618,7 +618,7 @@ configuration without memorising keys:
 
 ## Documentation library
 
-![VsGit reference library overview with the search box, counts for 17 components, 82 Git terms, and 173 operations, and the Overview tab](docs/images/documentation-library.png)
+![VsGit reference library overview with the search box, counts for 17 components, 82 Git terms, and 173 operations, and the Overview tab](img/images/documentation-library.png)
 
 Choose **Open Full Library** inside the sidebar view, use the view-title book
 action, or run **VsGit: Open Documentation**. Press `/` to focus search and
@@ -636,12 +636,12 @@ action, or run **VsGit: Open Documentation**. Press `/` to focus search and
 
 <table>
 <tr>
-<td width="50%" valign="top"><img src="docs/images/documentation-components.png" alt="Components tab listing VsGit surfaces" /><br/><sub>Components</sub></td>
-<td width="50%" valign="top"><img src="docs/images/documentation-glossary.png" alt="Git glossary tab listing terms" /><br/><sub>Git glossary</sub></td>
+<td width="50%" valign="top"><img src="img/images/documentation-components.png" alt="Components tab listing VsGit surfaces" /><br/><sub>Components</sub></td>
+<td width="50%" valign="top"><img src="img/images/documentation-glossary.png" alt="Git glossary tab listing terms" /><br/><sub>Git glossary</sub></td>
 </tr>
 <tr>
-<td width="50%" valign="top"><img src="docs/images/documentation-operations.png" alt="Operations tab listing workflow categories with operation counts" /><br/><sub>Operations</sub></td>
-<td width="50%" valign="top"><img src="docs/images/documentation-search.png" alt="Search results for reflog across components and glossary" /><br/><sub>Search across everything</sub></td>
+<td width="50%" valign="top"><img src="img/images/documentation-operations.png" alt="Operations tab listing workflow categories with operation counts" /><br/><sub>Operations</sub></td>
+<td width="50%" valign="top"><img src="img/images/documentation-search.png" alt="Search results for reflog across components and glossary" /><br/><sub>Search across everything</sub></td>
 </tr>
 </table>
 
@@ -1275,7 +1275,7 @@ Explorer (colourful, language-specific icons for JS/TS/JSON/Python/etc.).
 - Signed release provenance and automated post-publish Marketplace smoke tests.
 
 The detailed engineering status remains in
-[docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md). Pending items above
+[img/IMPLEMENTATION_PLAN.md](img/IMPLEMENTATION_PLAN.md). Pending items above
 are plans, not claims of implemented behavior.
 
 ---
@@ -1309,7 +1309,7 @@ src/
                           helpers (HTML escaping, crypto token/nonce generation,
                           command preview, confirmation)
 resources/                images only (icon.png/.svg, activity-bar logo)
-docs/images/              README screenshots (not shipped in the .vsix)
+img/images/              README screenshots (not shipped in the .vsix)
 webview-ui/               webview runtime assets, shipped in the .vsix
   graph/
     graph.js / graph.css   Git Graph panel client
@@ -1514,4 +1514,4 @@ Licensed under the [MIT License](LICENSE).
 - **Repository:** [framedparadox/vsgit-vscode](https://github.com/framedparadox/vsgit-vscode)
 - **Issues:** [Report a bug](https://github.com/framedparadox/vsgit-vscode/issues)
 - **Changelog:** [CHANGELOG.md](CHANGELOG.md)
-- **Implementation plan:** [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)
+- **Implementation plan:** [img/IMPLEMENTATION_PLAN.md](img/IMPLEMENTATION_PLAN.md)

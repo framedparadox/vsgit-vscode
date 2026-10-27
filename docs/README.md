@@ -10,7 +10,7 @@ website/
   main.js           progressive enhancements (scroll effects, tabs, lightbox)
   assets/
     icon.svg/.png   brand icon (copied from resources/)
-    screens/*.png   screenshots (copied from docs/images/)
+    screens/*.png   screenshots (copied from img/images/)
 ```
 
 ## Preview locally
@@ -33,6 +33,6 @@ The folder is excluded from the `.vsix` via `.vscodeignore`.
 
 ## Updating screenshots
 
-When a screenshot in `docs/images/` is recaptured, copy the new file over the
+When a screenshot in `img/images/` is recaptured, copy the new file over the
 matching one in `assets/screens/`. Update the version in the Tech specs section
 and the JSON-LD block in `index.html` on each release.

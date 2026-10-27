@@ -113,5 +113,5 @@ should explain:
 5. Screenshots or a short recording for material UI changes.
 
 Update `README.md`, `CHANGELOG.md`, and
-`docs/IMPLEMENTATION_PLAN.md` whenever implementation status or public behavior
+`img/IMPLEMENTATION_PLAN.md` whenever implementation status or public behavior
 changes.
